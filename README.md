@@ -79,7 +79,6 @@ python main.py --mode continuous
 - **📜 交易历史**: 所有交易记录及盈亏统计
 - **📡 Live Log Output**: 实时滚动日志，支持 Agent 标签高亮显示 (Oracle, Strategist, Critic, Guardian)，500行容量历史回溯
 
-
 ---
 
 ## 📁 项目结构
@@ -152,6 +151,50 @@ LLM-TradeBot/
 4. **风控审计层** (红色): RiskAuditAgent 执行最终审核和自动修正
 5. **执行层** (紫色): ExecutionEngine 执行订单
 6. **可视化层**: Recent Decisions 表格完整展示所有 Agent 数据 (16列)
+
+#### 详细流程图
+
+```mermaid
+graph TB
+    subgraph "1️⃣ 数据采集层"
+        A[🕵️ DataSyncAgent] --> MS[MarketSnapshot<br/>5m/15m/1h + 外部数据]
+    end
+    
+    subgraph "2️⃣ 量化分析层"
+        MS --> QA[👨‍🔬 QuantAnalystAgent]
+        QA --> TS[TrendSubAgent<br/>1h-T, 15m-T, 5m-T]
+        QA --> OS[OscillatorSubAgent<br/>1h-O, 15m-O, 5m-O]
+        QA --> SS[SentimentSubAgent<br/>Sentiment]
+        TS & OS & SS --> QR[quant_analysis]
+    end
+    
+    subgraph "3️⃣ 决策对抗层"
+        QR --> DC[⚖️ DecisionCoreAgent<br/>加权投票]
+        DC --> RD[RegimeDetector<br/>市场状态]
+        DC --> PA[PositionAnalyzer<br/>价格位置%]
+        RD & PA --> VR[VoteResult<br/>Action, Conf, Reason, Aligned]
+    end
+    
+    subgraph "4️⃣ 风控审计层"
+        VR --> RA[🛡️ RiskAuditAgent<br/>一票否决]
+        RA --> AR[AuditResult<br/>Risk, Guard, Corrections]
+    end
+    
+    subgraph "5️⃣ 执行层"
+        AR --> EE[🚀 ExecutionEngine]
+    end
+    
+    subgraph "6️⃣ 可视化层"
+        VR & AR --> DT[📊 Recent Decisions<br/>16 Columns]
+    end
+    
+    style A fill:#4A90E2,color:#fff
+    style QA fill:#7ED321,color:#fff
+    style DC fill:#F5A623,color:#fff
+    style RA fill:#D0021B,color:#fff
+    style EE fill:#BD10E0,color:#fff
+    style DT fill:#50E3C2,color:#000
+```
 
 > 📖 **详细文档**: 查看 [数据流转分析文档](./docs/data_flow_analysis.md) 了解完整的数据流转机制，或查看 [多Agent技术详解](./README_MULTI_AGENT.md) 了解底层实现细节。
 
