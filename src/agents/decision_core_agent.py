@@ -102,6 +102,7 @@ class DecisionCoreAgent:
             'oscillator_5m': quant_analysis.get('oscillator_5m', {}).get('score', 0),
             'oscillator_15m': quant_analysis.get('oscillator_15m', {}).get('score', 0),
             'oscillator_1h': quant_analysis.get('oscillator_1h', {}).get('score', 0),
+            'sentiment': quant_analysis.get('comprehensive', {}).get('details', {}).get('sentiment', {}).get('total_sentiment_score', 0)
         }
         
         # 2. 市场状态与位置分析
@@ -132,18 +133,23 @@ class DecisionCoreAgent:
                 return result
 
         # 4. 加权计算（得分范围-100~+100）
+        # 动态权重：如果存在情绪得分，分配 30% 权重给情绪
+        w_sentiment = 0.3 if scores.get('sentiment') != 0 else 0
+        w_others = 1.0 - w_sentiment
+        
         weighted_score = (
-            scores['trend_5m'] * self.weights.trend_5m +
-            scores['trend_15m'] * self.weights.trend_15m +
-            scores['trend_1h'] * self.weights.trend_1h +
-            scores['oscillator_5m'] * self.weights.oscillator_5m +
-            scores['oscillator_15m'] * self.weights.oscillator_15m +
-            scores['oscillator_1h'] * self.weights.oscillator_1h
+            (scores['trend_5m'] * self.weights.trend_5m +
+             scores['trend_15m'] * self.weights.trend_15m +
+             scores['trend_1h'] * self.weights.trend_1h +
+             scores['oscillator_5m'] * self.weights.oscillator_5m +
+             scores['oscillator_15m'] * self.weights.oscillator_15m +
+             scores['oscillator_1h'] * self.weights.oscillator_1h) * w_others +
+            (scores.get('sentiment', 0) * w_sentiment)
         )
         
-        # 5. 计算各信号的实际贡献分（用于可解释性）
+        # 5. 计算各信号的实际贡献分
         vote_details = {
-            key: scores[key] * getattr(self.weights, key)
+            key: scores[key] * getattr(self.weights, key, 1.0) * (w_others if key != 'sentiment' else 1.0)
             for key in scores.keys()
         }
         
@@ -154,16 +160,28 @@ class DecisionCoreAgent:
             scores['trend_5m']
         )
         
-        # 7. 初始决策映射（分数 -> 动作）
+        # 7. 初始决策映射
         action, base_confidence = self._score_to_action(weighted_score, aligned)
         
-        # 8. 综合信心度校准
-        final_confidence = base_confidence
+        # 8. 综合信心度校准与对抗审计
+        final_confidence = base_confidence * 100
+        
+        # --- 对抗式审计: 机构资金流背离检查 ---
+        sent_details = quant_analysis.get('comprehensive', {}).get('details', {}).get('sentiment', {})
+        inst_nf_1h = sent_details.get('inst_netflow_1h', 0)
+        
+        if action == 'open_long' and inst_nf_1h < -1000000: # 1h 机构净流出超过 1M
+            final_confidence *= 0.5
+            alignment_reason += " | 对抗警告: 技术看多但机构资金大额流出 (背离)"
+        elif action == 'open_short' and inst_nf_1h > 1000000: # 1h 机构净流入超过 1M
+            final_confidence *= 0.5
+            alignment_reason += " | 对抗警告: 技术看空但机构资金大额流入 (背离)"
+
         if regime and position:
             final_confidence = self._calculate_comprehensive_confidence(
-                base_confidence, regime, position, aligned
+                final_confidence, regime, position, aligned
             )
-            # 信心度衰减逻辑：如果动作方向与位置不符，强制降低信心度
+            # 信心度衰减逻辑
             if action == 'open_long' and not position['allow_long']:
                 final_confidence *= 0.3
                 alignment_reason += f" | 预警: 做多位置过高({position['position_pct']:.1f}%)"
@@ -176,11 +194,9 @@ class DecisionCoreAgent:
             weighted_score, 
             aligned, 
             alignment_reason, 
-            quant_analysis
+            quant_analysis,
+            regime=regime
         )
-        if regime:
-            reason = f"[{regime['regime'].upper()}] {reason}"
-        
         # 10. 构建结果
         result = VoteResult(
             action=action,
@@ -196,9 +212,18 @@ class DecisionCoreAgent:
         # 11. 记录历史
         self.history.append(result)
         
-        log.critic(f"最终决策: {action.upper()} (综合信心: {final_confidence:.1f}%)")
-        
         return result
+
+    async def vote(self, snapshot: Any, quant_analysis: Dict) -> VoteResult:
+        """
+        兼容性接口: 调用 make_decision
+        """
+        # 将 snapshot 转换为 market_data 格式供 make_decision 使用
+        market_data = {
+            'df_5m': snapshot.stable_5m if hasattr(snapshot, 'stable_5m') else None,
+            'current_price': snapshot.live_5m.get('close', 0) if hasattr(snapshot, 'live_5m') else 0
+        }
+        return await self.make_decision(quant_analysis, market_data)
 
     def _calculate_comprehensive_confidence(self, 
                                           base_conf: float, 
@@ -294,7 +319,8 @@ class DecisionCoreAgent:
         weighted_score: float,
         aligned: bool,
         alignment_reason: str,
-        quant_analysis: Dict
+        quant_analysis: Dict,
+        regime: Optional[Dict] = None
     ) -> str:
         """生成决策原因（可解释性）"""
         # 提取关键信息
@@ -304,7 +330,12 @@ class DecisionCoreAgent:
         
         reasons = []
         
-        # 1. 总体得分
+        # 1. 市场状态 (Regime)
+        if regime:
+            regime_name = regime.get('regime', 'unknown').upper()
+            reasons.append(f"[{regime_name}]")
+        
+        # 2. 总体得分
         reasons.append(f"加权得分: {weighted_score:.1f}")
         
         # 2. 多周期对齐情况

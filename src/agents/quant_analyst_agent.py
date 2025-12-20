@@ -233,185 +233,155 @@ class OscillatorSubAgent:
         return {
             'score': score,
             'details': details,
-            'confidence': abs(score)
+            'confidence': abs(score),
+            'total_oscillator_score': score # Add this for new integration
         }
+
+
+class SentimentSubAgent:
+    """
+    情绪分析员 (The Sentiment Analyst)
+    
+    职责：分析外部量化数据 (Netflow, OI)
+    输出：sentiment_score (-100 到 +100)
+    """
+    
+    def analyze(self, snapshot: MarketSnapshot) -> Dict:
+        """
+        分析外部 API 与 Binance 原生提供的情绪数据
+        """
+        score = 0
+        details = {}
+        q_data = getattr(snapshot, 'quant_data', {})
+        b_funding = getattr(snapshot, 'binance_funding', {})
+        b_oi = getattr(snapshot, 'binance_oi', {})
+        
+        # 1. 机构资金流 (Institution Netflow) - 来自外部 API
+        if q_data:
+            netflow = q_data.get('netflow', {}).get('institution', {}).get('future', {})
+            nf_1h = netflow.get('1h', 0)
+            nf_15m = netflow.get('15m', 0)
+            
+            if nf_1h > 0: score += 30
+            elif nf_1h < 0: score -= 30
+            
+            if nf_15m > 0: score += 20
+            elif nf_15m < 0: score -= 20
+                
+            details['inst_netflow_1h'] = nf_1h
+        
+        # 2. 资金费率 (Funding Rate) - Binance 原生 (逆向指标)
+        if b_funding:
+            f_rate = b_funding.get('funding_rate', 0)
+            details['binance_funding_rate'] = f_rate
+            
+            # 资金费率过高 (>0.03%)：多头过度拥挤，警惕多头踩踏
+            if f_rate > 0.0003:
+                score -= 30
+                details['funding_signal'] = "多头拥挤"
+            # 资金费率过低 (< -0.01%)：空头过度拥挤，警惕空头挤压
+            elif f_rate < -0.0001:
+                score += 30
+                details['funding_signal'] = "空头拥挤"
+            else:
+                details['funding_signal'] = "中性"
+
+        # 3. 持仓量 (Open Interest) - 跨源验证
+        if b_oi:
+            details['binance_oi_value'] = b_oi.get('open_interest', 0)
+            
+        score = max(-100, min(100, score))
+        details['total_sentiment_score'] = score
+        return details
 
 
 class QuantAnalystAgent:
     """
     量化策略师 (The Strategist)
     
-    职责：协调趋势分析员和震荡分析员
+    职责：协调趋势、震荡与情绪分析员
     输出：综合分析报告
     """
     
     def __init__(self):
         self.trend_agent = TrendSubAgent()
-        self.osc_agent = OscillatorSubAgent()
+        self.oscillator_agent = OscillatorSubAgent()
+        self.sentiment_agent = SentimentSubAgent()
         log.info("👨‍🔬 量化策略师 (The Strategist) 初始化完成")
-    
+
     async def analyze_all_timeframes(self, snapshot: MarketSnapshot) -> Dict:
         """
         分析所有周期（异步版本，适配DecisionCoreAgent）
-        
-        Args:
-            snapshot: 市场快照
-            
-        Returns:
-            {
-                'trend_5m': {...},
-                'trend_15m': {...},
-                'trend_1h': {...},
-                'oscillator_5m': {...},
-                'oscillator_15m': {...},
-                'oscillator_1h': {...},
-                'comprehensive': {...}
-            }
-        """
-        # 调用原有的analyze方法
-        analysis = self.analyze(snapshot)
-        
-        # 转换为DecisionCoreAgent期望的格式
-        result = {
-            # 趋势信号（从1h趋势得分推断）
-            'trend_5m': {
-                'score': analysis['trend_score'] * 0.3,  # 权重调整
-                'signal': self._score_to_signal(analysis['trend_score'] * 0.3),
-                'details': analysis['trend_details']
-            },
-            'trend_15m': {
-                'score': analysis['trend_score'] * 0.6,
-                'signal': self._score_to_signal(analysis['trend_score'] * 0.6),
-                'details': analysis['trend_details']
-            },
-            'trend_1h': {
-                'score': analysis['trend_score'],
-                'signal': self._score_to_signal(analysis['trend_score']),
-                'details': analysis['trend_details']
-            },
-            
-            # 震荡信号
-            'oscillator_5m': {
-                'score': analysis['reversion_score'] * 0.3,
-                'signal': self._score_to_signal(analysis['reversion_score'] * 0.3),
-                'details': analysis['reversion_details']
-            },
-            'oscillator_15m': {
-                'score': analysis['reversion_score'] * 0.6,
-                'signal': self._score_to_signal(analysis['reversion_score'] * 0.6),
-                'details': analysis['reversion_details']
-            },
-            'oscillator_1h': {
-                'score': analysis['reversion_score'],
-                'signal': self._score_to_signal(analysis['reversion_score']),
-                'details': analysis['reversion_details']
-            },
-            
-            # 综合信号
-            'comprehensive': {
-                'score': (analysis['trend_score'] + analysis['reversion_score']) / 2,
-                'signal': self._score_to_signal((analysis['trend_score'] + analysis['reversion_score']) / 2),
-                'details': {
-                    'volatility': analysis['volatility'],
-                    'trend_strength': 'strong' if abs(analysis['trend_score']) > 50 else 'moderate' if abs(analysis['trend_score']) > 20 else 'weak',
-                    'alignment_ok': analysis['alignment_ok']
-                }
-            }
-        }
-        
-        return result
-    
-    def _score_to_signal(self, score: float) -> str:
-        """将得分转换为信号标签"""
-        if score > 50:
-            return 'strong_long'
-        elif score > 20:
-            return 'moderate_long'
-        elif score > 0:
-            return 'weak_long'
-        elif score > -20:
-            return 'weak_short'
-        elif score > -50:
-            return 'moderate_short'
-        else:
-            return 'strong_short'
-    
-    def analyze(self, snapshot: MarketSnapshot) -> Dict:
-        """
-        并行分析
-        
-        Args:
-            snapshot: 市场快照
-            
-        Returns:
-            综合分析结果
         """
         log.strategist("📊 开始量化分析...")
         
-        # 1. 趋势分析
-        trend_result = self.trend_agent.analyze(snapshot)
-        log.strategist(f"  ├─ 趋势得分: {trend_result['score']}")
+        # 1. 趋势与震荡得分
+        trend_results = self.trend_agent.analyze(snapshot)
+        osc_results = self.oscillator_agent.analyze(snapshot)
         
-        # 2. 震荡分析
-        osc_result = self.osc_agent.analyze(snapshot)
-        log.strategist(f"  └─ 反转得分: {osc_result['score']}")
+        # 2. 外部情绪得分
+        sentiment_results = self.sentiment_agent.analyze(snapshot)
         
-        # 3. 计算波动率（用于动态权重）
-        volatility = self._calculate_volatility(snapshot)
+        # 3. 综合判断 (权重: 趋势 40%, 震荡 30%, 情绪 30%)
+        t_score = trend_results.get('total_trend_score', 0)
+        o_score = osc_results.get('total_oscillator_score', 0)
+        s_score = sentiment_results.get('total_sentiment_score', 0)
         
-        # 4. 综合报告
-        analysis = {
-            'trend_score': trend_result['score'],
-            'trend_details': trend_result['details'],
-            'trend_confidence': trend_result['confidence'],
-            
-            'reversion_score': osc_result['score'],
-            'reversion_details': osc_result['details'],
-            'reversion_confidence': osc_result['confidence'],
-            
-            'volatility': volatility,
-            'timestamp': snapshot.timestamp.isoformat(),
-            'alignment_ok': snapshot.alignment_ok
+        composite_score = (t_score * 0.4) + (o_score * 0.3) + (s_score * 0.3)
+        
+        log.strategist(f"  ├─ 趋势得分: {t_score}")
+        log.strategist(f"  ├─ 反转得分: {o_score}")
+        log.strategist(f"  ├─ 情绪得分: {s_score}")
+        log.strategist(f"  └─ 综合得分: {composite_score:.1f}")
+        
+        report = {
+            'comprehensive': {
+                'score': composite_score,
+                'signal': self._score_to_signal(composite_score),
+                'volatility': self._calculate_volatility(snapshot),
+                'details': {
+                    'trend': trend_results,
+                    'oscillator': osc_results,
+                    'sentiment': sentiment_results
+                }
+            },
+            'trend': trend_results,
+            'oscillator': osc_results,
+            'sentiment': sentiment_results
         }
         
-        log.strategist(f"✅ 量化分析完成，波动率: {volatility:.2f}")
+        log.strategist(f"✅ 量化分析完成，主信号: {report['comprehensive']['signal']}")
         
-        return analysis
-    
+        return report
+
+    def _score_to_signal(self, score: float) -> str:
+        """将得分转换为信号标签"""
+        if score > 30:
+            return "buy"
+        elif score < -30:
+            return "sell"
+        else:
+            return "neutral"
+
+    async def analyze(self, snapshot: MarketSnapshot) -> Dict:
+        """兼容性接口，返回综合分析内容"""
+        result = await self.analyze_all_timeframes(snapshot)
+        return result['comprehensive']
+
     def _calculate_volatility(self, snapshot: MarketSnapshot) -> float:
         """
         计算波动率
-        
         使用ATR/价格作为波动率指标
-        
-        Args:
-            snapshot: 市场快照
-            
-        Returns:
-            波动率 (0-1)
         """
-        stable_5m = snapshot.stable_5m
+        df = snapshot.stable_5m
+        if df.empty or 'atr' not in df.columns:
+            return 0.5
+            
+        latest_atr = df['atr'].iloc[-1]
+        latest_price = snapshot.live_5m.get('close', df['close'].iloc[-1])
         
-        if stable_5m.empty or len(stable_5m) < 20:
-            return 0.5  # 默认中等波动
-        
-        # 计算True Range
-        df = stable_5m.copy()
-        df['prev_close'] = df['close'].shift(1)
-        df['tr1'] = df['high'] - df['low']
-        df['tr2'] = abs(df['high'] - df['prev_close'])
-        df['tr3'] = abs(df['low'] - df['prev_close'])
-        df['true_range'] = df[['tr1', 'tr2', 'tr3']].max(axis=1)
-        
-        # ATR (14周期)
-        atr = df['true_range'].rolling(14).mean().iloc[-1]
-        
-        # 归一化 (ATR / 价格)
-        current_price = df['close'].iloc[-1]
-        volatility = atr / current_price if current_price > 0 else 0.5
-        
-        # 限制在0-1范围
-        return max(0, min(1, volatility))
+        if latest_price == 0: return 0.5
+        return float(latest_atr / latest_price)
 
 
 # 测试函数

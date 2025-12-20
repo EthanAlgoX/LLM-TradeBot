@@ -18,6 +18,7 @@ from typing import Dict, List, Tuple
 from dataclasses import dataclass, field
 
 from src.api.binance_client import BinanceClient
+from src.api.quant_client import quant_client
 from src.utils.logger import log
 
 
@@ -45,6 +46,13 @@ class MarketSnapshot:
     timestamp: datetime
     alignment_ok: bool       # 时间对齐状态
     fetch_duration: float    # 获取耗时（秒）
+    
+    # 对外量化深度数据 (Netflow, OI)
+    quant_data: Dict = field(default_factory=dict)
+    
+    # Binance 原生数据 (Native Data)
+    binance_funding: Dict = field(default_factory=dict)
+    binance_oi: Dict = field(default_factory=dict)
     
     # 原始数据（可选，用于调试）
     raw_5m: List[Dict] = field(default_factory=list)
@@ -110,11 +118,22 @@ class DataSyncAgent:
                 None,
                 self.client.get_klines,
                 symbol, '1h', limit
+            ),
+            quant_client.fetch_coin_data(symbol), # 新增: 异步外部量化数据
+            loop.run_in_executor(
+                None,
+                self.client.get_funding_rate_with_cache,
+                symbol
+            ),
+            loop.run_in_executor(
+                None,
+                self.client.get_open_interest,
+                symbol
             )
         ]
         
         # 等待所有请求完成
-        k5m, k15m, k1h = await asyncio.gather(*tasks)
+        k5m, k15m, k1h, q_data, b_funding, b_oi = await asyncio.gather(*tasks)
         
         fetch_duration = (datetime.now() - start_time).total_seconds()
         log.oracle(f"✅ 数据获取完成，耗时: {fetch_duration:.2f}秒")
@@ -141,7 +160,10 @@ class DataSyncAgent:
             # 原始数据
             raw_5m=k5m,
             raw_15m=k15m,
-            raw_1h=k1h
+            raw_1h=k1h,
+            quant_data=q_data,
+            binance_funding=b_funding,
+            binance_oi=b_oi
         )
         
         # 缓存最新快照

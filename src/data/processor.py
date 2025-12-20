@@ -399,9 +399,9 @@ class MarketDataProcessor:
         full_index = pd.date_range(start=start, end=end, freq=f'{freq_minutes}T')
         df_re = df.reindex(full_index)
 
-        # 将对象类型尽量推断为数值，减少 future warning
+        # 尝试推断对象类型为数值，减少 future warning
         try:
-            df_re = df_re.infer_objects()
+            df_re = df_re.infer_objects(copy=False)
         except Exception:
             pass
 
@@ -413,7 +413,7 @@ class MarketDataProcessor:
         df_re.interpolate(method='time', limit=allowed_gap_bars, inplace=True)
 
         # 标记插值成功的行（原本是NaN，现在有值）
-        imputed_mask = orig_na & df_re['close'].notna()
+        imputed_mask = orig_na.astype(bool) & df_re['close'].notna().astype(bool)
 
         # 记录 imputed 标识（便于下游过滤）
         df_re['is_imputed'] = imputed_mask
@@ -454,7 +454,7 @@ class MarketDataProcessor:
         features['volume'] = df_checked['volume']
 
         # returns & log returns
-        features['return_pct'] = df_checked['close'].pct_change() * 100
+        features['return_pct'] = df_checked['close'].pct_change(fill_method=None) * 100
         # 替换由除以0产生的 inf
         features['return_pct'].replace([np.inf, -np.inf], np.nan, inplace=True)
         # log on zeros will produce -inf; protect by replacing non-positive with NaN first
@@ -470,8 +470,8 @@ class MarketDataProcessor:
         features['rolling_median_price'] = df_checked['close'].rolling(window=L, min_periods=min_periods).median()
 
         # momentum
-        features['momentum_1'] = df_checked['close'].pct_change(periods=1)
-        features['momentum_12'] = df_checked['close'].pct_change(periods=min(12, L))
+        features['momentum_1'] = df_checked['close'].pct_change(periods=1, fill_method=None)
+        features['momentum_12'] = df_checked['close'].pct_change(periods=min(12, L), fill_method=None)
 
         # MACD/ATR/VWAP 等相对值（使用安全除法）
         # 修复说明（2025-12-18）: MACD现在保存为原始价差（USDT），在特征工程时归一化

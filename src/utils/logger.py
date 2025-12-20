@@ -132,15 +132,18 @@ def setup_logger():
     )
     
     # 文件输出 - 不使用彩色代码
-    log_file = config.logging.get('file', 'logs/multi_agent.log')
+    # 使用日期子目录: logs/YYYY-MM-DD/trading.log
+    log_file = config.logging.get('file', 'logs/trading.log')
     log_path = Path(log_file)
-    log_path.parent.mkdir(parents=True, exist_ok=True)
+    # 动态生成带日期的路径格式 (loguru 支持在路径中使用 {time} 令牌)
+    # 我们将 logs/trading.log 转换为 logs/{time:YYYY-MM-DD}/trading.log
+    dynamic_log_file = str(log_path.parent / "{time:YYYY-MM-DD}" / log_path.name)
     
     logger.add(
-        log_file,
+        dynamic_log_file,
         format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function} - {message}",
         level=config.logging.get('level', 'INFO'),
-        rotation="100 MB",
+        rotation="00:00",
         retention="30 days",
         compression="zip"
     )

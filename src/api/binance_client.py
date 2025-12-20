@@ -31,6 +31,10 @@ class BinanceClient:
         
         self.ws_manager: Optional[ThreadedWebsocketManager] = None
         
+        # 缓存层
+        self._funding_cache = {} # {symbol: (rate, timestamp)}
+        self._cache_duration = 3600 # 1小时缓存
+        
         log.info(f"Binance客户端初始化完成 (测试网: {self.testnet})")
     
     def get_klines(self, symbol: str, interval: str, limit: int = 500) -> List[Dict]:
@@ -181,21 +185,47 @@ class BinanceClient:
             raise
     
     def get_funding_rate(self, symbol: str) -> Dict:
-        """获取资金费率"""
+        """获取资金费率 (实时 - Premium Index)"""
         try:
-            funding = self.client.futures_funding_rate(symbol=symbol, limit=1)
-            
-            if not funding:
-                return {'symbol': symbol, 'funding_rate': 0}
+            # 用户指定使用 premiumIndex 接口 (futures_mark_price)
+            funding = self.client.futures_mark_price(symbol=symbol)
             
             return {
-                'symbol': funding[0]['symbol'],
-                'funding_rate': float(funding[0]['fundingRate']),
-                'funding_time': funding[0]['fundingTime']
+                'symbol': funding['symbol'],
+                'funding_rate': float(funding['lastFundingRate']),
+                'funding_time': funding['nextFundingTime']
             }
         except BinanceAPIException as e:
             log.error(f"获取资金费率失败: {e}")
             raise
+
+    def get_funding_rate_with_cache(self, symbol: str) -> Dict:
+        """获取带1小时缓存的资金费率"""
+        now = datetime.now().timestamp()
+        
+        # 检查缓存
+        if symbol in self._funding_cache:
+            rate, ts = self._funding_cache[symbol]
+            if now - ts < self._cache_duration:
+                log.debug(f"使用缓存的资金费率: {symbol}")
+                return {
+                    'symbol': symbol,
+                    'funding_rate': rate,
+                    'is_cached': True
+                }
+        
+        # 缓存失效或不存在，取新值
+        try:
+            data = self.get_funding_rate(symbol)
+            self._funding_cache[symbol] = (data['funding_rate'], now)
+            data['is_cached'] = False
+            return data
+        except Exception as e:
+            log.error(f"刷新资金费率缓存失败: {e}")
+            # 如果有旧缓存，勉强返回
+            if symbol in self._funding_cache:
+                return {'symbol': symbol, 'funding_rate': self._funding_cache[symbol][0], 'is_cached': True, 'error': 'refresh_failed'}
+            return {'symbol': symbol, 'funding_rate': 0, 'is_cached': False, 'error': str(e)}
     
     def get_open_interest(self, symbol: str) -> Dict:
         """获取持仓量"""
