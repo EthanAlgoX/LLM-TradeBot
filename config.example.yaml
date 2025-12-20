@@ -1,0 +1,47 @@
+# Binance API 配置
+# 注意: api_key 和 api_secret 会被 .env 文件中的环境变量自动覆盖
+# 推荐使用 .env 文件配置敏感信息
+binance:
+  api_key: "BINANCE_API_KEY"        # 会被环境变量 BINANCE_API_KEY 覆盖
+  api_secret: "BINANCE_API_SECRET"  # 会被环境变量 BINANCE_API_SECRET 覆盖
+  testnet: true  # 测试网模式，实盘前改为 false
+  
+# DeepSeek API 配置
+# 注意: api_key 会被 .env 文件中的环境变量自动覆盖
+deepseek:
+  api_key: "DEEPSEEK_API_KEY"       # 会被环境变量 DEEPSEEK_API_KEY 覆盖
+  base_url: "https://api.deepseek.com"
+  model: "deepseek-chat"
+  temperature: 0.3
+  max_tokens: 2000
+
+# 交易配置
+trading:
+  symbol: "BTCUSDT"
+  timeframes: ["1m", "5m", "15m", "1h"]
+  leverage: 5
+  
+# 风控配置
+risk:
+  max_risk_per_trade_pct: 1.5  # 单笔最大风险
+  max_total_position_pct: 30.0  # 最大总仓位
+  max_leverage: 5
+  max_consecutive_losses: 3
+  stop_trading_on_drawdown_pct: 10.0
+
+# Redis 配置
+redis:
+  host: "localhost"
+  port: 6379
+  db: 0
+  
+# 日志配置
+logging:
+  level: "INFO"
+  file: "logs/trading.log"
+  
+# 回测配置
+backtest:
+  start_date: "2024-01-01"
+  end_date: "2024-12-01"
+  initial_capital: 10000

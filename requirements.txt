@@ -1,0 +1,34 @@
+# Binance API
+python-binance==1.0.19
+ccxt==4.2.25
+
+# 数据处理
+pandas==2.1.4
+numpy==1.26.2
+ta==0.11.0
+
+# 异步处理
+asyncio==3.4.3
+aiohttp==3.9.1
+websockets==12.0
+
+# DeepSeek API
+openai==1.6.1
+
+# 数据存储
+redis==5.0.1
+sqlalchemy==2.0.23
+
+# 配置管理
+pyyaml==6.0.1
+python-dotenv==1.0.0
+
+# 日志
+loguru==0.7.2
+
+# 回测
+backtrader==1.9.78.123
+
+# 工具
+requests==2.31.0
+jsonschema==4.20.0
