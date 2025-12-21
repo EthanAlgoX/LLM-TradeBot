@@ -105,17 +105,38 @@ class PredictAgent:
     BB_LOW_THRESHOLD = 20
     BB_HIGH_THRESHOLD = 80
     
-    def __init__(self, horizon: str = '15m'):
+    def __init__(self, horizon: str = '30m', model_path: str = 'models/prophet_lgb.pkl'):
         """
         初始化预测预言家 (The Prophet)
         
         Args:
-            horizon: 预测时间范围 (默认 15m)
+            horizon: 预测时间范围 (默认 30m - 与 ML 模型 label 一致)
+            model_path: ML 模型文件路径
         """
         self.horizon = horizon
         self.history: List[PredictResult] = []
-        self.ml_model = None  # 预留 ML 模型接口
-        log.info(f"🔮 预测预言家 (The Prophet) 初始化完成 | 预测周期: {horizon}")
+        self.ml_model = None
+        self.model_path = model_path
+        
+        # 尝试加载 ML 模型
+        self._try_load_ml_model()
+        
+        mode_str = "ML 模型" if self.ml_model is not None else "规则评分"
+        log.info(f"🔮 预测预言家 (The Prophet) 初始化完成 | 预测周期: {horizon} | 模式: {mode_str}")
+    
+    def _try_load_ml_model(self):
+        """尝试加载 ML 模型"""
+        import os
+        if os.path.exists(self.model_path):
+            try:
+                from src.models.prophet_model import ProphetMLModel, HAS_LIGHTGBM
+                if HAS_LIGHTGBM:
+                    self.ml_model = ProphetMLModel(self.model_path)
+                    log.info(f"✅ ML 模型已加载: {self.model_path}")
+                else:
+                    log.warning("LightGBM 未安装，使用规则评分模式")
+            except Exception as e:
+                log.warning(f"ML 模型加载失败: {e}，使用规则评分模式")
     
     async def predict(self, features: Dict[str, float]) -> PredictResult:
         """
@@ -311,13 +332,42 @@ class PredictAgent:
     
     async def _predict_with_ml(self, features: Dict[str, float]) -> PredictResult:
         """
-        使用 ML 模型预测 (预留接口)
+        使用 ML 模型预测
         
-        TODO: 实现 ML 模型集成
+        Args:
+            features: 预处理后的特征字典
+        
+        Returns:
+            PredictResult 对象
         """
-        # 占位实现：回退到规则评分
-        log.warning("ML 模型未配置，使用规则评分")
-        return await self._predict_with_rules(features)
+        try:
+            # 使用 ML 模型预测概率
+            prob_up = self.ml_model.predict_proba(features)
+            prob_down = 1.0 - prob_up
+            
+            # 获取特征重要性作为因子
+            importance = self.ml_model.get_feature_importance()
+            # 取 Top 5 重要特征
+            top_factors = dict(sorted(
+                importance.items(), 
+                key=lambda x: abs(x[1]), 
+                reverse=True
+            )[:5])
+            
+            # 根据概率偏离程度计算置信度
+            confidence = abs(prob_up - 0.5) * 2  # 偏离越大置信度越高
+            
+            return PredictResult(
+                probability_up=round(prob_up, 4),
+                probability_down=round(prob_down, 4),
+                confidence=round(min(confidence, 1.0), 4),
+                horizon=self.horizon,
+                factors=top_factors,
+                model_type='ml_lightgbm'
+            )
+        except Exception as e:
+            log.warning(f"ML 预测失败: {e}，回退到规则评分")
+            return await self._predict_with_rules(features)
     
     def load_ml_model(self, model_path: str):
         """
@@ -326,9 +376,13 @@ class PredictAgent:
         Args:
             model_path: 模型文件路径
         """
-        # TODO: 实现模型加载逻辑
-        log.info(f"加载 ML 模型: {model_path}")
-        pass
+        from src.models.prophet_model import ProphetMLModel, HAS_LIGHTGBM
+        if HAS_LIGHTGBM:
+            self.ml_model = ProphetMLModel(model_path)
+            self.model_path = model_path
+            log.info(f"✅ ML 模型已加载: {model_path}")
+        else:
+            log.warning("LightGBM 未安装，无法加载 ML 模型")
     
     def get_statistics(self) -> Dict:
         """获取预测统计信息"""

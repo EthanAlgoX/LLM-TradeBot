@@ -337,12 +337,36 @@ body {
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    max-height: 350px;
+    /* 限制高度 */
 }
 
 /* Table Compact */
 .table-container {
-    overflow-y: auto;
+    overflow-y: scroll;
+    /* 始终显示滚动条 */
     flex: 1;
+    max-height: 300px;
+    /* 表格最大高度 */
+}
+
+/* 表格滚动条样式 */
+.table-container::-webkit-scrollbar {
+    width: 8px;
+}
+
+.table-container::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 4px;
+}
+
+.table-container::-webkit-scrollbar-thumb {
+    background: var(--glass-border);
+    border-radius: 4px;
+}
+
+.table-container::-webkit-scrollbar-thumb:hover {
+    background: var(--neon-blue);
 }
 
 table {
@@ -362,6 +386,45 @@ th {
     padding: 8px 5px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     font-size: 0.8rem;
+}
+
+/* Agent Group Header Row */
+.agent-group-row th {
+    text-align: center;
+    font-weight: 700;
+    font-size: 0.75rem;
+    padding: 6px 4px;
+    border-bottom: 2px solid rgba(255, 255, 255, 0.2);
+}
+
+.group-system {
+    background: rgba(116, 185, 255, 0.15);
+    color: #74b9ff;
+}
+
+.group-critic {
+    background: rgba(253, 203, 110, 0.15);
+    color: #fdcb6e;
+}
+
+.group-strategist {
+    background: rgba(0, 184, 148, 0.15);
+    color: #00b894;
+}
+
+.group-prophet {
+    background: rgba(232, 67, 147, 0.15);
+    color: #e84393;
+}
+
+.group-guardian {
+    background: rgba(255, 118, 117, 0.15);
+    color: #ff7675;
+}
+
+.group-context {
+    background: rgba(162, 155, 254, 0.15);
+    color: #a29bfe;
 }
 
 td {
@@ -388,15 +451,44 @@ tr:hover {
     color: var(--text-secondary);
 }
 
-/* Row 2: Analysis (Logs) + Decisions (Table) - Moved here */
 /* Row 2: Decisions (Wide) | History (Narrow) */
 .row-tables {
     display: grid;
-    grid-template-columns: 1.4fr 1fr;
-    /* Increased from 1.2fr to 1.4fr */
+    grid-template-columns: 1fr;
     gap: 20px;
-    flex: 2.5;
-    min-height: 400px;
+    flex: 2;
+    min-height: 300px;
+}
+
+/* Row 2: Decisions (Full Width) */
+.row-decisions {
+    display: flex;
+    flex-direction: column;
+    flex: 1.8;
+    min-height: 300px;
+}
+
+.row-decisions>.card {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+/* Row 2.5: Trade History (Full Width) */
+.row-trades {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 280px;
+    /* 增加高度 */
+}
+
+.row-trades>.card {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    max-height: 280px;
+    /* 限制最大高度 */
 }
 
 .row-tables>.card {
@@ -675,7 +767,8 @@ tr:hover {
     display: flex !important;
     flex-direction: row !important;
     align-items: stretch !important;
-    height: 450px !important;
+    height: 1000px !important;
+    /* 增加高度 */
     overflow: hidden !important;
     box-sizing: border-box;
     padding: 0 !important;
@@ -683,18 +776,61 @@ tr:hover {
 
 .agent-docs-sidebar {
     flex: 0 0 320px !important;
-    height: 100% !important;
-    max-height: 100% !important;
+    height: 1000px !important;
+    /* 与父容器一致 */
+    max-height: 1000px !important;
     overflow-y: auto;
+    /* 内容超出时显示滚动条 */
     box-sizing: border-box;
+    padding: 20px;
+}
+
+/* 左侧文档滚动条样式 */
+.agent-docs-sidebar::-webkit-scrollbar {
+    width: 8px;
+}
+
+.agent-docs-sidebar::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 4px;
+}
+
+.agent-docs-sidebar::-webkit-scrollbar-thumb {
+    background: var(--glass-border);
+    border-radius: 4px;
+}
+
+.agent-docs-sidebar::-webkit-scrollbar-thumb:hover {
+    background: var(--neon-blue);
 }
 
 #logs-container {
     flex: 1 !important;
-    height: 100% !important;
-    max-height: 100% !important;
-    overflow-y: auto;
+    height: 1000px !important;
+    /* 与左侧高度一致 */
+    max-height: 1000px !important;
+    overflow-y: scroll !important;
+    /* 始终显示滚动条 */
     padding: 20px;
     box-sizing: border-box;
     background: transparent;
+}
+
+/* 日志容器滚动条样式 */
+#logs-container::-webkit-scrollbar {
+    width: 8px;
+}
+
+#logs-container::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 4px;
+}
+
+#logs-container::-webkit-scrollbar-thumb {
+    background: var(--glass-border);
+    border-radius: 4px;
+}
+
+#logs-container::-webkit-scrollbar-thumb:hover {
+    background: var(--neon-blue);
 }

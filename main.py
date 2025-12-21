@@ -111,7 +111,7 @@ class MultiAgentTradingBot:
         print("\n🚀 初始化Agent...")
         self.data_sync_agent = DataSyncAgent(self.client)
         self.quant_analyst = QuantAnalystAgent()
-        self.predict_agent = PredictAgent(horizon='15m')  # 🔮 新增预测预言家
+        self.predict_agent = PredictAgent(horizon='30m')  # 🔮 预测预言家 (30分钟预测)
         self.decision_core = DecisionCoreAgent()
         self.risk_audit = RiskAuditAgent(
             max_leverage=10.0,
@@ -268,10 +268,28 @@ class MultiAgentTradingBot:
             global_state.prophet_probability = predict_result.probability_up
             
             # 保存预测结果（包含输入特征）
+            # 转换 numpy 类型为 Python 原生类型
+            import numpy as np
+            def to_serializable(obj):
+                if isinstance(obj, np.integer):
+                    return int(obj)
+                elif isinstance(obj, np.floating):
+                    return float(obj)
+                elif isinstance(obj, np.ndarray):
+                    return obj.tolist()
+                elif isinstance(obj, dict):
+                    return {k: to_serializable(v) for k, v in obj.items()}
+                elif isinstance(obj, list):
+                    return [to_serializable(v) for v in obj]
+                else:
+                    return obj
+
             prediction_record = {
                 'input_features': predict_features,  # 记录输入特征
                 'output': predict_result.to_dict()   # 预测输出
             }
+            # 彻底转换整个字典
+            prediction_record = to_serializable(prediction_record)
             self.saver.save_prediction(prediction_record, self.symbol, snapshot_id)
             
             # LOG 2.5: Prophet
@@ -348,6 +366,7 @@ class MultiAgentTradingBot:
                 # Add implicit safe risk for Wait/Hold
                 decision_dict['risk_level'] = 'safe'
                 decision_dict['guardian_passed'] = True
+                decision_dict['prophet_probability'] = predict_result.probability_up  # 🔮 Prophet
                 
                 # Update Market Context
                 if vote_result.regime:
@@ -456,6 +475,7 @@ class MultiAgentTradingBot:
             decision_dict['risk_level'] = audit_result.risk_level.value
             decision_dict['guardian_passed'] = audit_result.passed
             decision_dict['guardian_reason'] = audit_result.blocked_reason
+            decision_dict['prophet_probability'] = predict_result.probability_up  # 🔮 Prophet
             
             # Update Market Context
             if vote_result.regime:
@@ -840,7 +860,7 @@ class MultiAgentTradingBot:
         t = threading.Thread(target=_monitor, daemon=True)
         t.start()
 
-    def run_continuous(self, interval_minutes: int = 5):
+    def run_continuous(self, interval_minutes: int = 3):
         """
         持续运行模式
         
@@ -855,6 +875,18 @@ class MultiAgentTradingBot:
 
         # Start Real-time Monitors
         self.start_account_monitor()
+        
+        # 🔮 启动 Prophet 自动训练器 (每 2 小时重新训练)
+        from src.models.prophet_model import ProphetAutoTrainer, HAS_LIGHTGBM
+        if HAS_LIGHTGBM:
+            self.auto_trainer = ProphetAutoTrainer(
+                predict_agent=self.predict_agent,
+                binance_client=self.client,
+                interval_hours=2.0,  # 每 2 小时训练一次
+                training_days=7,     # 使用最近 7 天数据
+                symbol=self.symbol
+            )
+            self.auto_trainer.start()
         
         # 设置初始间隔 (优先使用 CLI 参数，后续 API 可覆盖)
         global_state.cycle_interval = interval_minutes
@@ -882,22 +914,31 @@ class MultiAgentTradingBot:
                 # 等待下一次检查
                 print(f"\n⏳ 等待 {current_interval} 分钟...")
                 
-                # Sleep in chunks to allow responsive PAUSE/STOP
+                # Sleep in chunks to allow responsive PAUSE/STOP and INTERVAL changes
                 # Check every 1 second during the wait interval
-                wait_seconds = current_interval * 60
-                for i in range(wait_seconds):
+                elapsed_seconds = 0
+                while True:
+                    # 每秒检查当前间隔设置 (支持动态调整)
+                    current_interval = global_state.cycle_interval
+                    wait_seconds = current_interval * 60
+                    
+                    # 如果已经等待足够时间，结束等待
+                    if elapsed_seconds >= wait_seconds:
+                        break
+                    
+                    # 检查执行模式
                     if global_state.execution_mode != "Running":
                         break
                     
                     # Heartbeat every 60s
-                    if i > 0 and i % 60 == 0:
-                        remaining = int((wait_seconds - i) / 60)
+                    if elapsed_seconds > 0 and elapsed_seconds % 60 == 0:
+                        remaining = int((wait_seconds - elapsed_seconds) / 60)
                         if remaining > 0:
                              print(f"⏳ Next cycle in {remaining}m...")
-                             # Optional: add a quiet log or just keep alive
                              global_state.add_log(f"⏳ Waiting next cycle... ({remaining}m)")
 
                     time.sleep(1)
+                    elapsed_seconds += 1
                 
         except KeyboardInterrupt:
             print(f"\n\n⚠️  收到停止信号，退出...")
@@ -922,7 +963,7 @@ def main():
     parser.add_argument('--stop-loss', type=float, default=1.0, help='止损百分比')
     parser.add_argument('--take-profit', type=float, default=2.0, help='止盈百分比')
     parser.add_argument('--mode', choices=['once', 'continuous'], default='once', help='运行模式')
-    parser.add_argument('--interval', type=int, default=5, help='持续运行间隔（分钟）')
+    parser.add_argument('--interval', type=int, default=3, help='持续运行间隔（分钟）')
     
     args = parser.parse_args()
     

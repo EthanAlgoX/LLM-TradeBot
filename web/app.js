@@ -231,6 +231,14 @@ function renderDecisionTable(history) {
             posHtml = `<span class="badge neutral">${pos}</span>`;
         }
 
+        // Prophet P(Up) - PredictAgent probability
+        let prophetHtml = '<span class="cell-na">-</span>';
+        if (d.prophet_probability !== undefined && d.prophet_probability !== null) {
+            const pUp = (d.prophet_probability * 100).toFixed(0);
+            const cls = d.prophet_probability > 0.55 ? 'pos' : (d.prophet_probability < 0.45 ? 'neg' : 'neutral');
+            prophetHtml = `<span class="val ${cls}">${pUp}%</span>`;
+        }
+
         return `
             <tr>
                 <td>${time}</td>
@@ -245,6 +253,7 @@ function renderDecisionTable(history) {
                 <td>${signal15m}</td>
                 <td>${signal5m}</td>
                 <td>${sentHtml}</td>
+                <td>${prophetHtml}</td>
                 <td>${riskHtml}</td>
                 <td>${guardHtml}</td>
                 <td>${posPctHtml}</td>
@@ -421,6 +430,12 @@ function renderSystemStatus(system) {
     if (cycleEl && system.cycle_counter !== undefined) {
         cycleEl.textContent = `#${system.cycle_counter}`;
     }
+
+    // Sync Interval Selector with backend value
+    const intervalSel = document.getElementById('interval-selector');
+    if (intervalSel && system.cycle_interval !== undefined) {
+        intervalSel.value = system.cycle_interval.toString();
+    }
 }
 
 
@@ -518,8 +533,10 @@ function renderLogs(logs) {
         return `<div class="log-entry">${time} ${content}</div>`;
     }).join('');
 
-    // Restore Scroll Position
-    if (isScrolledToBottom) {
+    // Auto-scroll to bottom: 
+    // - 如果用户没有主动向上滚动（距离底部100px以内），则自动滚动到底部
+    // - 首次加载时（scrollTop === 0）也自动滚动到底部
+    if (isScrolledToBottom || previousScrollTop === 0) {
         container.scrollTop = container.scrollHeight;
     } else {
         container.scrollTop = previousScrollTop;

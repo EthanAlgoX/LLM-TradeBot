@@ -136,25 +136,34 @@ LLM-TradeBot/
     - **Action**: Asynchronously fetches and aligns multi-timeframe K-lines (5m, 15m, 1h) and external quant data (Netflow, LSR) to ensure a consistent market snapshot.
 
 2. **👨‍🔬 QuantAnalystAgent (The Strategist)**
-    - **Role**: Signal Generator.
+    - **Role**: Signal Generator (Technical Analysis).
     - **Composition**:
         - `TrendSubAgent`: Analyzes EMA/MACD across timeframes.
         - `OscillatorSubAgent`: Detects reversal zones using RSI/Bollinger Bands.
         - `SentimentSubAgent`: Incorporates external data like Funding Rates and Open Interest.
     - **Output**: A raw comprehensive score and detailed sub-signal breakdown.
 
-3. **⚖️ DecisionCoreAgent (The Critic)**
+3. **🔮 PredictAgent (The Prophet)**
+    - **Role**: **Future Predictor (ML Model)**.
+    - **Action**:
+        - Uses **LightGBM** machine learning model trained on historical data.
+        - Analyzes 50+ technical features to predict price direction for the next **30 minutes**.
+        - Supports auto-retraining (every 2h) to adapt to changing market conditions.
+    - **Output**: Probability of price increase (P_Up) and confidence score.
+
+4. **⚖️ DecisionCoreAgent (The Critic)**
     - **Role**: **Adversarial Judge**.
     - **Action**:
         - **Contextualization**: Uses `RegimeDetector` to identify market state (Trending/Choppy) and `PositionAnalyzer` to locate price relative to history.
-        - **Weighted Voting**: Re-evaluates granular signals from the Strategist with dynamic weights adapted to the current regime.
+        - **Integration**: Combines Strategist's technical signals with Prophet's ML predictions.
+        - **Weighted Voting**: Re-evaluates granular signals with dynamic weights adapted to the current regime.
         - **Output**: The final trading intent (Long/Short/Wait) with a confidence score.
 
-4. **🛡️ RiskAuditAgent (The Guardian)**
+5. **🛡️ RiskAuditAgent (The Guardian)**
     - **Role**: Risk Controller.
     - **Action**: Physically independent audit layer. Checks Max Drawdown protection, R/R requirements, and exposure limits. Has **Veto Power** to block high-risk trades regardless of high confidence.
 
-5. **🚀 ExecutionEngine**
+6. **🚀 ExecutionEngine**
     - **Role**: Sniper.
     - **Action**: Precision execution within the closing seconds of the candle, handling order lifecycle and state updates.
 
@@ -170,10 +179,11 @@ LLM-TradeBot/
 
 1. **Data Collection Layer** (Blue): DataSyncAgent async concurrent collection
 2. **Quant Analysis Layer** (Green): QuantAnalystAgent with 3 parallel Sub-Agents
-3. **Decision Adversarial Layer** (Orange): DecisionCoreAgent with regime-aware weighted voting
-4. **Risk Audit Layer** (Red): RiskAuditAgent final check and auto-correction
-5. **Execution Layer** (Purple): ExecutionEngine order execution
-6. **Visualization Layer**: Recent Decisions table showing full Agent data (16 columns)
+3. **Prediction Layer** (Magenta): PredictAgent with LightGBM ML model
+4. **Decision Adversarial Layer** (Orange): DecisionCoreAgent with regime-aware weighted voting
+5. **Risk Audit Layer** (Red): RiskAuditAgent final check and auto-correction
+6. **Execution Layer** (Purple): ExecutionEngine order execution
+7. **Visualization Layer**: Recent Decisions table showing full Agent data (16 columns)
 
 #### Detailed Flowchart
 
@@ -185,38 +195,40 @@ graph TB
     
     subgraph "2️⃣ Quant Analysis Layer"
         MS --> QA[👨‍🔬 QuantAnalystAgent]
-        QA --> TS[TrendSubAgent<br/>1h-T, 15m-T, 5m-T]
-        QA --> OS[OscillatorSubAgent<br/>1h-O, 15m-O, 5m-O]
-        QA --> SS[SentimentSubAgent<br/>Sentiment]
+        QA --> TS[TrendSubAgent]
+        QA --> OS[OscillatorSubAgent]
+        QA --> SS[SentimentSubAgent]
         TS & OS & SS --> QR[quant_analysis]
     end
-    
-    subgraph "3️⃣ Decision Adversarial Layer"
-        QR --> DC[⚖️ DecisionCoreAgent<br/>Weighted Voting]
-        DC --> RD[RegimeDetector<br/>Market Regime]
-        DC --> PA[PositionAnalyzer<br/>Price Position%]
-        RD & PA --> VR[VoteResult<br/>Action, Conf, Reason, Aligned]
+
+    subgraph "3️⃣ Prediction Layer"
+        MS --> PA[🔮 PredictAgent]
+        PA --> ML[LightGBM Model<br/>Auto-Train 2h]
+        ML --> PR[Prediction<br/>P_Up, Conf]
     end
     
-    subgraph "4️⃣ Risk Audit Layer"
+    subgraph "4️⃣ Decision Adversarial Layer"
+        QR & PR --> DC[⚖️ DecisionCoreAgent<br/>Weighted Voting]
+        DC --> RD[RegimeDetector]
+        DC --> POS[PositionAnalyzer]
+        RD & POS --> VR[VoteResult<br/>Action, Conf]
+    end
+    
+    subgraph "5️⃣ Risk Audit Layer"
         VR --> RA[🛡️ RiskAuditAgent<br/>Veto Power]
-        RA --> AR[AuditResult<br/>Risk, Guard, Corrections]
+        RA --> AR[AuditResult<br/>Risk, Guard]
     end
     
-    subgraph "5️⃣ Execution Layer"
+    subgraph "6️⃣ Execution Layer"
         AR --> EE[🚀 ExecutionEngine]
-    end
-    
-    subgraph "6️⃣ Visualization Layer"
-        VR & AR --> DT[📊 Recent Decisions<br/>16 Columns]
     end
     
     style A fill:#4A90E2,color:#fff
     style QA fill:#7ED321,color:#fff
+    style PA fill:#BD10E0,color:#fff
     style DC fill:#F5A623,color:#fff
     style RA fill:#D0021B,color:#fff
-    style EE fill:#BD10E0,color:#fff
-    style DT fill:#50E3C2,color:#000
+    style EE fill:#9013FE,color:#fff
 ```
 
 > 📖 **Detailed Docs**: See [Data Flow Analysis](./docs/data_flow_analysis.md) for complete mechanisms.
@@ -305,6 +317,13 @@ data/
 ---
 
 ## 🎉 Latest Updates
+
+**2025-12-21**:
+
+- ✅ **ML Model Upgrade**: Upgraded `PredictAgent` to use **LightGBM** machine learning model.
+- ✅ **Auto-Training**: Implemented automatic model retraining every 2 hours to adapt to market drifts.
+- ✅ **Dashboard Refinement**: Enhanced dashboard with auto-scrolling logs, robust scrollbars, and ML probability display.
+- ✅ **Cycle Optimization**: Optimized decision cycle to 3 minutes for faster response.
 
 **2025-12-20**:
 

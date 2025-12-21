@@ -48,6 +48,7 @@ async def get_status():
             "running": global_state.is_running,
             "mode": global_state.execution_mode,
             "cycle_counter": global_state.cycle_counter,
+            "cycle_interval": global_state.cycle_interval,  # 添加当前间隔
             "current_cycle_id": global_state.current_cycle_id,
             "uptime_start": global_state.start_time,
             "last_heartbeat": global_state.last_update
