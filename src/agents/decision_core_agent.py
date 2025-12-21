@@ -339,10 +339,10 @@ class DecisionCoreAgent:
         regime: Optional[Dict] = None
     ) -> str:
         """生成决策原因（可解释性）"""
-        # 提取关键信息
-        trend_1h = quant_analysis.get('trend_1h', {})
-        trend_15m = quant_analysis.get('trend_15m', {})
-        osc_1h = quant_analysis.get('oscillator_1h', {})
+        # 提取关键信息 (使用正确的key路径)
+        trend_data = quant_analysis.get('trend', {})
+        osc_data = quant_analysis.get('oscillator', {})
+        sentiment_data = quant_analysis.get('sentiment', {})
         
         reasons = []
         
@@ -354,14 +354,16 @@ class DecisionCoreAgent:
         # 2. 总体得分
         reasons.append(f"加权得分: {weighted_score:.1f}")
         
-        # 2. 多周期对齐情况
+        # 3. 多周期对齐情况
         reasons.append(f"周期对齐: {alignment_reason}")
         
-        # 3. 主要驱动因素（取绝对值最大的2个信号）
+        # 4. 主要驱动因素（使用正确的granular scores）
         vote_details = {
-            'trend_1h': trend_1h.get('score', 0),
-            'trend_15m': trend_15m.get('score', 0),
-            'oscillator_1h': osc_1h.get('score', 0)
+            'trend_1h': trend_data.get('trend_1h_score', 0),
+            'trend_15m': trend_data.get('trend_15m_score', 0),
+            'oscillator_1h': osc_data.get('osc_1h_score', 0),
+            'oscillator_15m': osc_data.get('osc_15m_score', 0),
+            'sentiment': sentiment_data.get('total_sentiment_score', 0)
         }
         sorted_signals = sorted(
             vote_details.items(), 
@@ -371,8 +373,7 @@ class DecisionCoreAgent:
         
         for sig_name, sig_score in sorted_signals:
             if abs(sig_score) > 20:
-                signal_label = quant_analysis.get(sig_name, {}).get('signal', 'unknown')
-                reasons.append(f"{sig_name}: {signal_label}({sig_score})")
+                reasons.append(f"{sig_name}: {sig_score:+.0f}")
         
         return " | ".join(reasons)
     

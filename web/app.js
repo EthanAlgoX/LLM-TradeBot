@@ -497,6 +497,10 @@ function renderLogs(logs) {
         content = content.replace(/ExecutionEngine/g, '<span style="color: #00cec9; font-weight: bold;">ExecutionEngine</span>');
         content = content.replace(/The Executor/g, '<span style="color: #00cec9;">The Executor</span>');
 
+        // Prophet (Magenta/Pink)
+        content = content.replace(/PredictAgent/g, '<span style="color: #e84393; font-weight: bold;">PredictAgent</span>');
+        content = content.replace(/The Prophet/g, '<span style="color: #e84393;">The Prophet</span>');
+
         // 2. Sub-Agents (Lighter Green)
         content = content.replace(/TrendSubAgent/g, '<span style="color: #55efc4;">TrendSubAgent</span>');
         content = content.replace(/OscillatorSubAgent/g, '<span style="color: #55efc4;">OscillatorSubAgent</span>');

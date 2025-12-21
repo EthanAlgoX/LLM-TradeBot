@@ -165,10 +165,14 @@ class OscillatorSubAgent:
         Returns:
             分析结果字典
         """
-        score = 0
         details = {}
         
-        # 1. 计算实时RSI (关键优化)
+        # Track individual scores for each timeframe
+        osc_5m_score = 0
+        osc_15m_score = 0
+        osc_1h_score = 0
+        
+        # 1. 计算5m实时RSI (关键优化)
         stable_5m = snapshot.stable_5m
         live_5m = snapshot.live_5m
         
@@ -194,26 +198,53 @@ class OscillatorSubAgent:
             
             # 基于RSI打分
             if live_rsi > 75:
-                rsi_score = -80  # 强烈建议卖出/做空
+                osc_5m_score = -80  # 强烈建议卖出/做空
                 rsi_status = "超买严重"
             elif live_rsi < 25:
-                rsi_score = +80  # 强烈建议买入/做多
+                osc_5m_score = +80  # 强烈建议买入/做多
                 rsi_status = "超卖严重"
             elif live_rsi > 65:
-                rsi_score = -40  # 轻度超买
+                osc_5m_score = -40  # 轻度超买
                 rsi_status = "轻度超买"
             elif live_rsi < 35:
-                rsi_score = +40  # 轻度超卖
+                osc_5m_score = +40  # 轻度超卖
                 rsi_status = "轻度超卖"
             else:
-                rsi_score = 0
+                osc_5m_score = 0
                 rsi_status = "中性"
             
-            score += rsi_score
             details['5m_rsi'] = float(live_rsi)
             details['5m_status'] = rsi_status
         
-        # 2. 1h RSI确认
+        # 2. 15m RSI分析 (新增)
+        stable_15m = snapshot.stable_15m
+        if not stable_15m.empty:
+            if 'rsi' in stable_15m.columns:
+                rsi_15m_val = stable_15m['rsi'].iloc[-1]
+            else:
+                rsi_15m_calc = RSIIndicator(close=stable_15m['close'], window=14).rsi()
+                rsi_15m_val = rsi_15m_calc.iloc[-1] if len(rsi_15m_calc) > 0 else 50
+            
+            # 15m RSI评分
+            if rsi_15m_val > 75:
+                osc_15m_score = -60
+                details['15m_status'] = "超买"
+            elif rsi_15m_val < 25:
+                osc_15m_score = +60
+                details['15m_status'] = "超卖"
+            elif rsi_15m_val > 65:
+                osc_15m_score = -30
+                details['15m_status'] = "轻度超买"
+            elif rsi_15m_val < 35:
+                osc_15m_score = +30
+                details['15m_status'] = "轻度超卖"
+            else:
+                osc_15m_score = 0
+                details['15m_status'] = "中性"
+            
+            details['15m_rsi'] = float(rsi_15m_val)
+        
+        # 3. 1h RSI确认
         stable_1h = snapshot.stable_1h
         if not stable_1h.empty:
             if 'rsi' in stable_1h.columns:
@@ -222,31 +253,40 @@ class OscillatorSubAgent:
                 rsi_1h = RSIIndicator(close=stable_1h['close'], window=14).rsi()
                 last_rsi_1h = rsi_1h.iloc[-1] if len(rsi_1h) > 0 else 50
             
-            # 1h超买超卖的权重更高
+            # 1h级别超买超卖的权重更高
             if last_rsi_1h > 80:
-                score -= 20  # 额外扣分
+                osc_1h_score = -40
                 details['1h_warning'] = "1h级别超买"
             elif last_rsi_1h < 20:
-                score += 20  # 额外加分
+                osc_1h_score = +40
                 details['1h_warning'] = "1h级别超卖"
+            elif last_rsi_1h > 70:
+                osc_1h_score = -20
+                details['1h_status'] = "1h轻度超买"
+            elif last_rsi_1h < 30:
+                osc_1h_score = +20
+                details['1h_status'] = "1h轻度超卖"
+            else:
+                osc_1h_score = 0
+                details['1h_status'] = "1h中性"
             
             details['1h_rsi'] = float(last_rsi_1h)
         
+        # 计算总分 (按权重: 5m=30%, 15m=30%, 1h=40%)
+        total_score = int(osc_5m_score * 0.3 + osc_15m_score * 0.3 + osc_1h_score * 0.4)
+        
         # 限制得分范围
-        score = max(-100, min(100, score))
+        total_score = max(-100, min(100, total_score))
         
         return {
-            'score': score,
+            'score': total_score,
             'details': details,
-            'confidence': abs(score),
-            'total_oscillator_score': score,
+            'confidence': abs(total_score),
+            'total_oscillator_score': total_score,
             # Granular scores for DecisionCoreAgent
-            'osc_1h_score': score - rsi_score if 'rsi_score' in locals() else 0, # Approximation for 1h part? 
-            # Wait, rsi_score is 5m score. 1h logic modifies 'score' directly (-= 20).
-            # Let's be precise:
-            'osc_5m_score': rsi_score if 'rsi_score' in locals() else 0,
-            'osc_1h_score': score - (rsi_score if 'rsi_score' in locals() else 0), # The rest is 1h score
-            'osc_15m_score': 0 # No 15m logic yet
+            'osc_5m_score': osc_5m_score,
+            'osc_15m_score': osc_15m_score,
+            'osc_1h_score': osc_1h_score
         }
 
 
@@ -261,6 +301,9 @@ class SentimentSubAgent:
     def analyze(self, snapshot: MarketSnapshot) -> Dict:
         """
         分析外部 API 与 Binance 原生提供的情绪数据
+        
+        Returns:
+            与 TrendSubAgent/OscillatorSubAgent 格式一致的字典
         """
         score = 0
         details = {}
@@ -281,6 +324,7 @@ class SentimentSubAgent:
             elif nf_15m < 0: score -= 20
                 
             details['inst_netflow_1h'] = nf_1h
+            details['inst_netflow_15m'] = nf_15m
         
         # 2. 资金费率 (Funding Rate) - Binance 原生 (逆向指标)
         if b_funding:
@@ -303,8 +347,14 @@ class SentimentSubAgent:
             details['binance_oi_value'] = b_oi.get('open_interest', 0)
             
         score = max(-100, min(100, score))
-        details['total_sentiment_score'] = score
-        return details
+        
+        # 返回与其他 SubAgent 一致的结构
+        return {
+            'score': score,
+            'details': details,
+            'confidence': abs(score),
+            'total_sentiment_score': score
+        }
 
 
 class QuantAnalystAgent:

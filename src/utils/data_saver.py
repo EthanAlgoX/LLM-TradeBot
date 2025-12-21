@@ -34,6 +34,9 @@ class DataSaver:
             'features': os.path.join(base_dir, 'the_strategist', 'features'),
             'analytics': os.path.join(base_dir, 'the_strategist', 'analytics'),
             
+            # 2b. 预测层 - 预测预言家 (The Prophet)
+            'predictions': os.path.join(base_dir, 'the_prophet', 'predictions'),
+            
             # 3. 对抗层 - 对抗评论员 (The Critic)
             'llm_logs': os.path.join(base_dir, 'the_critic', 'llm_logs'),
             'decisions': os.path.join(base_dir, 'the_critic', 'decisions'),
@@ -262,6 +265,25 @@ class DataSaver:
             json.dump(audit_result, f, indent=2, ensure_ascii=False)
             
         log.debug(f"保存风控审计记录: {path}")
+        return {'json': path}
+
+    def save_prediction(
+        self,
+        prediction: Dict,
+        symbol: str,
+        snapshot_id: str
+    ) -> Dict[str, str]:
+        """保存预测预言家(The Prophet)的预测结果"""
+        date_folder = self._get_date_folder('predictions')
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        
+        filename = f'prediction_{symbol}_{timestamp}_snap_{snapshot_id}.json'
+        path = os.path.join(date_folder, filename)
+        
+        with open(path, 'w', encoding='utf-8') as f:
+            json.dump(prediction, f, indent=2, ensure_ascii=False)
+            
+        log.debug(f"保存预测结果: {path}")
         return {'json': path}
 
     def list_files(self, category: str, date: str = None) -> List[str]:

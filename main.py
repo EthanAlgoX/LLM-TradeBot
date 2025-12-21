@@ -38,6 +38,7 @@ from src.utils.logger import log
 from src.utils.trade_logger import trade_logger
 from src.utils.data_saver import DataSaver
 from src.data.processor import MarketDataProcessor
+from src.features.technical_features import TechnicalFeatureEngineer
 from dataclasses import asdict
 
 # 导入多Agent
@@ -46,6 +47,7 @@ from src.agents import (
     QuantAnalystAgent,
     DecisionCoreAgent,
     RiskAuditAgent,
+    PredictAgent,
     PositionInfo,
     SignalWeight
 )
@@ -109,6 +111,7 @@ class MultiAgentTradingBot:
         print("\n🚀 初始化Agent...")
         self.data_sync_agent = DataSyncAgent(self.client)
         self.quant_analyst = QuantAnalystAgent()
+        self.predict_agent = PredictAgent(horizon='15m')  # 🔮 新增预测预言家
         self.decision_core = DecisionCoreAgent()
         self.risk_audit = RiskAuditAgent(
             max_leverage=10.0,
@@ -117,9 +120,11 @@ class MultiAgentTradingBot:
             max_stop_loss_pct=0.05
         )
         self.processor = MarketDataProcessor()  # ✅ 初始化数据处理器
+        self.feature_engineer = TechnicalFeatureEngineer()  # 🔮 特征工程器 for Prophet
         
         print("  ✅ DataSyncAgent 已就绪")
         print("  ✅ QuantAnalystAgent 已就绪")
+        print("  ✅ PredictAgent 已就绪")
         print("  ✅ DecisionCoreAgent 已就绪")
         print("  ✅ RiskAuditAgent 已就绪")
         
@@ -241,8 +246,43 @@ class MultiAgentTradingBot:
             # ✅ Save Quant Analysis (Analytics)
             self.saver.save_context(quant_analysis, self.symbol, 'analytics', snapshot_id)
             
+            # Step 2.5: 预测 - 预测预言家 (The Prophet)
+            print("[Step 2.5/5] 🔮 预测预言家 (The Prophet) - 计算上涨概率...")
+            
+            # 使用 15m 数据构建高级特征供预测
+            df_15m_features = self.feature_engineer.build_features(processed_dfs['15m'])
+            
+            # 提取最新行的特征值作为字典
+            if not df_15m_features.empty:
+                latest_features = df_15m_features.iloc[-1].to_dict()
+                # 过滤非数值类型
+                predict_features = {k: v for k, v in latest_features.items() 
+                                   if isinstance(v, (int, float)) and not isinstance(v, bool)}
+            else:
+                predict_features = {}
+            
+            # 调用 PredictAgent
+            predict_result = await self.predict_agent.predict(predict_features)
+            
+            # 更新全局状态
+            global_state.prophet_probability = predict_result.probability_up
+            
+            # 保存预测结果（包含输入特征）
+            prediction_record = {
+                'input_features': predict_features,  # 记录输入特征
+                'output': predict_result.to_dict()   # 预测输出
+            }
+            self.saver.save_prediction(prediction_record, self.symbol, snapshot_id)
+            
+            # LOG 2.5: Prophet
+            prob_pct = predict_result.probability_up * 100
+            prob_symbol = "📈" if prob_pct > 55 else ("📉" if prob_pct < 45 else "➡️")
+            global_state.add_log(f"🔮 PredictAgent (The Prophet): {prob_symbol} P(Up)={prob_pct:.1f}% | Signal: {predict_result.signal} | Conf: {predict_result.confidence:.0%}")
+            
+            print(f"  ✅ 预测完毕: P(上涨)={prob_pct:.1f}%, 信号={predict_result.signal}")
+            
             # Step 3: 对抗 - 对抗评论员 (The Critic)
-            print("[Step 3/4] ⚖️ 对抗评论员 (The Critic) - 极速审理信号...")
+            print("[Step 3/5] ⚖️ 对抗评论员 (The Critic) - 极速审理信号...")
             # LOG 3: Critic (Log later after decision)
             # ✅ 复用 Step 1 已处理的数据，避免第三次计算
             market_data = {
@@ -327,11 +367,11 @@ class MultiAgentTradingBot:
                 }
             
             # Step 4: 审计 - 风控守护者 (The Guardian)
-            print(f"[Step 4/4] 👮 风控守护者 (The Guardian) - 进行终审...")
+            print(f"[Step 4/5] 👮 风控守护者 (The Guardian) - 进行终审...")
             
             # Critic Log for Action decision
             # Step 4: 审计 - 风控守护者 (The Guardian)
-            print(f"[Step 4/4] 👮 风控守护者 (The Guardian) - 进行终审...")
+            print(f"[Step 4/5] 👮 风控守护者 (The Guardian) - 进行终审...")
             
             # LOG 3: Critic (Action Case) - if not already logged (Wait case returns early)
             regime_txt = vote_result.regime.get('regime', 'Unknown') if vote_result.regime else 'Unknown'
@@ -816,9 +856,8 @@ class MultiAgentTradingBot:
         # Start Real-time Monitors
         self.start_account_monitor()
         
-        # Initialize with CLI argument, but allow API overrides later
-        if global_state.cycle_interval == 3: # Only override default if strictly needed
-             global_state.cycle_interval = interval_minutes
+        # 设置初始间隔 (优先使用 CLI 参数，后续 API 可覆盖)
+        global_state.cycle_interval = interval_minutes
         
         log.info(f"🚀 启动持续交易模式 (间隔: {global_state.cycle_interval}m)")
         

@@ -27,6 +27,7 @@ class SharedState:
     # Agent Status
     oracle_status: str = "Waiting"
     strategist_score: float = 0.0
+    prophet_probability: float = 0.0  # PredictAgent 上涨概率
     critic_confidence: float = 0.0
     guardian_status: str = "Standing By"
     
