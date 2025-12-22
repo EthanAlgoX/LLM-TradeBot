@@ -25,21 +25,32 @@ import sys
 import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '.')))
 
-from typing import Dict, Optional
+from typing import Dict, Optional, List
 from datetime import datetime
 import json
 import time
+import threading
+import signal
+from dataclasses import asdict
 
 from src.api.binance_client import BinanceClient
 from src.execution.engine import ExecutionEngine
 from src.risk.manager import RiskManager
-from src.config import Config
-from src.utils.logger import log
+from src.utils.logger import log, setup_logger
 from src.utils.trade_logger import trade_logger
 from src.utils.data_saver import DataSaver
-from src.data.processor import MarketDataProcessor
+from src.data.processor import MarketDataProcessor  # ✅ Corrected Import
 from src.features.technical_features import TechnicalFeatureEngineer
-from dataclasses import asdict
+from src.server.state import global_state
+from src.utils.semantic_converter import SemanticConverter  # ✅ Global Import
+from src.agents.regime_detector import RegimeDetector  # ✅ Market Regime Detection
+from src.config import Config # Re-added Config as it's used later
+
+# FastAPI dependencies
+from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
+import uvicorn
 
 # 导入多Agent
 from src.agents import (
@@ -47,15 +58,11 @@ from src.agents import (
     QuantAnalystAgent,
     DecisionCoreAgent,
     RiskAuditAgent,
-    PredictAgent,
     PositionInfo,
     SignalWeight
 )
-
-# DeepSeek 决策引擎 (替代多Agent投票)
 from src.strategy.deepseek_engine import StrategyEngine
-import threading
-import uvicorn
+from src.agents.predict_agent import PredictAgent
 from src.server.app import app
 from src.server.state import global_state
 
@@ -77,8 +84,7 @@ class MultiAgentTradingBot:
         leverage: int = 1,
         stop_loss_pct: float = 1.0,
         take_profit_pct: float = 2.0,
-        test_mode: bool = False,
-        decision_mode: str = 'agents'  # 'agents' = 多Agent投票, 'deepseek' = LLM直接决策
+        test_mode: bool = False
     ):
         """
         初始化多Agent交易机器人
@@ -90,12 +96,8 @@ class MultiAgentTradingBot:
             take_profit_pct: 止盈百分比
             test_mode: 测试模式（不执行真实交易）
         """
-        # 决策模式
-        self.decision_mode = decision_mode
-        
-        mode_name = "DeepSeek LLM" if decision_mode == 'deepseek' else "多Agent投票"
         print("\n" + "="*80)
-        print(f"🤖 AI Trader - {mode_name}决策模式")
+        print(f"🤖 AI Trader - DeepSeek LLM 决策模式")
         print("="*80)
         
         self.config = Config()
@@ -109,6 +111,7 @@ class MultiAgentTradingBot:
         self.primary_symbol = self.config.get('trading.primary_symbol', self.symbols[0])
         self.current_symbol = self.primary_symbol  # 当前处理的交易对
         self.test_mode = test_mode
+        global_state.is_test_mode = test_mode  # Set test mode in global state
         
         # 交易参数
         self.max_position_size = max_position_size
@@ -127,7 +130,7 @@ class MultiAgentTradingBot:
         print("\n🚀 初始化Agent...")
         self.data_sync_agent = DataSyncAgent(self.client)
         self.quant_analyst = QuantAnalystAgent()
-        self.decision_core = DecisionCoreAgent()
+        # self.decision_core = DecisionCoreAgent() # Deprecated in DeepSeek Mode
         self.risk_audit = RiskAuditAgent(
             max_leverage=10.0,
             max_position_pct=0.3,
@@ -136,6 +139,7 @@ class MultiAgentTradingBot:
         )
         self.processor = MarketDataProcessor()  # ✅ 初始化数据处理器
         self.feature_engineer = TechnicalFeatureEngineer()  # 🔮 特征工程器 for Prophet
+        # self.regime_detector = RegimeDetector()  # 📊 市场状态检测器 (Integrated into QuantAnalystAgent)
         
         # 🔮 为每个币种创建独立的 PredictAgent
         self.predict_agents = {}
@@ -145,15 +149,11 @@ class MultiAgentTradingBot:
         print("  ✅ DataSyncAgent 已就绪")
         print("  ✅ QuantAnalystAgent 已就绪")
         print(f"  ✅ PredictAgent 已就绪 (共 {len(self.symbols)} 个币种)")
-        print("  ✅ DecisionCoreAgent 已就绪")
         print("  ✅ RiskAuditAgent 已就绪")
         
-        # 🧠 DeepSeek 决策引擎 (如果选择 deepseek 模式)
-        if self.decision_mode == 'deepseek':
-            self.strategy_engine = StrategyEngine()
-            print("  ✅ DeepSeek StrategyEngine 已就绪")
-        else:
-            self.strategy_engine = None
+        # 🧠 DeepSeek 决策引擎
+        self.strategy_engine = StrategyEngine()
+        print("  ✅ DeepSeek StrategyEngine 已就绪")
         
         print(f"\n⚙️  交易配置:")
         print(f"  - 交易对: {', '.join(self.symbols)}")
@@ -204,6 +204,28 @@ class MultiAgentTradingBot:
             global_state.oracle_status = "Fetching Data..." 
             market_snapshot = await self.data_sync_agent.fetch_all_timeframes(self.current_symbol)
             global_state.oracle_status = "Data Ready"
+            
+            # 💰 测试模式: 更新虚拟持仓盈亏
+            if self.test_mode and self.current_symbol in global_state.virtual_positions:
+                position = global_state.virtual_positions[self.current_symbol]
+                current_price = market_snapshot.live_5m['close']
+                entry_price = position['entry_price']
+                quantity = position['quantity']
+                side = position['side']
+                leverage = position.get('leverage', 1)
+                
+                # 计算未实现盈亏
+                if side == 'LONG':
+                    pnl = (current_price - entry_price) * quantity * leverage
+                else:  # SHORT
+                    pnl = (entry_price - current_price) * quantity * leverage
+                
+                pnl_pct = (pnl / (entry_price * quantity)) * 100
+                position['unrealized_pnl'] = pnl
+                position['pnl_pct'] = pnl_pct
+                position['current_price'] = current_price
+                
+                log.info(f"💰 {self.current_symbol} 未实现盈亏: ${pnl:,.2f} ({pnl_pct:+.2f}%)")
 
             # ✅ Save Market Data & Process Indicators
             processed_dfs = {}
@@ -248,11 +270,11 @@ class MultiAgentTradingBot:
             global_state.strategist_score = s_score
             
             # --- Detailed Multi-Agent Logging ---
-            # --- Single Line Strategist Log ---
             # Trend
             t_res = quant_analysis.get('trend', {})
+            t_details = t_res.get('details', {})
             t_score = t_res.get('total_trend_score', 0)
-            t_str = f"Trend({t_res.get('1h_trend','N/A')},{t_score})"
+            t_str = f"Trend({t_details.get('1h_trend','N/A')},{t_score})"
             
             # Oscillator
             o_res = quant_analysis.get('oscillator', {})
@@ -323,7 +345,7 @@ class MultiAgentTradingBot:
             
             print(f"  ✅ 预测完毕: P(上涨)={prob_pct:.1f}%, 信号={predict_result.signal}")
             
-            # Step 3: 对抗 - 对抗评论员 (The Critic) / DeepSeek 决策
+            # Step 3: 对抗 - DeepSeek 决策
             # ✅ 复用 Step 1 已处理的数据，避免第三次计算
             market_data = {
                 'df_5m': processed_dfs['5m'],
@@ -332,93 +354,139 @@ class MultiAgentTradingBot:
                 'current_price': current_price
             }
             
-            # 根据决策模式选择决策引擎
-            if self.decision_mode == 'deepseek':
-                # 🧠 DeepSeek LLM 直接决策模式
-                print("[Step 3/5] 🧠 DeepSeek LLM - 智能决策中...")
-                
-                # 构建市场上下文文本
-                market_context_text = self._build_market_context(
-                    quant_analysis=quant_analysis,
-                    predict_result=predict_result,
-                    market_data=market_data
-                )
-                
-                market_context_data = {
-                    'symbol': self.current_symbol,
-                    'timestamp': datetime.now().isoformat(),
-                    'current_price': current_price
-                }
-                
-                # 调用 DeepSeek 决策引擎
-                llm_decision = self.strategy_engine.make_decision(
-                    market_context_text=market_context_text,
-                    market_context_data=market_context_data
-                )
-                
-                # 转换为 VoteResult 兼容格式
-                from src.agents.decision_core_agent import VoteResult
-                vote_result = VoteResult(
-                    action=llm_decision.get('action', 'wait'),
-                    confidence=llm_decision.get('confidence', 0) / 100.0,  # 转换为 0-1
-                    weighted_score=llm_decision.get('confidence', 0) - 50,  # -50 to +50
-                    vote_details={'deepseek': llm_decision.get('confidence', 0)},
-                    multi_period_aligned=True,
-                    reason=llm_decision.get('reasoning', 'DeepSeek LLM decision'),
-                    regime={'regime': 'llm_mode', 'confidence': 100},
-                    position={'position_pct': 50, 'location': 'llm'}
-                )
-                
-                # 保存完整的 LLM 响应
-                self.saver.save_llm_log(
-                    content=f"PROMPT: DeepSeek Decision Engine\n\n{llm_decision.get('raw_response', '')}",
-                    symbol=self.current_symbol,
-                    snapshot_id=snapshot_id
-                )
-                
-                # LOG: DeepSeek
-                global_state.add_log(f"🧠 DeepSeek LLM: Action={vote_result.action.upper()} | Conf={llm_decision.get('confidence', 0)}% | {llm_decision.get('reasoning', '')[:50]}")
-            else:
-                # ⚖️ 多Agent投票决策模式
-                print("[Step 3/5] ⚖️ 对抗评论员 (The Critic) - 极速审理信号...")
-                
-                vote_result = await self.decision_core.make_decision(
-                    quant_analysis,
-                    predict_result=predict_result,
-                    market_data=market_data
-                )
-                
-                # LOG 3: Critic (Log later after decision)
+            # 📊 检测市场状态与价格位置 (Integrated in Quant Analysis)
+            # regime_info = self.regime_detector.detect_regime(processed_dfs['5m'])
+            regime_info = quant_analysis.get('regime', {})
+            
+            # 🧠 DeepSeek LLM 直接决策模式
+            print("[Step 3/5] 🧠 DeepSeek LLM - 智能决策中...")
+            
+            # 构建市场上下文文本
+            market_context_text = self._build_market_context(
+                quant_analysis=quant_analysis,
+                predict_result=predict_result,
+                market_data=market_data,
+                regime_info=regime_info
+            )
+            
+            market_context_data = {
+                'symbol': self.current_symbol,
+                'timestamp': datetime.now().isoformat(),
+                'current_price': current_price
+            }
+            
+            # 调用 DeepSeek 决策引擎
+            llm_decision = self.strategy_engine.make_decision(
+                market_context_text=market_context_text,
+                market_context_data=market_context_data
+            )
+            
+            # 转换为 VoteResult 兼容格式
+            from src.agents.decision_core_agent import VoteResult
+            
+            # Extract scores for dashboard
+            q_trend = quant_analysis.get('trend', {})
+            q_osc = quant_analysis.get('oscillator', {})
+            q_sent = quant_analysis.get('sentiment', {})
+            q_comp = quant_analysis.get('comprehensive', {})
+            
+            # Construct vote_details similar to DecisionCore
+            vote_details = {
+                'deepseek': llm_decision.get('confidence', 0),
+                'strategist_total': q_comp.get('score', 0),
+                # Trend
+                'trend_1h': q_trend.get('trend_1h_score', 0),
+                'trend_15m': q_trend.get('trend_15m_score', 0),
+                'trend_5m': q_trend.get('trend_5m_score', 0),
+                # Oscillator
+                'oscillator_1h': q_osc.get('osc_1h_score', 0),
+                'oscillator_15m': q_osc.get('osc_15m_score', 0),
+                'oscillator_5m': q_osc.get('osc_5m_score', 0),
+                # Sentiment
+                'sentiment': q_sent.get('total_sentiment_score', 0),
+                # Prophet
+                'prophet': predict_result.probability_up
+            }
+            
+            # Determine Regime from Trend Score using Semantic Converter
+            trend_score_total = quant_analysis.get('trend', {}).get('total_trend_score', 0)
+            regime_desc = SemanticConverter.get_trend_semantic(trend_score_total)
+            
+            # Determine Position details from LLM Decision
+            pos_pct = llm_decision.get('position_size_pct', 0)
+            if not pos_pct and llm_decision.get('position_size_usd') and self.max_position_size:
+                 # Fallback: estimate pct if usd is provided
+                 pos_pct = (llm_decision.get('position_size_usd') / self.max_position_size) * 100
+                 # Clamp to reasonable range (仓位大小不应超过100%)
+                 pos_pct = min(pos_pct, 100)
+            
+            # 获取真正的价格位置信息（从 regime_info）
+            price_position_info = regime_info.get('position', {}) if regime_info else {}
+            
+            vote_result = VoteResult(
+                action=llm_decision.get('action', 'wait'),
+                confidence=llm_decision.get('confidence', 0) / 100.0,  # 转换为 0-1
+                weighted_score=llm_decision.get('confidence', 0) - 50,  # -50 to +50
+                vote_details=vote_details,
+                multi_period_aligned=True,
+                reason=llm_decision.get('reasoning', 'DeepSeek LLM decision'),
+                regime={
+                    'regime': regime_desc,
+                    'confidence': llm_decision.get('confidence', 0)
+                },
+                position=price_position_info  # 使用真正的价格位置信息
+            )
+            
+            # 保存完整的 LLM 交互日志 (Input, Process, Output)
+            full_log_content = f"""
+================================================================================
+🕐 Timestamp: {datetime.now().isoformat()}
+💱 Symbol: {self.current_symbol}
+================================================================================
+
+--------------------------------------------------------------------------------
+📤 INPUT (PROMPT)
+--------------------------------------------------------------------------------
+[SYSTEM PROMPT]
+{llm_decision.get('system_prompt', '(Missing System Prompt)')}
+
+[USER PROMPT]
+{llm_decision.get('user_prompt', '(Missing User Prompt)')}
+
+--------------------------------------------------------------------------------
+🧠 PROCESSING (REASONING)
+--------------------------------------------------------------------------------
+{llm_decision.get('reasoning_detail', '(No reasoning detail)')}
+
+--------------------------------------------------------------------------------
+📥 OUTPUT (DECISION)
+--------------------------------------------------------------------------------
+{llm_decision.get('raw_response', '(No raw response)')}
+"""
+            self.saver.save_llm_log(
+                content=full_log_content,
+                symbol=self.current_symbol,
+                snapshot_id=snapshot_id
+            )
+            
+            # LOG: DeepSeek
+            global_state.add_log(f"🧠 DeepSeek LLM: Action={vote_result.action.upper()} | Conf={llm_decision.get('confidence', 0)}% | {llm_decision.get('reasoning', '')[:50]}")
             
             # ✅ Decision Recording moved after Risk Audit for complete context
             # Saved to file still happens here for "raw" decision
             self.saver.save_decision(asdict(vote_result), self.current_symbol, snapshot_id, cycle_id=cycle_id)
-            
-            # ✅ Generate and Save LLM Context (LLM Logs) - 仅 agents 模式
-            if self.decision_mode == 'agents':
-                # 记录输入给决策引擎的完整上下文以及最终投票结果
-                llm_context = self.decision_core.to_llm_context(
-                    vote_result=vote_result, 
-                    quant_analysis=quant_analysis
-                )
-                self.saver.save_llm_log(
-                    content=f"PROMPT: N/A (Agent Voting Consensus)\n\n{llm_context}",
-                    symbol=self.current_symbol,
-                    snapshot_id=snapshot_id
-                )
-            
 
             # 如果是观望，也需要更新状态
-            if vote_result.action == 'hold':
-                print("\n✅ 决策: 观望")
+            if vote_result.action in ('hold', 'wait'):
+                print(f"\n✅ 决策: 观望 ({vote_result.action})")
                 
                 # GlobalState Logging of Logic
                 regime_txt = vote_result.regime.get('regime', 'Unknown') if vote_result.regime else 'Unknown'
-                pos_txt = f"{vote_result.position.get('position_pct', 0):.0f}%" if vote_result.position else 'N/A'
+                pos_txt = f"{min(max(vote_result.position.get('position_pct', 0), 0), 100):.0f}%" if vote_result.position else 'N/A'
                 
                 # GlobalState Logging of Logic
                 regime_txt = vote_result.regime.get('regime', 'Unknown') if vote_result.regime else 'Unknown'
-                pos_txt = f"{vote_result.position.get('position_pct', 0):.0f}%" if vote_result.position else 'N/A'
+                pos_txt = f"{min(max(vote_result.position.get('position_pct', 0), 0), 100):.0f}%" if vote_result.position else 'N/A'
                 
                 # LOG 3: Critic (Wait Case)
                 global_state.add_log(f"⚖️ DecisionCoreAgent (The Critic): Context(Regime={regime_txt}, Pos={pos_txt}) => Vote: WAIT ({vote_result.reason})")
@@ -444,11 +512,16 @@ class MultiAgentTradingBot:
                 decision_dict['guardian_passed'] = True
                 decision_dict['prophet_probability'] = predict_result.probability_up  # 🔮 Prophet
                 
+                # ✅ Add Semantic Analysis for Dashboard
+                decision_dict['vote_analysis'] = SemanticConverter.convert_analysis_map(decision_dict.get('vote_details', {}))
+                
                 # Update Market Context
                 if vote_result.regime:
                     global_state.market_regime = vote_result.regime.get('regime', 'Unknown')
                 if vote_result.position:
-                    global_state.price_position = f"{vote_result.position.get('position_pct', 0):.1f}% ({vote_result.position.get('location', 'Unknown')})"
+                    # Safety clamp: ensure position_pct is 0-100
+                    pos_pct = min(max(vote_result.position.get('position_pct', 0), 0), 100)
+                    global_state.price_position = f"{pos_pct:.1f}% ({vote_result.position.get('location', 'Unknown')})"
                     
                 global_state.update_decision(decision_dict)
 
@@ -471,7 +544,7 @@ class MultiAgentTradingBot:
             # LOG 3: Critic (Action Case) - if not already logged (Wait case returns early)
             regime_txt = vote_result.regime.get('regime', 'Unknown') if vote_result.regime else 'Unknown'
             # Note: Wait case returns, so if we are here, it's an action.
-            global_state.add_log(f"⚖️ DecisionCoreAgent (The Critic): Context(Regime={regime_txt}) => Vote: {vote_result.action.upper()} (Conf: {vote_result.confidence:.0f}%)")
+            global_state.add_log(f"⚖️ DecisionCoreAgent (The Critic): Context(Regime={regime_txt}) => Vote: {vote_result.action.upper()} (Conf: {vote_result.confidence*100:.0f}%)")
             
             global_state.guardian_status = "Auditing..."
             global_state.guardian_status = "Auditing..."
@@ -487,7 +560,7 @@ class MultiAgentTradingBot:
             if vote_result.regime:
                 print(f"  📊 市场状态: {vote_result.regime['regime']}")
             if vote_result.position:
-                print(f"  📍 价格位置: {vote_result.position['position_pct']:.1f}% ({vote_result.position['location']})")
+                print(f"  📍 价格位置: {min(max(vote_result.position['position_pct'], 0), 100):.1f}% ({vote_result.position['location']})")
             
             # 将对抗式上下文注入订单参数，以便风控审计使用
             order_params['regime'] = vote_result.regime
@@ -501,10 +574,10 @@ class MultiAgentTradingBot:
             # Fetch directly from client to get full details
             try:
                 acc_info = self.client.get_futures_account()
-                # acc_info keys: 'totalWalletBalance', 'totalUnrealizedProfit', 'availableBalance', etc.
-                wallet_bal = float(acc_info.get('totalWalletBalance', 0))
-                unrealized_pnl = float(acc_info.get('totalUnrealizedProfit', 0))
-                avail_bal = float(acc_info.get('availableBalance', 0))
+                # acc_info keys: 'total_wallet_balance', 'total_unrealized_profit', 'available_balance', etc. (snake_case)
+                wallet_bal = float(acc_info.get('total_wallet_balance', 0))
+                unrealized_pnl = float(acc_info.get('total_unrealized_profit', 0))
+                avail_bal = float(acc_info.get('available_balance', 0))
                 total_equity = wallet_bal + unrealized_pnl
                 
                 # Update State
@@ -514,10 +587,13 @@ class MultiAgentTradingBot:
                     wallet=wallet_bal,
                     pnl=unrealized_pnl
                 )
+                global_state.record_account_success()  # Track success
                 
                 account_balance = avail_bal # For backward compatibility with audit
             except Exception as e:
                 log.error(f"Failed to fetch account info: {e}")
+                global_state.record_account_failure()  # Track failure
+                global_state.add_log(f"❌ 交易周期账户信息获取失败: {str(e)}")  # Dashboard log
                 account_balance = 0.0
 
             current_position = self._get_current_position()
@@ -553,11 +629,16 @@ class MultiAgentTradingBot:
             decision_dict['guardian_reason'] = audit_result.blocked_reason
             decision_dict['prophet_probability'] = predict_result.probability_up  # 🔮 Prophet
             
+            # ✅ Add Semantic Analysis for Dashboard
+            decision_dict['vote_analysis'] = SemanticConverter.convert_analysis_map(decision_dict.get('vote_details', {}))
+            
             # Update Market Context
             if vote_result.regime:
                 global_state.market_regime = vote_result.regime.get('regime', 'Unknown')
             if vote_result.position:
-                global_state.price_position = f"{vote_result.position.get('position_pct', 0):.1f}% ({vote_result.position.get('location', 'Unknown')})"
+                # Safety clamp: ensure position_pct is 0-100
+                pos_pct = min(max(vote_result.position.get('position_pct', 0), 0), 100)
+                global_state.price_position = f"{pos_pct:.1f}% ({vote_result.position.get('location', 'Unknown')})"
                 
             global_state.update_decision(decision_dict)
             
@@ -642,6 +723,24 @@ class MultiAgentTradingBot:
                 global_state.trade_history.insert(0, trade_record)
                 if len(global_state.trade_history) > 50:
                     global_state.trade_history.pop()
+                
+                # 🎯 递增周期开仓计数器
+                global_state.cycle_positions_opened += 1
+                log.info(f"本周期已开仓: {global_state.cycle_positions_opened}/1")
+                
+                # 💰 测试模式: 记录虚拟持仓
+                if self.test_mode:
+                    side = 'LONG' if 'long' in vote_result.action.lower() else 'SHORT'
+                    global_state.virtual_positions[self.current_symbol] = {
+                        'entry_price': current_price,
+                        'quantity': order_params['quantity'],
+                        'side': side,
+                        'entry_time': datetime.now().isoformat(),
+                        'stop_loss': order_params.get('stop_loss_price', 0),
+                        'take_profit': order_params.get('take_profit_price', 0),
+                        'leverage': order_params.get('leverage', 1)
+                    }
+                    log.info(f"💰 虚拟持仓已记录: {self.current_symbol} {side} @ ${current_price:,.2f}")
                 
                 return {
                     'status': 'success',
@@ -864,6 +963,160 @@ class MultiAgentTradingBot:
             log.error(f"订单执行失败: {e}", exc_info=True)
             return False
     
+    
+    def _build_market_context(self, quant_analysis: Dict, predict_result, market_data: Dict) -> str:
+        """
+        构建 DeepSeek LLM 所需的市场上下文文本
+        """
+        # 提取关键数据
+        current_price = market_data['current_price']
+        
+    # ... existing code ...
+    from src.utils.semantic_converter import SemanticConverter
+    
+    def _format_choppy_analysis(self, regime_info: Dict) -> str:
+        """Format CHOPPY market analysis for DeepSeek prompt"""
+        if not regime_info or regime_info.get('regime') != 'choppy':
+            return ""
+        
+        choppy = regime_info.get('choppy_analysis', {})
+        if not choppy:
+            return ""
+        
+        range_info = choppy.get('range', {})
+        
+        lines = [
+            "",
+            "### ⚠️ CHOPPY MARKET ANALYSIS (Range Trading Intelligence)",
+            f"- **Squeeze Active**: {'YES 🔴' if choppy.get('squeeze_active') else 'NO'}",
+            f"- **Squeeze Intensity**: {choppy.get('squeeze_intensity', 0):.0f}% (Higher = Breakout More Likely)",
+            f"- **Breakout Probability**: {choppy.get('breakout_probability', 0):.0f}%",
+            f"- **Potential Direction**: {choppy.get('breakout_direction', 'unknown').upper()}",
+            f"- **Range Support**: ${range_info.get('support', 0):,.2f}",
+            f"- **Range Resistance**: ${range_info.get('resistance', 0):,.2f}",
+            f"- **Mean Reversion Signal**: {choppy.get('mean_reversion_signal', 'neutral').upper().replace('_', ' ')}",
+            f"- **Consolidation Bars**: {choppy.get('consolidation_bars', 0)}",
+            f"- **💡 Strategy Hint**: {choppy.get('strategy_hint', 'N/A')}",
+            ""
+        ]
+        return "\n".join(lines)
+
+    def _build_market_context(self, quant_analysis: Dict, predict_result, market_data: Dict, regime_info: Dict = None) -> str:
+        """
+        构建 DeepSeek LLM 所需的市场上下文文本
+        """
+        # 提取关键数据
+        current_price = market_data['current_price']
+        
+        # 格式化趋势分析
+        trend = quant_analysis.get('trend', {})
+        trend_details = trend.get('details', {})
+        
+        oscillator = quant_analysis.get('oscillator', {})
+        # Oscillator details are flattened in top level for some keys but let's be safe
+        
+        sentiment = quant_analysis.get('sentiment', {})
+        
+        # Prophet 预测 (语义化转换)
+        prob_pct = predict_result.probability_up * 100
+        prophet_signal = predict_result.signal
+        
+        # 语义转换逻辑 (Prophet)
+        if prob_pct >= 80:
+            prediction_desc = f"Strong Uptrend Forecast (High Probability of Rising > 80%, Value: {prob_pct:.1f}%)"
+        elif prob_pct >= 60:
+            prediction_desc = f"Bullish Bias (Likely to Rise 60-80%, Value: {prob_pct:.1f}%)"
+        elif prob_pct <= 20:
+            prediction_desc = f"Strong Downtrend Forecast (High Probability of Falling > 80%, Value: {prob_pct:.1f}%)"
+        elif prob_pct <= 40:
+            prediction_desc = f"Bearish Bias (Likely to Fall 60-80%, Value: {prob_pct:.1f}%)"
+        else:
+            prediction_desc = f"Uncertain/Neutral (40-60%, Value: {prob_pct:.1f}%)"
+
+        # 语义化转换 (Technical Indicators)
+        t_score_total = trend.get('total_trend_score')  # Default to None
+        t_semantic = SemanticConverter.get_trend_semantic(t_score_total)
+        # Individual Trend Scores (Corrected Keys)
+        t_1h_score = trend.get('trend_1h_score') 
+        t_15m_score = trend.get('trend_15m_score')
+        t_5m_score = trend.get('trend_5m_score')
+        t_1h_sem = SemanticConverter.get_trend_semantic(t_1h_score)
+        t_15m_sem = SemanticConverter.get_trend_semantic(t_15m_score)
+        t_5m_sem = SemanticConverter.get_trend_semantic(t_5m_score)
+        
+        o_score_total = oscillator.get('total_oscillator_score')
+        o_semantic = SemanticConverter.get_oscillator_semantic(o_score_total)
+        
+        s_score_total = sentiment.get('total_sentiment_score')
+        s_semantic = SemanticConverter.get_sentiment_score_semantic(s_score_total)
+
+        rsi_15m = oscillator.get('rsi_15m')
+        rsi_1h = oscillator.get('rsi_1h')
+        rsi_1m_semantic = SemanticConverter.get_rsi_semantic(rsi_15m)
+        rsi_1h_semantic = SemanticConverter.get_rsi_semantic(rsi_1h)
+        
+        # MACD is in trend details, not oscillator
+        macd_15m = trend.get('details', {}).get('15m_macd_diff')
+        macd_semantic = SemanticConverter.get_macd_semantic(macd_15m)
+        
+        oi_change = sentiment.get('oi_change_24h_pct')
+        oi_semantic = SemanticConverter.get_oi_change_semantic(oi_change)
+        
+        # 市场状态与价格位置
+        regime_type = "Unknown"
+        regime_confidence = 0
+        price_position = "Unknown"
+        price_position_pct = 50
+        if regime_info:
+            regime_type = regime_info.get('regime', 'unknown')
+            regime_confidence = regime_info.get('confidence', 0)
+            position_info = regime_info.get('position', {})
+            price_position = position_info.get('location', 'unknown')
+            price_position_pct = position_info.get('position_pct', 50)
+        
+        # Helper to format values safely
+        def fmt_val(val, fmt="{:.2f}"):
+            return fmt.format(val) if val is not None else "N/A"
+        
+        context = f"""
+## 1. Price Overview
+- Current Price: ${current_price:,.2f}
+- Symbol: {self.current_symbol}
+
+## 2. Trend Analysis
+- 1h Trend: {t_1h_sem} (Score: {fmt_val(t_1h_score, "{:.0f}")})
+- 15m Trend: {t_15m_sem} (Score: {fmt_val(t_15m_score, "{:.0f}")})
+- 5m Trend: {t_5m_sem} (Score: {fmt_val(t_5m_score, "{:.0f}")})
+- Total Trend Score: {fmt_val(t_score_total, "{:.0f}")} (Range: -100 to +100) => {t_semantic}
+
+## 3. Oscillators
+- RSI (15m): {fmt_val(rsi_15m)} => {rsi_1m_semantic}
+- RSI (1h): {fmt_val(rsi_1h)} => {rsi_1h_semantic}
+- MACD (15m): {fmt_val(macd_15m, "{:.4f}")} => {macd_semantic}
+- Total Oscillator Score: {fmt_val(o_score_total, "{:.0f}")} (Range: -100 to +100) => {o_semantic}
+
+## 4. Market Sentiment
+- 24h OI Change: {fmt_val(oi_change)}% => {oi_semantic}
+- Total Sentiment Score: {fmt_val(s_score_total, "{:.0f}")} (Range: -100 to +100) => {s_semantic}
+
+## 5. AI Prediction (Prophet)
+- Forecast: {prediction_desc}
+- Signal: {prophet_signal}
+- Confidence: {predict_result.confidence:.0%}
+
+## 6. Market Regime & Price Position
+- Market Regime: {regime_type.upper()} (Confidence: {min(max(regime_confidence, 0), 100):.0f}%)
+- Price Position: {price_position.upper()} ({min(max(price_position_pct, 0), 100):.1f}% of recent range)
+- Note: Position near extremes (0-20% or 80-100%) suggests potential reversal zones
+{self._format_choppy_analysis(regime_info)}
+## 7. Comprehensive Score
+- Strategist Score: {quant_analysis.get('comprehensive', {}).get('score', 0):.0f}/100
+"""
+        return context
+
+# ... locating where vote_result is processed to add semantic analysis
+
+
     def run_once(self) -> Dict:
         """运行一次交易循环（同步包装）"""
         result = asyncio.run(self.run_trading_cycle())
@@ -927,8 +1180,11 @@ class MultiAgentTradingBot:
                     equity = wallet + pnl
                     
                     global_state.update_account(equity, avail, wallet, pnl)
+                    global_state.record_account_success()  # Track success
                 except Exception as e:
                     log.error(f"Account Monitor Error: {e}")
+                    global_state.record_account_failure()  # Track failure
+                    global_state.add_log(f"❌ 账户信息获取失败: {str(e)}")  # Dashboard log
                     time.sleep(5) # Backoff on error
                 
                 time.sleep(3) # Update every 3 seconds
@@ -1002,7 +1258,12 @@ class MultiAgentTradingBot:
                 global_state.add_log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
                 global_state.add_log(f"🔄 Cycle #{cycle_num} started | Symbols: {', '.join(self.symbols)}")
 
+                # 🎯 重置周期开仓计数器
+                global_state.cycle_positions_opened = 0
+                
                 # 🔄 多币种顺序处理: 依次分析每个交易对
+                # Step 1: 收集所有交易对的决策
+                all_decisions = []
                 for symbol in self.symbols:
                     self.current_symbol = symbol  # 设置当前处理的交易对
                     
@@ -1010,6 +1271,33 @@ class MultiAgentTradingBot:
                     result = asyncio.run(self.run_trading_cycle())
                     
                     print(f"  [{symbol}] 结果: {result['status']}")
+                    
+                    # 如果是开仓决策，收集起来
+                    if result.get('action') in ['open_long', 'open_short'] and result.get('status') == 'success':
+                        all_decisions.append({
+                            'symbol': symbol,
+                            'result': result,
+                            'confidence': result.get('confidence', 0)
+                        })
+                
+                # Step 2: 从所有开仓决策中选择信心度最高的一个
+                if all_decisions:
+                    # 按信心度排序
+                    all_decisions.sort(key=lambda x: x['confidence'], reverse=True)
+                    best_decision = all_decisions[0]
+                    
+                    print(f"\n🎯 本周期最优开仓机会: {best_decision['symbol']} (信心度: {best_decision['confidence']:.1f}%)")
+                    global_state.add_log(f"🎯 Best opportunity this cycle: {best_decision['symbol']} (Confidence: {best_decision['confidence']:.1f}%)")
+                    
+                    # 只执行最优的一个
+                    # 注意：实际执行已经在 run_trading_cycle 中完成了
+                    # 这里只是记录和通知
+                    
+                    # 如果有其他开仓机会被跳过，记录下来
+                    if len(all_decisions) > 1:
+                        skipped = [f"{d['symbol']}({d['confidence']:.1f}%)" for d in all_decisions[1:]]
+                        print(f"  ⏭️  跳过其他机会: {', '.join(skipped)}")
+                        global_state.add_log(f"⏭️  Skipped opportunities: {', '.join(skipped)} (1 position per cycle limit)")
                 
                 # Dynamic Interval: specific to new requirement
                 current_interval = global_state.cycle_interval
@@ -1067,10 +1355,13 @@ def main():
     parser.add_argument('--take-profit', type=float, default=2.0, help='止盈百分比')
     parser.add_argument('--mode', choices=['once', 'continuous'], default='once', help='运行模式')
     parser.add_argument('--interval', type=int, default=3, help='持续运行间隔（分钟）')
-    parser.add_argument('--decision-mode', choices=['agents', 'deepseek'], default='agents', 
-                        help='决策模式: agents=多Agent投票, deepseek=LLM直接决策')
     
     args = parser.parse_args()
+    
+    # 测试模式默认 1 分钟周期，实盘模式默认 3 分钟
+    if args.test and args.interval == 3:  # 如果是测试模式且用户没有指定间隔
+        args.interval = 1
+    
     
     # 创建机器人
     bot = MultiAgentTradingBot(
@@ -1078,8 +1369,7 @@ def main():
         leverage=args.leverage,
         stop_loss_pct=args.stop_loss,
         take_profit_pct=args.take_profit,
-        test_mode=args.test,
-        decision_mode=getattr(args, 'decision_mode', 'agents')
+        test_mode=args.test
     )
     
     # 启动 Dashboard Server (Only if in continuous mode or if explicitly requested, but let's do it always for now if deps exist)

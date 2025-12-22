@@ -11,6 +11,7 @@ class SharedState:
     # System Status
     is_running: bool = False
     execution_mode: str = "Running" # Running, Paused, Stopped
+    is_test_mode: bool = False  # Test mode or live trading
     start_time: str = ""
     last_update: str = ""
     
@@ -18,6 +19,7 @@ class SharedState:
     cycle_counter: int = 0  # Total number of cycles since start
     current_cycle_id: str = ""  # Current cycle identifier (cycle_NNNN_timestamp)
     cycle_interval: int = 3  # Cycle interval in minutes (default 3)
+    cycle_positions_opened: int = 0  # Positions opened in current cycle
     
     # Market Data
     current_price: float = 0.0
@@ -38,6 +40,16 @@ class SharedState:
         "wallet_balance": 0.0,
         "total_pnl": 0.0
     })
+    
+    # Virtual Account (Test Mode)
+    virtual_initial_balance: float = 10000.0  # Starting balance for test mode
+    virtual_balance: float = 10000.0  # Current balance in test mode
+    virtual_positions: Dict[str, Dict] = field(default_factory=dict)  # {symbol: {entry_price, quantity, side, ...}}
+    
+    # Account Failure Tracking
+    account_failure_count: int = 0  # Consecutive failures
+    account_last_success_time: Optional[float] = None  # Timestamp of last successful fetch
+    account_alert_active: bool = False  # Whether alert is currently shown
     
     # Chart Data
     equity_history: List[Dict] = field(default_factory=list)  # [{'time': '12:00', 'value': 1000}, ...]
@@ -91,6 +103,25 @@ class SharedState:
         if len(self.decision_history) > 100:
             self.decision_history.pop()
         self.last_update = datetime.now().strftime("%H:%M:%S")
+    
+    def record_account_success(self):
+        """Record successful account info fetch"""
+        import time
+        self.account_failure_count = 0
+        self.account_last_success_time = time.time()
+        self.account_alert_active = False
+    
+    def record_account_failure(self):
+        """Record failed account info fetch"""
+        import time
+        self.account_failure_count += 1
+        
+        # Check if we should trigger alert (5 minutes = 300 seconds)
+        if self.account_last_success_time:
+            time_since_success = time.time() - self.account_last_success_time
+            if time_since_success >= 300 and not self.account_alert_active:
+                self.account_alert_active = True
+                log.error(f"⚠️ 账户信息获取失败已超过 5 分钟！连续失败次数: {self.account_failure_count}")
         
     def add_log(self, message: str):
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")

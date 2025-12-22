@@ -40,6 +40,10 @@
                     <span id="sys-mode" class="value badge">LOADING</span>
                 </div>
                 <div class="status-item">
+                    <span class="label">ENVIRONMENT</span>
+                    <span id="sys-env" class="value badge">LOADING</span>
+                </div>
+                <div class="status-item">
                     <span class="label">CYCLE</span>
                     <span id="cycle-counter" class="value">#0</span>
                 </div>
@@ -99,9 +103,9 @@
                                 }
                                 // 初始化加载 BTC
                                 loadTradingViewChart('BTCUSDT');
-                                
+
                                 // 监听选择器变化
-                                document.getElementById('symbol-selector').addEventListener('change', function(e) {
+                                document.getElementById('symbol-selector').addEventListener('change', function (e) {
                                     loadTradingViewChart(e.target.value);
                                 });
                             </script>
@@ -178,7 +182,7 @@
                                 <tr class="agent-group-row">
                                     <th colspan="3" class="group-system">📊 System</th>
                                     <th colspan="3" class="group-critic">⚖️ Critic</th>
-                                    <th colspan="6" class="group-strategist">👨‍🔬 Strategist</th>
+                                    <th colspan="5" class="group-strategist">👨‍🔬 Strategist</th>
                                     <th class="group-prophet">🔮 Prophet</th>
                                     <th colspan="2" class="group-guardian">🛡️ Guardian</th>
                                     <th colspan="4" class="group-context">📈 Context</th>
@@ -192,8 +196,7 @@
                                     <th title="信心度 (0-100%)">Conf</th>
                                     <th title="决策原因详细说明 (悬停查看完整)">Reason</th>
                                     <th title="Strategist 综合评分 (-100~+100)">Strat</th>
-                                    <th title="1小时趋势信号 (TrendSubAgent)">1h-T</th>
-                                    <th title="1小时震荡信号 (OscillatorSubAgent)">1h-O</th>
+                                    <th title="1小时周期信号 (趋势T + 震荡O)">1h</th>
                                     <th title="15分钟周期信号 (趋势T + 震荡O)">15m</th>
                                     <th title="5分钟周期信号 (趋势T + 震荡O)">5m</th>
                                     <th title="情绪信号 (资金流向 + 资金费率)">Sent</th>

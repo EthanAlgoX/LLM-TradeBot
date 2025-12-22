@@ -89,6 +89,23 @@ class RegimeDetector:
             adx, bb_width_pct, atr_pct, trend_direction
         )
         
+        # ✅ Sanity Checks: Clip values to valid ranges and handle NaN
+        def safe_clip(val, min_val, max_val, default=0.0):
+            """Clip value to range, handle NaN/None/inf"""
+            if val is None or (isinstance(val, float) and (np.isnan(val) or np.isinf(val))):
+                return default
+            return max(min_val, min(max_val, float(val)))
+        
+        confidence = safe_clip(confidence, 0, 100, 50.0)
+        adx = safe_clip(adx, 0, 100, 20.0)
+        bb_width_pct = safe_clip(bb_width_pct, 0, 50, 2.0)
+        atr_pct = safe_clip(atr_pct, 0, 20, 0.5)
+        
+        # 6. CHOPPY 专项分析 (Range Trading Intelligence)
+        choppy_analysis = None
+        if regime == MarketRegime.CHOPPY:
+            choppy_analysis = self._analyze_choppy_market(df, bb_width_pct)
+        
         return {
             'regime': regime.value,
             'confidence': confidence,
@@ -96,7 +113,9 @@ class RegimeDetector:
             'bb_width_pct': bb_width_pct,
             'atr_pct': atr_pct,
             'trend_direction': trend_direction,
-            'reason': reason
+            'reason': reason,
+            'position': self._calculate_price_position(df),
+            'choppy_analysis': choppy_analysis  # 🆕 CHOPPY-specific insights
         }
     
     def _get_or_calculate_adx(self, df: pd.DataFrame) -> float:
@@ -231,6 +250,187 @@ class RegimeDetector:
             40.0,
             f"市场状态不明确（ADX {adx:.1f}）"
         )
+    
+    def _calculate_price_position(self, df: pd.DataFrame, lookback: int = 50) -> Dict:
+        """
+        计算价格在近期区间中的位置
+        
+        Returns:
+            {
+                'position_pct': float,  # 0-100, 0=最低, 100=最高
+                'location': str  # 'low', 'middle', 'high'
+            }
+        """
+        try:
+            if len(df) < lookback:
+                lookback = len(df)
+            
+            recent_high = df['high'].iloc[-lookback:].max()
+            recent_low = df['low'].iloc[-lookback:].min()
+            current_price = df['close'].iloc[-1]
+            
+            if recent_high == recent_low:
+                position_pct = 50.0
+            else:
+                position_pct = ((current_price - recent_low) / (recent_high - recent_low)) * 100
+            
+            # Clip to 0-100
+            position_pct = max(0, min(100, position_pct))
+            
+            # Determine location
+            if position_pct <= 25:
+                location = 'low'
+            elif position_pct >= 75:
+                location = 'high'
+            else:
+                location = 'middle'
+            
+            return {
+                'position_pct': position_pct,
+                'location': location
+            }
+        except Exception:
+            return {'position_pct': 50.0, 'location': 'unknown'}
+
+    def _analyze_choppy_market(self, df: pd.DataFrame, current_bb_width: float, lookback: int = 20) -> Dict:
+        """
+        CHOPPY 市场专项分析
+        
+        提供区间交易和突破预警的关键信息：
+        1. Squeeze 检测 (布林带收窄)
+        2. 支撑阻力识别
+        3. 突破概率评估
+        4. Mean Reversion 机会
+        
+        Returns:
+            {
+                'squeeze_active': bool,          # 是否处于 Squeeze 状态
+                'squeeze_intensity': float,      # Squeeze 强度 0-100
+                'range': {                       # 区间信息
+                    'support': float,
+                    'resistance': float,
+                    'range_pct': float           # 区间宽度相对于价格的百分比
+                },
+                'breakout_probability': float,   # 突破概率 0-100
+                'breakout_direction': str,       # 可能的突破方向 'up', 'down', 'unknown'
+                'mean_reversion_signal': str,    # 'buy_dip', 'sell_rally', 'neutral'
+                'consolidation_bars': int,       # 连续震荡K线数量
+                'strategy_hint': str             # 策略建议
+            }
+        """
+        try:
+            # 1. Squeeze 检测 - 布林带宽度相对于历史值的收窄程度
+            squeeze_active = False
+            squeeze_intensity = 0.0
+            
+            if 'bb_upper' in df.columns and 'bb_lower' in df.columns and 'bb_middle' in df.columns:
+                # 计算历史布林带宽度
+                bb_widths = ((df['bb_upper'] - df['bb_lower']) / df['bb_middle'] * 100).iloc[-lookback:]
+                avg_width = bb_widths.mean()
+                min_width = bb_widths.min()
+                
+                # 当前宽度 vs 平均宽度
+                if avg_width > 0:
+                    width_ratio = current_bb_width / avg_width
+                    if width_ratio < 0.7:  # 宽度低于平均70% = Squeeze
+                        squeeze_active = True
+                        squeeze_intensity = (1 - width_ratio) * 100  # 0-100
+            
+            # 2. 支撑阻力识别
+            recent_high = df['high'].iloc[-lookback:].max()
+            recent_low = df['low'].iloc[-lookback:].min()
+            current_price = df['close'].iloc[-1]
+            
+            range_pct = ((recent_high - recent_low) / current_price) * 100 if current_price > 0 else 0
+            
+            # 3. 价格位置与 Mean Reversion 信号
+            position_pct = ((current_price - recent_low) / (recent_high - recent_low) * 100) if (recent_high - recent_low) > 0 else 50
+            
+            if position_pct <= 20:
+                mean_reversion_signal = 'buy_dip'
+            elif position_pct >= 80:
+                mean_reversion_signal = 'sell_rally'
+            else:
+                mean_reversion_signal = 'neutral'
+            
+            # 4. 突破概率评估
+            breakout_probability = 0.0
+            breakout_direction = 'unknown'
+            
+            # Squeeze + 价格逼近边界 = 高突破概率
+            if squeeze_active:
+                breakout_probability += squeeze_intensity * 0.5  # Max 50 from squeeze
+                
+                # 价格逼近边界增加概率
+                if position_pct >= 85:
+                    breakout_probability += 30
+                    breakout_direction = 'up'
+                elif position_pct <= 15:
+                    breakout_probability += 30
+                    breakout_direction = 'down'
+                else:
+                    breakout_probability += 10
+            
+            # 成交量异常检测增加概率
+            if 'volume' in df.columns:
+                recent_vol = df['volume'].iloc[-5:].mean()
+                avg_vol = df['volume'].iloc[-lookback:].mean()
+                if recent_vol > avg_vol * 1.5:
+                    breakout_probability += 20
+            
+            breakout_probability = min(100, breakout_probability)
+            
+            # 5. 连续震荡 K 线计数 (用于判断震荡末期)
+            consolidation_bars = 0
+            for i in range(1, min(50, len(df))):
+                idx = -i
+                bar_range = (df['high'].iloc[idx] - df['low'].iloc[idx]) / df['close'].iloc[idx] * 100
+                if bar_range < 1.5:  # 波动小于 1.5% 视为震荡
+                    consolidation_bars += 1
+                else:
+                    break
+            
+            # 6. 策略建议
+            if squeeze_active and breakout_probability >= 60:
+                if breakout_direction == 'up':
+                    strategy_hint = "SQUEEZE_BREAKOUT_LONG: Prepare for upside breakout, set alerts at resistance"
+                elif breakout_direction == 'down':
+                    strategy_hint = "SQUEEZE_BREAKOUT_SHORT: Prepare for downside breakout, set alerts at support"
+                else:
+                    strategy_hint = "SQUEEZE_IMMINENT: Volatility expansion expected, wait for direction confirmation"
+            elif mean_reversion_signal == 'buy_dip':
+                strategy_hint = "MEAN_REVERSION_LONG: Price near support, consider long with tight stop below support"
+            elif mean_reversion_signal == 'sell_rally':
+                strategy_hint = "MEAN_REVERSION_SHORT: Price near resistance, consider short with tight stop above resistance"
+            else:
+                strategy_hint = "RANGE_WAIT: No clear edge, wait for price to reach range extremes"
+            
+            return {
+                'squeeze_active': squeeze_active,
+                'squeeze_intensity': min(100, max(0, squeeze_intensity)),
+                'range': {
+                    'support': recent_low,
+                    'resistance': recent_high,
+                    'range_pct': min(20, max(0, range_pct))
+                },
+                'breakout_probability': breakout_probability,
+                'breakout_direction': breakout_direction,
+                'mean_reversion_signal': mean_reversion_signal,
+                'consolidation_bars': consolidation_bars,
+                'strategy_hint': strategy_hint
+            }
+            
+        except Exception as e:
+            return {
+                'squeeze_active': False,
+                'squeeze_intensity': 0,
+                'range': {'support': 0, 'resistance': 0, 'range_pct': 0},
+                'breakout_probability': 0,
+                'breakout_direction': 'unknown',
+                'mean_reversion_signal': 'neutral',
+                'consolidation_bars': 0,
+                'strategy_hint': 'ANALYSIS_ERROR: Unable to analyze choppy market'
+            }
 
 
 # 测试代码

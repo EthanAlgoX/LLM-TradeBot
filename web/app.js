@@ -83,6 +83,11 @@ function updateDashboard() {
                 applyDecisionFilters(); // 应用当前过滤条件
             }
             if (data.trade_history) renderTradeHistory(data.trade_history);
+
+            // Check for account fetch failure alert
+            if (data.account_alert && data.account_alert.active) {
+                showAccountAlert(data.account_alert.failure_count);
+            }
         })
         .catch(err => console.error('Error fetching data:', err));
 }
@@ -168,35 +173,60 @@ function renderDecisionTable(history) {
         const time = d.timestamp || 'Just now';
         const symbol = d.symbol || 'BTCUSDT';
         const action = (d.action || 'HOLD').toUpperCase();
-        const conf = d.confidence ? d.confidence.toFixed(0) + '%' : '-';
+        const conf = d.confidence ? ((d.confidence > 1 ? d.confidence : d.confidence * 100).toFixed(0) + '%') : '-';
 
         let actionClass = 'action-hold';
         if (action.includes('LONG') || action.includes('BUY')) actionClass = 'action-buy';
         else if (action.includes('SHORT') || action.includes('SELL')) actionClass = 'action-sell';
 
-        // Helper to format score cell
+        // Helper to format score cell with Semantic Support
         const fmtScore = (key, label) => {
-            if (!d.vote_details || d.vote_details[key] === undefined) return '<span class="cell-na">-</span>';
-            const val = Math.round(d.vote_details[key]);
+            // Get Numeric Score
+            let scoreVal = 'N/A';
+            if (d.vote_details && d.vote_details[key] !== undefined && d.vote_details[key] !== null) {
+                scoreVal = Math.round(d.vote_details[key]);
+            }
+
+            // Check for semantic analysis first
+            if (d.vote_analysis && d.vote_analysis[key]) {
+                const text = d.vote_analysis[key];
+                let cls = 'neutral';
+                if (text.toLowerCase().includes('bull') || text.toLowerCase().includes('buy') || text.toLowerCase().includes('up')) cls = 'pos';
+                else if (text.toLowerCase().includes('bear') || text.toLowerCase().includes('sell') || text.toLowerCase().includes('down')) cls = 'neg';
+
+                // Truncate long text for display, tooltip for Score
+                const shortText = text.replace(/\(.*\)/, '').trim(); // Remove () parts for short display
+                return `<span class="val ${cls}" title="Score: ${scoreVal}" style="cursor:help; font-size: 0.8em;">${shortText}</span>`;
+            }
+
+            // Fallback to number if no semantic
+            if (scoreVal === 'N/A') return '<span class="cell-na">-</span>';
+            const val = parseInt(scoreVal);
             const cls = val > 0 ? 'pos' : (val < 0 ? 'neg' : 'neutral');
             return `<span class="val ${cls}">${val}</span>`;
         };
 
-        // Extract Agent Scores
+        // Extract Agent Scores (Semantic)
         const stratHtml = fmtScore('strategist_total');
         const trend1hHtml = fmtScore('trend_1h');
         const osc1hHtml = fmtScore('oscillator_1h');
         const sentHtml = fmtScore('sentiment');
 
-        // Multi-period signals (15m, 5m)
+        // Combine 1h signals (Compact view)
+        const signal1h = `<div style="font-size:0.75em">T:${trend1hHtml}<br>O:${osc1hHtml}</div>`;
+
+        // Multi-period signals (15m, 5m) - Semantic
         const trend15mHtml = fmtScore('trend_15m');
         const osc15mHtml = fmtScore('oscillator_15m');
+
+        // Combine 15m and 5m signals (Compact view)
+        // If semantic is available, we might want to show abbreviated icons or short text
+        // For compact cells, let's just use the short semantic
+        const signal15m = `<div style="font-size:0.75em">T:${trend15mHtml}<br>O:${osc15mHtml}</div>`;
+
         const trend5mHtml = fmtScore('trend_5m');
         const osc5mHtml = fmtScore('oscillator_5m');
-
-        // Combine 15m and 5m signals
-        const signal15m = `<div style="font-size:0.75em">T:${d.vote_details?.trend_15m ? Math.round(d.vote_details.trend_15m) : '-'}<br>O:${d.vote_details?.oscillator_15m ? Math.round(d.vote_details.oscillator_15m) : '-'}</div>`;
-        const signal5m = `<div style="font-size:0.75em">T:${d.vote_details?.trend_5m ? Math.round(d.vote_details.trend_5m) : '-'}<br>O:${d.vote_details?.oscillator_5m ? Math.round(d.vote_details.oscillator_5m) : '-'}</div>`;
+        const signal5m = `<div style="font-size:0.75em">T:${trend5mHtml}<br>O:${osc5mHtml}</div>`;
 
         // Reason (truncated with tooltip)
         let reasonHtml = '<span class="cell-na">-</span>';
@@ -281,8 +311,7 @@ function renderDecisionTable(history) {
                 <td>${conf}</td>
                 <td>${reasonHtml}</td>
                 <td>${stratHtml}</td>
-                <td>${trend1hHtml}</td>
-                <td>${osc1hHtml}</td>
+                <td>${signal1h}</td>
                 <td>${signal15m}</td>
                 <td>${signal5m}</td>
                 <td>${sentHtml}</td>
@@ -441,6 +470,20 @@ function renderSystemStatus(system) {
     if (intervalSel && system.cycle_interval !== undefined) {
         intervalSel.value = system.cycle_interval.toString();
     }
+
+    // Update Environment Indicator (Test Mode / Live Trading)
+    const envEl = document.getElementById('sys-env');
+    if (envEl && system.is_test_mode !== undefined) {
+        if (system.is_test_mode) {
+            envEl.textContent = '🧪 TEST';
+            envEl.className = 'value badge warning'; // Yellow for test
+            envEl.title = 'Running in test mode - No real trades';
+        } else {
+            envEl.textContent = '💰 LIVE';
+            envEl.className = 'value badge online'; // Green for live
+            envEl.title = 'Live trading mode - Real money at risk';
+        }
+    }
 }
 
 
@@ -571,6 +614,81 @@ function setControl(action, payload = {}) {
             setTimeout(updateDashboard, 200);
         })
         .catch(err => console.error('Control request failed:', err));
+}
+
+// Account Failure Alert Modal
+let alertShown = false;
+
+function showAccountAlert(failureCount) {
+    if (alertShown) return; // Only show once
+    alertShown = true;
+
+    const modal = document.createElement('div');
+    modal.id = 'account-alert-modal';
+    modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.8);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 10000;
+    `;
+
+    const content = document.createElement('div');
+    content.style.cssText = `
+        background: linear-gradient(135deg, #1e1e2e 0%, #2a2a3e 100%);
+        border: 2px solid #ff4444;
+        border-radius: 12px;
+        padding: 30px;
+        max-width: 500px;
+        box-shadow: 0 10px 40px rgba(255, 68, 68, 0.3);
+    `;
+
+    content.innerHTML = `
+        <div style="text-align: center;">
+            <div style="font-size: 48px; margin-bottom: 20px;">⚠️</div>
+            <h2 style="color: #ff4444; margin: 0 0 15px 0; font-size: 24px;">账户信息获取失败</h2>
+            <p style="color: #94a3b8; margin: 0 0 10px 0; line-height: 1.6;">
+                连续 <strong style="color: #ff4444;">5 分钟</strong> 无法获取账户信息
+            </p>
+            <p style="color: #64748b; margin: 0 0 25px 0; font-size: 14px;">
+                连续失败次数: <span style="color: #ff4444; font-weight: bold;">${failureCount}</span>
+            </p>
+            <div style="background: rgba(255, 68, 68, 0.1); border-left: 3px solid #ff4444; padding: 15px; margin-bottom: 25px; text-align: left;">
+                <p style="margin: 0; color: #e0e6ed; font-size: 14px; line-height: 1.5;">
+                    <strong>可能原因:</strong><br>
+                    • API 密钥失效或权限不足<br>
+                    • 网络连接问题<br>
+                    • Binance API 服务异常
+                </p>
+            </div>
+            <button id="close-alert-btn" style="
+                background: linear-gradient(135deg, #ff4444 0%, #cc0000 100%);
+                color: white;
+                border: none;
+                padding: 12px 30px;
+                border-radius: 6px;
+                font-size: 16px;
+                font-weight: bold;
+                cursor: pointer;
+                transition: all 0.3s;
+            ">
+                我知道了
+            </button>
+        </div>
+    `;
+
+    modal.appendChild(content);
+    document.body.appendChild(modal);
+
+    document.getElementById('close-alert-btn').addEventListener('click', () => {
+        modal.remove();
+        alertShown = false; // Allow showing again if issue persists
+    });
 }
 
 function setupEventListeners() {

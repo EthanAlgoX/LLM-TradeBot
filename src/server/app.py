@@ -47,6 +47,7 @@ async def get_status():
         "system": {
             "running": global_state.is_running,
             "mode": global_state.execution_mode,
+            "is_test_mode": global_state.is_test_mode,
             "cycle_counter": global_state.cycle_counter,
             "cycle_interval": global_state.cycle_interval,  # 添加当前间隔
             "current_cycle_id": global_state.current_cycle_id,
@@ -64,6 +65,17 @@ async def get_status():
             "guardian_status": global_state.guardian_status
         },
         "account": global_state.account_overview,
+        "virtual_account": {
+            "is_test_mode": global_state.is_test_mode,
+            "initial_balance": global_state.virtual_initial_balance,
+            "current_balance": global_state.virtual_balance,
+            "positions": global_state.virtual_positions,
+            "total_unrealized_pnl": sum(pos.get('unrealized_pnl', 0) for pos in global_state.virtual_positions.values())
+        },
+        "account_alert": {
+            "active": global_state.account_alert_active,
+            "failure_count": global_state.account_failure_count
+        },
         "chart_data": {
             "equity": global_state.equity_history
         },

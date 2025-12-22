@@ -185,12 +185,21 @@ class DataSaver:
         symbol: str,
         snapshot_id: str
     ) -> Dict[str, str]:
-        """保存LLM交互日志 (原 save_step5_markdown)"""
-        date_folder = self._get_date_folder('llm_logs')
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        """保存LLM交互日志 (按币种分文件夹)
         
-        filename = f'llm_log_{symbol}_{timestamp}_{snapshot_id}.md'
-        path = os.path.join(date_folder, filename)
+        路径结构: data/the_critic/llm_logs/{SYMBOL}/{YYYYMMDD}/llm_log_{timestamp}_{snapshot_id}.md
+        """
+        # Get base llm_logs directory
+        base_llm_dir = self.dirs.get('llm_logs')
+        
+        # Create symbol-specific subfolder
+        date_str = datetime.now().strftime('%Y%m%d')
+        symbol_date_folder = os.path.join(base_llm_dir, symbol, date_str)
+        os.makedirs(symbol_date_folder, exist_ok=True)
+        
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f'llm_log_{timestamp}_{snapshot_id}.md'
+        path = os.path.join(symbol_date_folder, filename)
         
         with open(path, 'w', encoding='utf-8') as f:
             f.write(content)

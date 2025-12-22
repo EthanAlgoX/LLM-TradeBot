@@ -24,6 +24,105 @@ class RiskManager:
         
         log.info("风险管理器初始化完成")
     
+    def validate_format(self, decision: Dict, raw_response: str = "") -> Tuple[bool, str]:
+        """
+        验证 DeepSeek 输出格式
+        
+        Args:
+            decision: 解析后的决策字典
+            raw_response: 原始 LLM 响应文本（可选，用于检查标签）
+            
+        Returns:
+            (is_valid, error_message)
+        """
+        action = decision.get('action', '').lower()
+        
+        # 1. 检查必需字段
+        required_fields = ['symbol', 'action', 'reasoning']
+        for field in required_fields:
+            if field not in decision or not decision[field]:
+                return False, f"格式错误: 缺少必需字段 '{field}'"
+        
+        # 2. 检查 reasoning 长度（应该简洁）
+        reasoning = decision.get('reasoning', '')
+        if len(reasoning.split()) > 50:
+            return False, f"格式错误: reasoning 过长 ({len(reasoning.split())} 词 > 50 词)"
+        
+        # 3. 检查 action 类型
+        valid_actions = ['open_long', 'open_short', 'close_long', 'close_short', 'hold', 'wait']
+        if action not in valid_actions:
+            return False, f"格式错误: 无效的 action '{action}', 必须是 {valid_actions} 之一"
+        
+        # 4. 检查开仓动作的必需字段
+        if action in ['open_long', 'open_short']:
+            open_required = ['leverage', 'position_size_usd', 'stop_loss', 'take_profit']
+            for field in open_required:
+                if field not in decision:
+                    return False, f"格式错误: {action} 缺少必需字段 '{field}'"
+                
+                # 检查是否为数字类型
+                value = decision[field]
+                if not isinstance(value, (int, float)):
+                    return False, f"格式错误: '{field}' 必须是纯数字，不能是字符串或公式 (当前值: {value})"
+                
+                # 检查是否包含非法字符（如果是从字符串转换来的）
+                value_str = str(value)
+                if '~' in value_str:
+                    return False, f"格式错误: '{field}' 包含范围符号 '~' (值: {value})"
+                if ',' in value_str and value_str.replace(',', '').replace('.', '').isdigit():
+                    return False, f"格式错误: '{field}' 包含千位分隔符 ',' (值: {value})"
+                if any(op in value_str for op in ['*', '/', '+', '-']) and not value_str.replace('.', '').replace('-', '').isdigit():
+                    return False, f"格式错误: '{field}' 包含运算符，必须是计算后的纯数字 (值: {value})"
+            
+            # 5. 检查杠杆范围
+            leverage = decision.get('leverage')
+            if not (1 <= leverage <= 5):
+                return False, f"格式错误: leverage 必须在 1-5 之间 (当前值: {leverage})"
+            
+            # 6. 检查止损方向
+            entry_price = decision.get('current_price') or decision.get('entry_price', 0)
+            stop_loss = decision.get('stop_loss')
+            take_profit = decision.get('take_profit')
+            
+            if entry_price and stop_loss and take_profit:
+                if action == 'open_long':
+                    if stop_loss >= entry_price:
+                        return False, f"格式错误: 做多止损必须 < 入场价 (SL:{stop_loss} >= Entry:{entry_price})"
+                    if take_profit <= entry_price:
+                        return False, f"格式错误: 做多止盈必须 > 入场价 (TP:{take_profit} <= Entry:{entry_price})"
+                elif action == 'open_short':
+                    if stop_loss <= entry_price:
+                        return False, f"格式错误: 做空止损必须 > 入场价 (SL:{stop_loss} <= Entry:{entry_price})"
+                    if take_profit >= entry_price:
+                        return False, f"格式错误: 做空止盈必须 < 入场价 (TP:{take_profit} >= Entry:{entry_price})"
+                
+                # 7. 检查风险回报比
+                risk = abs(entry_price - stop_loss)
+                reward = abs(take_profit - entry_price)
+                if risk > 0:
+                    rr_ratio = reward / risk
+                    if rr_ratio < 2.0:
+                        return False, f"格式错误: 风险回报比不足 (R:R = {rr_ratio:.2f} < 2.0)"
+        
+        # 8. 检查原始响应格式（如果提供）
+        if raw_response:
+            if '<reasoning>' not in raw_response or '</reasoning>' not in raw_response:
+                return False, "格式错误: 缺少 <reasoning> 标签"
+            if '<decision>' not in raw_response or '</decision>' not in raw_response:
+                return False, "格式错误: 缺少 <decision> 标签"
+            if '```json' not in raw_response:
+                return False, "格式错误: JSON 必须包裹在 ```json 代码块中"
+            
+            # 检查 JSON 数组格式
+            import re
+            json_match = re.search(r'```json\s*(\[.*?\])\s*```', raw_response, re.DOTALL)
+            if json_match:
+                json_str = json_match.group(1).strip()
+                if not json_str.startswith('[{'):
+                    return False, f"格式错误: JSON 必须是数组格式，以 '[{{' 开头 (当前: {json_str[:10]}...)"
+        
+        return True, "格式验证通过"
+    
     def validate_decision(
         self, 
         decision: Dict, 
@@ -45,13 +144,51 @@ class RiskManager:
         """
         modified_decision = decision.copy()
         
-        # 0. 提取对抗式数据
+        # 0. 格式验证 (最优先检查)
+        format_valid, format_error = self.validate_format(decision)
+        if not format_valid:
+            log.error(f"格式验证失败: {format_error}")
+            return False, decision, format_error
+        
+        # 1. 持仓数量限制检查 (最多3个同时持仓)
+        action = decision.get('action')
+        if action in ['open_long', 'open_short']:
+            # 检查本周期是否已经开过仓
+            try:
+                from src.server.state import global_state
+                if global_state.cycle_positions_opened >= 1:
+                    log.warning(f"本周期已开仓 {global_state.cycle_positions_opened} 次，拒绝新开仓")
+                    return False, decision, f"风控拦截: 本周期已开仓 ({global_state.cycle_positions_opened}/1)，每周期最多开一个新仓位"
+            except Exception as e:
+                log.warning(f"无法检查周期开仓计数: {e}")
+            
+            # 获取当前所有持仓数量
+            try:
+                from src.server.state import global_state
+                
+                # 测试模式: 使用虚拟持仓
+                if global_state.is_test_mode:
+                    position_count = len(global_state.virtual_positions)
+                    if position_count >= 3:
+                        log.warning(f"虚拟持仓数量已达上限: {position_count}/3，拒绝新开仓")
+                        return False, decision, f"风控拦截: 持仓数量已达上限 ({position_count}/3)，禁止新开仓"
+                # 实盘模式: 使用真实账户信息
+                elif account_info and 'positions' in account_info:
+                    active_positions = [p for p in account_info['positions'] if abs(float(p.get('positionAmt', 0))) > 0]
+                    position_count = len(active_positions)
+                    
+                    if position_count >= 3:
+                        log.warning(f"持仓数量已达上限: {position_count}/3，拒绝新开仓")
+                        return False, decision, f"风控拦截: 持仓数量已达上限 ({position_count}/3)，禁止新开仓"
+            except Exception as e:
+                log.warning(f"无法检查持仓数量: {e}")
+        
+        # 2. 提取对抗式数据
         regime = decision.get('regime')
         position = decision.get('position')
-        action = decision.get('action')
         confidence = decision.get('confidence', 0)
         
-        # 1. 市场状态检查 (一票否决)
+        # 2. 市场状态检查 (一票否决)
         if regime:
             r_type = regime.get('regime')
             if r_type == 'unknown':
@@ -62,16 +199,57 @@ class RiskManager:
                 # 震荡市需要极高信心才开仓
                 if action in ['long', 'short', 'open_long', 'open_short']:
                     return False, decision, f"风控拦截: 震荡市且信心不足({confidence:.1f} < 80)，禁止开仓"
+        
+        # 3. 逆势交易检查 (Contra-Trend Check)
+        # 检查是否逆 1h 趋势交易
+        if market_snapshot and action in ['long', 'short', 'open_long', 'open_short']:
+            # 从 market_snapshot 获取 1h 趋势信息
+            stable_1h = market_snapshot.get('stable_1h')
+            if stable_1h is not None and not stable_1h.empty and len(stable_1h) > 26:
+                # 检查 EMA12 和 EMA26
+                if 'ema_12' in stable_1h.columns and 'ema_26' in stable_1h.columns:
+                    ema12 = stable_1h['ema_12'].iloc[-1]
+                    ema26 = stable_1h['ema_26'].iloc[-1]
+                    
+                    # 判断 1h 趋势
+                    trend_1h = 'up' if ema12 > ema26 else 'down'
+                    
+                    # 检查是否逆势
+                    if trend_1h == 'down' and action in ['long', 'open_long']:
+                        return False, decision, f"风控拦截: 1h 下跌趋势中禁止做多 (EMA12:{ema12:.2f} < EMA26:{ema26:.2f})"
+                    elif trend_1h == 'up' and action in ['short', 'open_short']:
+                        return False, decision, f"风控拦截: 1h 上涨趋势中禁止做空 (EMA12:{ema12:.2f} > EMA26:{ema26:.2f})"
 
-        # 2. 位置检查 (位置感应过滤)
+        # 4. 位置检查 (位置感应过滤)
         if position:
             pos_pct = position.get('position_pct', 50)
             location = position.get('location')
             
-            # 禁止在区间中部开仓
+            # 检查是否为趋势整理 (Trend Consolidation)
+            is_trend_consolidation = False
+            if regime and market_snapshot:
+                r_type = regime.get('regime')
+                stable_1h = market_snapshot.get('stable_1h')
+                
+                # 如果是 CHOPPY 且 1h 有明确趋势，则为趋势整理
+                if r_type == 'choppy' and stable_1h is not None and not stable_1h.empty and len(stable_1h) > 26:
+                    if 'ema_12' in stable_1h.columns and 'ema_26' in stable_1h.columns:
+                        ema12 = stable_1h['ema_12'].iloc[-1]
+                        ema26 = stable_1h['ema_26'].iloc[-1]
+                        ema_diff_pct = abs(ema12 - ema26) / ema26 * 100
+                        
+                        # 如果 EMA 差异 > 1%，认为趋势明确
+                        if ema_diff_pct > 1.0:
+                            is_trend_consolidation = True
+                            log.info(f"检测到趋势整理: CHOPPY + 1h趋势明确 (EMA差异: {ema_diff_pct:.2f}%)")
+            
+            # 禁止在区间中部开仓 (除非是趋势整理)
             if location == 'middle' or 40 <= pos_pct <= 60:
                 if action in ['long', 'short', 'open_long', 'open_short']:
-                    return False, decision, f"风控拦截: 价格处于区间中部({pos_pct:.1f}%)，盈亏比极差，禁止开仓"
+                    if not is_trend_consolidation:
+                        return False, decision, f"风控拦截: 价格处于区间中部({pos_pct:.1f}%)，盈亏比极差，禁止开仓"
+                    else:
+                        log.info(f"趋势整理模式: 允许中部位置({pos_pct:.1f}%)开仓")
             
             # 做多位置检查
             if action in ['long', 'open_long'] and pos_pct > 70:
