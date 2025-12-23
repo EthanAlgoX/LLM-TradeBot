@@ -286,7 +286,7 @@ class MultiAgentTradingBot:
             for tf in ['5m', '15m', '1h']:
                 raw_klines = getattr(market_snapshot, f'raw_{tf}')
                 # 保存原始数据
-                self.saver.save_market_data(raw_klines, self.current_symbol, tf)
+                self.saver.save_market_data(raw_klines, self.current_symbol, tf, cycle_id=cycle_id)
                 
                 # 处理并保存指标 (Process indicators)
                 df_with_indicators = self.processor.extract_feature_snapshot(getattr(self.processor.process_klines(raw_klines, self.current_symbol, tf), "copy")())
@@ -298,9 +298,9 @@ class MultiAgentTradingBot:
                 
                 # Let's restore original lines carefully.
                 df_with_indicators = self.processor.process_klines(raw_klines, self.current_symbol, tf)
-                self.saver.save_indicators(df_with_indicators, self.current_symbol, tf, snapshot_id)
+                self.saver.save_indicators(df_with_indicators, self.current_symbol, tf, snapshot_id, cycle_id=cycle_id)
                 features_df = self.processor.extract_feature_snapshot(df_with_indicators)
-                self.saver.save_features(features_df, self.current_symbol, tf, snapshot_id)
+                self.saver.save_features(features_df, self.current_symbol, tf, snapshot_id, cycle_id=cycle_id)
                 
                 # 存入字典供后续步骤复用
                 processed_dfs[tf] = df_with_indicators
@@ -326,7 +326,7 @@ class MultiAgentTradingBot:
             global_state.strategist_score = s_score
             
             # Save Context
-            self.saver.save_context(quant_analysis, self.current_symbol, 'analytics', snapshot_id)
+            self.saver.save_context(quant_analysis, self.current_symbol, 'analytics', snapshot_id, cycle_id=cycle_id)
             
             # LOG 2: QuantAnalyst (The Strategist)
             trend_score = quant_analysis.get('trend', {}).get('total_trend_score', 0)
@@ -350,6 +350,9 @@ class MultiAgentTradingBot:
             p_up_pct = predict_result.probability_up * 100
             direction = "↗UP" if predict_result.probability_up > 0.55 else ("↘DN" if predict_result.probability_up < 0.45 else "➖NEU")
             global_state.add_log(f"🔮 PredictAgent (The Prophet): P(Up)={p_up_pct:.1f}% {direction}")
+            
+            # Save Prediction
+            self.saver.save_prediction(asdict(predict_result), self.current_symbol, snapshot_id, cycle_id=cycle_id)
             
             # Step 3: DeepSeek
             market_data = {
@@ -457,6 +460,7 @@ class MultiAgentTradingBot:
 ================================================================================
 🕐 Timestamp: {datetime.now().isoformat()}
 💱 Symbol: {self.current_symbol}
+🔄 Cycle: #{cycle_id}
 ================================================================================
 
 --------------------------------------------------------------------------------
@@ -688,10 +692,12 @@ class MultiAgentTradingBot:
                     'blocked_reason': audit_result.blocked_reason,
                     'corrections': audit_result.corrections,
                     'warnings': audit_result.warnings,
-                    'order_params': order_params
+                    'order_params': order_params,
+                    'cycle_id': cycle_id
                 },
                 symbol=self.current_symbol,
-                snapshot_id=snapshot_id
+                snapshot_id=snapshot_id,
+                cycle_id=cycle_id
             )
             
             print(f"  ✅ 审计结果: {'✅ 通过' if audit_result.passed else '❌ 拦截'}")
@@ -740,8 +746,9 @@ class MultiAgentTradingBot:
                     'action': 'SIMULATED_EXECUTION',
                     'params': order_params,
                     'status': 'success',
-                    'timestamp': datetime.now().isoformat()
-                }, self.current_symbol)
+                    'timestamp': datetime.now().isoformat(),
+                    'cycle_id': cycle_id
+                }, self.current_symbol, cycle_id=cycle_id)
                 
                 # 💰 测试模式逻辑: 计算 PnL 和更新状态 (Virtual Account)
                 realized_pnl = 0.0
@@ -839,7 +846,8 @@ class MultiAgentTradingBot:
                         'exit_price': exit_test_price,
                         'pnl': realized_pnl,
                         'confidence': order_params['confidence'],
-                        'status': 'SIMULATED'
+                        'status': 'SIMULATED',
+                        'cycle': cycle_id
                     }
                     if is_close_action:
                          trade_record['status'] = 'CLOSED (Fallback)'
@@ -892,8 +900,9 @@ class MultiAgentTradingBot:
                 'action': 'REAL_EXECUTION',
                 'params': order_params,
                 'status': 'success' if executed else 'failed',
-                'timestamp': datetime.now().isoformat()
-            }, self.current_symbol)
+                'timestamp': datetime.now().isoformat(),
+                'cycle_id': cycle_id
+            }, self.current_symbol, cycle_id=cycle_id)
             
             if executed:
                 print("  ✅ 订单执行成功!")
@@ -975,7 +984,8 @@ class MultiAgentTradingBot:
                         'exit_price': exit_price,
                         'pnl': pnl,
                         'confidence': order_params['confidence'],
-                        'status': 'EXECUTED'
+                        'status': 'EXECUTED',
+                        'cycle': cycle_id
                     }
                     if is_close_action:
                          trade_record['status'] = 'CLOSED (Fallback)'

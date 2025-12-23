@@ -74,7 +74,8 @@ class DataSaver:
         klines: List[Dict],
         symbol: str,
         timeframe: str,
-        save_formats: List[str] = ['json', 'csv', 'parquet']
+        save_formats: List[str] = ['json', 'csv', 'parquet'],
+        cycle_id: str = None
     ) -> Dict[str, str]:
         """保存原始K线数据 (原 save_step1_klines)"""
         if not klines:
@@ -101,7 +102,10 @@ class DataSaver:
         }
         
         saved_files = {}
-        filename_base = f'market_data_{symbol}_{timeframe}_{timestamp}'
+        if cycle_id:
+            filename_base = f'market_data_{symbol}_{timeframe}_{timestamp}_cycle_{cycle_id}'
+        else:
+            filename_base = f'market_data_{symbol}_{timeframe}_{timestamp}'
         
         if 'json' in save_formats:
             path = os.path.join(date_folder, f'{filename_base}.json')
@@ -127,13 +131,17 @@ class DataSaver:
         df: pd.DataFrame,
         symbol: str,
         timeframe: str,
-        snapshot_id: str
+        snapshot_id: str,
+        cycle_id: str = None
     ) -> Dict[str, str]:
         """保存技术指标数据 (原 save_step2_indicators)"""
         date_folder = self._get_date_folder('indicators')
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         
-        filename = f'indicators_{symbol}_{timeframe}_{timestamp}_{snapshot_id}.parquet'
+        if cycle_id:
+            filename = f'indicators_{symbol}_{timeframe}_{timestamp}_cycle_{cycle_id}_snap_{snapshot_id}.parquet'
+        else:
+            filename = f'indicators_{symbol}_{timeframe}_{timestamp}_{snapshot_id}.parquet'
         path = os.path.join(date_folder, filename)
         
         df.to_parquet(path)
@@ -146,13 +154,17 @@ class DataSaver:
         symbol: str,
         timeframe: str,
         snapshot_id: str,
-        version: str = 'v1'
+        version: str = 'v1',
+        cycle_id: str = None
     ) -> Dict[str, str]:
         """保存特征数据 (原 save_step3_features)"""
         date_folder = self._get_date_folder('features')
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         
-        filename = f'features_{symbol}_{timeframe}_{timestamp}_{snapshot_id}_{version}.parquet'
+        if cycle_id:
+            filename = f'features_{symbol}_{timeframe}_{timestamp}_cycle_{cycle_id}_snap_{snapshot_id}_{version}.parquet'
+        else:
+            filename = f'features_{symbol}_{timeframe}_{timestamp}_{snapshot_id}_{version}.parquet'
         path = os.path.join(date_folder, filename)
         
         features.to_parquet(path)
@@ -164,13 +176,17 @@ class DataSaver:
         context: Dict,
         symbol: str,
         identifier: str,
-        snapshot_id: str
+        snapshot_id: str,
+        cycle_id: str = None
     ) -> Dict[str, str]:
         """保存Agent上下文/分析结果 (原 save_step4_context)"""
         date_folder = self._get_date_folder('agent_context')
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         
-        filename = f'context_{symbol}_{identifier}_{timestamp}_{snapshot_id}.json'
+        if cycle_id:
+            filename = f'context_{symbol}_{identifier}_{timestamp}_cycle_{cycle_id}_snap_{snapshot_id}.json'
+        else:
+            filename = f'context_{symbol}_{identifier}_{timestamp}_{snapshot_id}.json'
         path = os.path.join(date_folder, filename)
         
         with open(path, 'w', encoding='utf-8') as f:
@@ -226,6 +242,7 @@ class DataSaver:
         # Use cycle_id if provided, otherwise fall back to snapshot_id
         if cycle_id:
             filename = f'decision_{symbol}_{cycle_id}_{timestamp}.json'
+            decision['cycle_id'] = cycle_id  # Ensure it's in the content too
         else:
             filename = f'decision_{symbol}_{timestamp}_{snapshot_id}.json'
         path = os.path.join(date_folder, filename)
@@ -239,13 +256,18 @@ class DataSaver:
     def save_execution(
         self,
         record: Dict,
-        symbol: str
+        symbol: str,
+        cycle_id: str = None
     ) -> Dict[str, str]:
         """保存执行记录"""
         date_folder = self._get_date_folder('orders')
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         
-        filename = f'order_{symbol}_{timestamp}.json'
+        if cycle_id:
+            filename = f'order_{symbol}_{timestamp}_cycle_{cycle_id}.json'
+            record['cycle_id'] = cycle_id
+        else:
+            filename = f'order_{symbol}_{timestamp}.json'
         path = os.path.join(date_folder, filename)
         
         with open(path, 'w', encoding='utf-8') as f:
@@ -266,13 +288,18 @@ class DataSaver:
         self,
         audit_result: Dict,
         symbol: str,
-        snapshot_id: str
+        snapshot_id: str,
+        cycle_id: str = None
     ) -> Dict[str, str]:
         """保存风控审计结果"""
         date_folder = self._get_date_folder('risk_audits')
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         
-        filename = f'audit_{symbol}_{timestamp}_{snapshot_id}.json'
+        if cycle_id:
+            filename = f'audit_{symbol}_{timestamp}_cycle_{cycle_id}_snap_{snapshot_id}.json'
+            audit_result['cycle_id'] = cycle_id
+        else:
+            filename = f'audit_{symbol}_{timestamp}_{snapshot_id}.json'
         path = os.path.join(date_folder, filename)
         
         with open(path, 'w', encoding='utf-8') as f:
@@ -285,13 +312,18 @@ class DataSaver:
         self,
         prediction: Dict,
         symbol: str,
-        snapshot_id: str
+        snapshot_id: str,
+        cycle_id: str = None
     ) -> Dict[str, str]:
         """保存预测预言家(The Prophet)的预测结果"""
         date_folder = self._get_date_folder('predictions')
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         
-        filename = f'prediction_{symbol}_{timestamp}_snap_{snapshot_id}.json'
+        if cycle_id:
+            filename = f'prediction_{symbol}_{timestamp}_cycle_{cycle_id}_snap_{snapshot_id}.json'
+            prediction['cycle_id'] = cycle_id
+        else:
+            filename = f'prediction_{symbol}_{timestamp}_snap_{snapshot_id}.json'
         path = os.path.join(date_folder, filename)
         
         with open(path, 'w', encoding='utf-8') as f:
@@ -334,6 +366,8 @@ class DataSaver:
             
             # 1. 完善基础字段
             trade_data['record_time'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            if 'cycle_id' not in trade_data and 'cycle' in trade_data:
+                trade_data['cycle_id'] = trade_data['cycle']
             
             # 2. 补全缺失字段 (Schema 稳定性)
             for col in self.TRADE_COLUMNS:
