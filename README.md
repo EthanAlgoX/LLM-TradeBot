@@ -370,61 +370,77 @@ LLM-TradeBot/
 ```mermaid
 graph TB
     subgraph "1️⃣ Data Collection Layer"
-        A[🕵️ DataSyncAgent] --> MS[MarketSnapshot<br/>5m/15m/1h + External Data]
+        A["🕵️ DataSyncAgent<br/>(The Oracle)"] --> MS["📊 MarketSnapshot<br/>5m/15m/1h K-Lines"]
     end
     
     subgraph "2️⃣ Quant Analysis Layer"
-        MS --> QA[👨‍🔬 QuantAnalystAgent]
-        QA --> TS[TrendSubAgent]
-        QA --> OS[OscillatorSubAgent]
-        QA --> SS[SentimentSubAgent]
-        TS & OS & SS --> QR[quant_analysis]
+        MS --> QA["👨‍🔬 QuantAnalystAgent<br/>(The Strategist)"]
+        QA --> TS["📈 TrendSubAgent"]
+        QA --> OS["📉 OscillatorSubAgent"]
+        QA --> SS["💹 SentimentSubAgent"]
+        TS & OS & SS --> QR["📋 quant_analysis"]
     end
 
     subgraph "3️⃣ Prediction Layer"
-        MS --> PA[🔮 PredictAgent]
-        PA --> ML[LightGBM Model<br/>Auto-Train 2h]
-        ML --> PR[Prediction<br/>P_Up, Conf]
+        MS --> PA["🔮 PredictAgent<br/>(The Prophet)"]
+        PA --> ML["🤖 LightGBM Model<br/>Auto-Train 2h"]
+        ML --> PR["📊 Prediction<br/>P_Up, Confidence"]
     end
 
     subgraph "4️⃣ Bull/Bear Adversarial Layer"
-        MS --> BULL[🐂 Bull Agent<br/>Optimist]
-        MS --> BEAR[🐻 Bear Agent<br/>Pessimist]
-        BULL --> BP[Bull Perspective<br/>Stance, Reasons]
-        BEAR --> BRP[Bear Perspective<br/>Stance, Reasons]
+        MS --> BULL["🐂 Bull Agent<br/>(Optimist)"]
+        MS --> BEAR["🐻 Bear Agent<br/>(Pessimist)"]
+        BULL --> BP["📗 Bullish View<br/>Stance + Reasons"]
+        BEAR --> BRP["📕 Bearish View<br/>Stance + Reasons"]
     end
     
     subgraph "5️⃣ Reflection Layer"
-        TH[Trade History<br/>Last 10 Trades] --> REF[🧠 ReflectionAgent<br/>The Philosopher]
-        REF --> RI[Reflection Insights<br/>Patterns, Recommendations]
+        TH["📜 Trade History<br/>Last 10 Trades"] --> REF["🧠 ReflectionAgent<br/>(The Philosopher)"]
+        REF --> RI["💡 Insights<br/>Patterns + Tips"]
     end
     
-    subgraph "6️⃣ Decision Adversarial Layer"
-        QR & PR & BP & BRP & RI --> DC[⚖️ DecisionCoreAgent<br/>Weighted Voting]
-        DC --> RD[RegimeDetector]
-        DC --> POS[PositionAnalyzer]
-        RD & POS --> VR[VoteResult<br/>Action, Conf]
+    subgraph "6️⃣ Decision Layer"
+        QR & PR & BP & BRP & RI --> DC["⚖️ DecisionCoreAgent<br/>(The Critic)"]
+        DC --> RD["📊 RegimeDetector"]
+        DC --> POS["📍 PositionAnalyzer"]
+        RD & POS --> VR["🎯 VoteResult<br/>Action + Confidence"]
     end
     
     subgraph "7️⃣ Risk Audit Layer"
-        VR --> RA[🛡️ RiskAuditAgent<br/>Veto Power]
-        RA --> AR[AuditResult<br/>Risk, Guard]
+        VR --> RA["🛡️ RiskAuditAgent<br/>(The Guardian)"]
+        RA --> AR["✅ AuditResult<br/>Risk Level + Pass/Block"]
     end
     
     subgraph "8️⃣ Execution Layer"
-        AR --> EE[🚀 ExecutionEngine]
-        EE -.-> TH
+        AR --> EE["🚀 ExecutionEngine<br/>(The Executor)"]
+        EE -.->|"Trade Complete"| TH
     end
     
-    style A fill:#4A90E2,color:#fff
-    style QA fill:#7ED321,color:#fff
-    style PA fill:#BD10E0,color:#fff
-    style BULL fill:#F8E71C,color:#333
-    style BEAR fill:#F8E71C,color:#333
-    style REF fill:#00CED1,color:#fff
-    style DC fill:#F5A623,color:#fff
-    style RA fill:#D0021B,color:#fff
-    style EE fill:#9013FE,color:#fff
+    %% Node Styles - Color coded by layer
+    style A fill:#4A90E2,color:#fff,stroke:#2171B5,stroke-width:2px
+    style MS fill:#6BAED6,color:#fff,stroke:#4A90E2
+    style QA fill:#7ED321,color:#fff,stroke:#5CB914,stroke-width:2px
+    style TS fill:#A8E063,color:#333,stroke:#7ED321
+    style OS fill:#A8E063,color:#333,stroke:#7ED321
+    style SS fill:#A8E063,color:#333,stroke:#7ED321
+    style QR fill:#5CB914,color:#fff,stroke:#7ED321
+    style PA fill:#BD10E0,color:#fff,stroke:#9B0AB8,stroke-width:2px
+    style ML fill:#D063E0,color:#fff,stroke:#BD10E0
+    style PR fill:#9B0AB8,color:#fff,stroke:#BD10E0
+    style BULL fill:#F8E71C,color:#333,stroke:#D4C512,stroke-width:2px
+    style BEAR fill:#F8E71C,color:#333,stroke:#D4C512,stroke-width:2px
+    style BP fill:#FFF3B0,color:#333,stroke:#F8E71C
+    style BRP fill:#FFF3B0,color:#333,stroke:#F8E71C
+    style REF fill:#00CED1,color:#fff,stroke:#00A5A8,stroke-width:2px
+    style TH fill:#40E0D0,color:#333,stroke:#00CED1
+    style RI fill:#00A5A8,color:#fff,stroke:#00CED1
+    style DC fill:#F5A623,color:#fff,stroke:#D4890F,stroke-width:2px
+    style RD fill:#FFD280,color:#333,stroke:#F5A623
+    style POS fill:#FFD280,color:#333,stroke:#F5A623
+    style VR fill:#D4890F,color:#fff,stroke:#F5A623
+    style RA fill:#D0021B,color:#fff,stroke:#A30116,stroke-width:2px
+    style AR fill:#FF6B6B,color:#fff,stroke:#D0021B
+    style EE fill:#9013FE,color:#fff,stroke:#7010CC,stroke-width:2px
 ```
 
 > 📖 **Detailed Docs**: See [Data Flow Analysis](./docs/data_flow_analysis.md) for complete mechanisms.
