@@ -1542,8 +1542,15 @@ class MultiAgentTradingBot:
         
         try:
             while global_state.is_running:
-                # Check pause/stop state
-                if global_state.execution_mode in ['Paused', 'Stopped']:
+                # Check stop state FIRST - must break before continue
+                if global_state.execution_mode == 'Stopped':
+                    print("\n⏹️ 系统已停止")
+                    global_state.add_log("⏹️ System STOPPED by user")
+                    global_state.is_running = False  # Also set is_running to False
+                    break
+                
+                # Check pause state - continue waiting
+                if global_state.execution_mode == 'Paused':
                     # 首次进入暂停时打印日志
                     if not hasattr(self, '_pause_logged') or not self._pause_logged:
                         print("\n⏸️ 系统已暂停，等待恢复...")
@@ -1553,11 +1560,6 @@ class MultiAgentTradingBot:
                     continue
                 else:
                     self._pause_logged = False  # 重置暂停日志标记
-                
-                if global_state.execution_mode == 'Stopped':
-                    print("\n⏹️ 系统已停止")
-                    global_state.add_log("⏹️ System STOPPED by user")
-                    break
 
                 # ✅ 统一周期计数: 在遍历币种前递增一次
                 global_state.cycle_counter += 1

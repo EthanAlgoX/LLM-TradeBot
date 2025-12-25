@@ -282,49 +282,57 @@
                         <!-- Documentation Sidebar -->
                         <div class="agent-docs-sidebar custom-scroll">
                             <div class="agent-doc-item">
-                                <h4 class="agent-title oracle">🕵️ DataSyncAgent (The Oracle)</h4>
-                                <p class="role"><strong>Role:</strong> Unified data provider, aligns time-space.</p>
+                                <h4 class="agent-title oracle">🕵️ Oracle (DataSync)</h4>
+                                <p class="role">统一数据供应，多维市场快照</p>
                                 <ul>
-                                    <li><strong>Async Fetch:</strong> Multi-timeframe (5m/15m/1h) + Funding Rates.</li>
-                                    <li><strong>Snapshot Alignment:</strong> All data from same "time slice".</li>
-                                    <li><strong>Dual View:</strong> Stable (closed) and Live (real-time) views.</li>
+                                    <li>多周期数据 (5m/15m/1h) + 资金费率</li>
+                                    <li>时间切片对齐，防止数据漂移</li>
+                                    <li>双视图：稳定(收盘) + 实时(跳动)</li>
                                 </ul>
                             </div>
                             <div class="agent-doc-item">
-                                <h4 class="agent-title strategist">👨‍🔬 QuantAnalystAgent (The Strategist)</h4>
-                                <p class="role"><strong>Role:</strong> Signal generator with multi-dimensional analysis.
-                                </p>
+                                <h4 class="agent-title strategist">👨‍🔬 Strategist (QuantAnalyst)</h4>
+                                <p class="role">多维信号生成器，量化分析核心</p>
                                 <ul>
-                                    <li><strong>TrendSubAgent:</strong> Focus on trends (EMA/MACD).</li>
-                                    <li><strong>OscillatorSubAgent:</strong> Focus on reversals (RSI/BB).</li>
-                                    <li><strong>SentimentSubAgent:</strong> Focus on sentiment (Funding/OI).</li>
+                                    <li>趋势子Agent: EMA/MACD 方向判断</li>
+                                    <li>震荡子Agent: RSI/BB 超买超卖</li>
+                                    <li>情绪子Agent: 资金流/费率异动</li>
                                 </ul>
                             </div>
                             <div class="agent-doc-item">
-                                <h4 class="agent-title prophet">🔮 PredictAgent (The Prophet)</h4>
-                                <p class="role"><strong>Role:</strong> ML-powered predictor with probability output.</p>
+                                <h4 class="agent-title prophet">🔮 Prophet (Predict)</h4>
+                                <p class="role">ML预测引擎，概率化决策支持</p>
                                 <ul>
-                                    <li><strong>LightGBM Model:</strong> 50+ features, auto-train every 2h.</li>
-                                    <li><strong>Probability:</strong> Predicts 30-min price direction (0-100%).</li>
-                                    <li><strong>Factor Analysis:</strong> SHAP-based feature importance.</li>
+                                    <li>LightGBM 50+特征，2h自动重训</li>
+                                    <li>30分钟价格方向概率 (0-100%)</li>
+                                    <li>SHAP特征重要性分析</li>
                                 </ul>
                             </div>
                             <div class="agent-doc-item">
-                                <h4 class="agent-title critic">⚖️ DecisionCoreAgent (The Critic)</h4>
-                                <p class="role"><strong>Role:</strong> Adversarial judge with final decision.</p>
+                                <h4 class="agent-title critic">⚖️ Critic (DecisionCore)</h4>
+                                <p class="role">LLM对抗裁判，最终决策中枢</p>
                                 <ul>
-                                    <li><strong>Regime Detection:</strong> Identifies Trending vs Choppy markets.</li>
-                                    <li><strong>Position Awareness:</strong> Price location in historical range.</li>
-                                    <li><strong>Weighted Voting:</strong> Dynamic weight adjustment per regime.</li>
+                                    <li>市场状态识别: 趋势/震荡/混沌</li>
+                                    <li>价格位置感知: 高位/中位/低位</li>
+                                    <li>🐂🐻 多空辩论 → 加权投票</li>
                                 </ul>
                             </div>
                             <div class="agent-doc-item">
-                                <h4 class="agent-title guardian">🛡️ RiskAuditAgent (The Guardian)</h4>
-                                <p class="role"><strong>Role:</strong> Independent auditor with veto power.</p>
+                                <h4 class="agent-title guardian">🛡️ Guardian (RiskAudit)</h4>
+                                <p class="role">独立风控审计，拥有一票否决权</p>
                                 <ul>
-                                    <li><strong>R/R Check:</strong> Minimum 2:1 reward-to-risk ratio.</li>
-                                    <li><strong>Drawdown Protection:</strong> Auto-halt on max drawdown.</li>
-                                    <li><strong>Contra-Trend Block:</strong> Prevents counter-trend trades.</li>
+                                    <li>盈亏比检查: 最低 2:1 风险回报</li>
+                                    <li>回撤保护: 触发阈值自动暂停</li>
+                                    <li>逆势拦截: 阻止明显逆势交易</li>
+                                </ul>
+                            </div>
+                            <div class="agent-doc-item">
+                                <h4 class="agent-title reflection">🪞 Mentor (Reflection)</h4>
+                                <p class="role">交易复盘分析，持续策略进化</p>
+                                <ul>
+                                    <li>每10笔交易触发 LLM 深度复盘</li>
+                                    <li>模式识别: 成功/失败案例总结</li>
+                                    <li>洞察注入: 反馈至 Critic 优化决策</li>
                                 </ul>
                             </div>
                         </div>

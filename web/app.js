@@ -554,13 +554,8 @@ function renderAccount(account) {
 function renderChart(history, initialAmount = null) {
     if (!equityChart) return;
 
-    // Filter for Cycle >= 1 (Skip setup phase Cycle 0)
-    // Also ensures we have valid data points
-    const validHistory = history.filter(h => h.cycle && h.cycle >= 1);
-
-    // If no valid history after filtering, fallback to showing ALL data (including cycle 0)
-    // This ensures the chart always shows something if there's any data
-    const dataToShow = validHistory.length > 0 ? validHistory : history;
+    // Use all history data - including cycle 0 (startup)
+    const dataToShow = history;
 
     const times = dataToShow.map(h => h.time);
     const values = dataToShow.map(h => h.value);

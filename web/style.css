@@ -1086,6 +1086,10 @@ tr:first-child td {
     color: #e84393 !important;
 }
 
+.agent-title.reflection {
+    color: #74b9ff !important;
+}
+
 /* --- Strict Alignment Fix --- */
 .compound-body.split-log-view {
     display: flex !important;

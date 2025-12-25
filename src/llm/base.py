@@ -18,7 +18,7 @@ class LLMConfig:
     base_url: Optional[str] = None
     model: Optional[str] = None
     timeout: int = 120
-    max_retries: int = 3
+    max_retries: int = 5
     temperature: float = 0.7
     max_tokens: int = 4096
     
@@ -146,17 +146,35 @@ class BaseLLMClient(ABC):
             except httpx.HTTPStatusError as e:
                 last_error = e
                 if e.response.status_code in [429, 500, 502, 503, 504]:
-                    # 可重试的错误
+                    # 可重试的 HTTP 错误
                     import time
-                    time.sleep(2 ** attempt)  # 指数退避
+                    wait_time = 2 ** attempt
+                    print(f"⚠️ LLM HTTP Error {e.response.status_code}, retrying in {wait_time}s (attempt {attempt + 1}/{self.config.max_retries})")
+                    time.sleep(wait_time)
                     continue
                 raise
+            except (httpx.ConnectError, httpx.ReadError, httpx.WriteError, 
+                    ConnectionResetError, ConnectionError, OSError) as e:
+                # 网络连接错误，需要重试
+                last_error = e
+                import time
+                wait_time = 2 ** attempt
+                print(f"⚠️ LLM Connection Error: {type(e).__name__}, retrying in {wait_time}s (attempt {attempt + 1}/{self.config.max_retries})")
+                time.sleep(wait_time)
+                continue
             except Exception as e:
                 last_error = e
-                if attempt == self.config.max_retries - 1:
-                    raise
+                # 其他未知错误，最后一次尝试后抛出
+                if attempt < self.config.max_retries - 1:
+                    import time
+                    wait_time = 2 ** attempt
+                    print(f"⚠️ LLM Unexpected Error: {type(e).__name__}: {e}, retrying in {wait_time}s")
+                    time.sleep(wait_time)
+                    continue
+                raise
         
         raise last_error or Exception("Max retries exceeded")
+
     
     def close(self):
         """关闭 HTTP 客户端"""
