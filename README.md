@@ -13,6 +13,13 @@ Intelligent Multi-Agent Quantitative Trading Bot based on the **Adversarial Deci
 
 ---
 
+## 🌐 Web App (Recommended)
+
+**Experience the bot immediately through our web interface:**
+**[👉 Live Dashboard](https://web-production-169bb.up.railway.app/)**
+
+---
+
 ## ✨ Key Features
 
 - 🕵️ **Perception First**: Unlike strict indicator-based systems, this framework prioritizes judging "IF we should trade" before deciding "HOW to trade".
@@ -22,6 +29,41 @@ Intelligent Multi-Agent Quantitative Trading Bot based on the **Adversarial Deci
 - ⚡ **Async Concurrency**: Currently fetches multi-timeframe data (5m/15m/1h) concurrently, ensuring data alignment at the snapshot moment.
 - 🛡️ **Safety First**: Stop-loss direction correction, capital pre-rehearsal, and veto mechanisms to safeguard live trading.
 - 📊 **Full-Link Auditing**: Every decision's adversarial process and confidence penalty details are recorded, achieving true "White-Box" decision-making.
+
+---
+
+## 🤝 Supported Ecosystem
+
+### Supported Exchanges
+
+#### CEX (Centralized Exchanges)
+
+| Exchange | Status | Register (Fee Discount) |
+|----------|--------|-------------------------|
+| **Binance** | ✅ Supported | [Register](https://www.binance.com/join?ref=NOFXENG) |
+| **Bybit** | 🗓️ Coming Soon | [Register](https://partner.bybit.com/b/83856) |
+| **OKX** | 🗓️ Coming Soon | [Register](https://www.okx.com/join/1865360) |
+| **Bitget** | 🗓️ Coming Soon | [Register](https://www.bitget.com/referral/register?from=referral&clacCode=c8a43172) |
+
+#### Perp-DEX (Decentralized Perpetual Exchanges)
+
+| Exchange | Status | Register (Fee Discount) |
+|----------|--------|-------------------------|
+| **Hyperliquid** | 🗓️ Coming Soon | [Register](https://app.hyperliquid.xyz/join/AITRADING) |
+| **Aster DEX** | 🗓️ Coming Soon | [Register](https://www.asterdex.com/en/referral/fdfc0e) |
+| **Lighter** | 🗓️ Coming Soon | [Register](https://app.lighter.xyz/?referral=68151432) |
+
+### Supported AI Models
+
+| AI Model | Status | Get API Key |
+|----------|--------|-------------|
+| **DeepSeek** | ✅ Supported | [Get API Key](https://platform.deepseek.com) |
+| **Qwen** | ✅ Supported | [Get API Key](https://dashscope.console.aliyun.com) |
+| **OpenAI (GPT)** | ✅ Supported | [Get API Key](https://platform.openai.com) |
+| **Claude** | ✅ Supported | [Get API Key](https://console.anthropic.com) |
+| **Gemini** | ✅ Supported | [Get API Key](https://aistudio.google.com) |
+| **Grok** | 🗓️ Coming Soon | [Get API Key](https://console.x.ai) |
+| **Kimi** | 🗓️ Coming Soon | [Get API Key](https://platform.moonshot.cn) |
 
 ---
 
@@ -136,7 +178,7 @@ python main.py --mode continuous
 > - Sufficient USDT balance in Futures wallet
 > - API permissions: Read + Futures Trading enabled
 
-After startup, visit: **<http://localhost:8000>**
+After startup, visit: **<http://localhost:8000>** (or use our [Cloud Hosting](https://web-production-169bb.up.railway.app/))
 
 **Dashboard Features**:
 
