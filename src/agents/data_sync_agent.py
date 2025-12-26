@@ -123,6 +123,8 @@ class DataSyncAgent:
         
         # log.oracle(f"📊 开始并发获取 {symbol} 数据...")
         
+        use_rest_fallback = False
+        
         # WebSocket 模式：从缓存获取数据
         if self.use_websocket and self.ws_manager and self._initial_load_complete:
             # 从 WebSocket 缓存获取数据
@@ -130,15 +132,22 @@ class DataSyncAgent:
             k15m = self.ws_manager.get_klines('15m', limit)
             k1h = self.ws_manager.get_klines('1h', limit)
             
-            # 仍需异步获取外部数据
-            q_data = await quant_client.fetch_coin_data(symbol)
-            loop = asyncio.get_event_loop()
-            b_funding, b_oi = await asyncio.gather(
-                loop.run_in_executor(None, self.client.get_funding_rate_with_cache, symbol),
-                loop.run_in_executor(None, self.client.get_open_interest, symbol)
-            )
-        else:
-            # REST API 模式或首次加载
+            # 检查数据是否足够
+            min_len = min(len(k5m), len(k15m), len(k1h))
+            if min_len < limit:
+                log.warning(f"[{symbol}] WebSocket 缓存数据不足 (min={min_len}, limit={limit})，回退到 REST API")
+                use_rest_fallback = True
+            else:
+                # 仍需异步获取外部数据
+                q_data = await quant_client.fetch_coin_data(symbol)
+                loop = asyncio.get_event_loop()
+                b_funding, b_oi = await asyncio.gather(
+                    loop.run_in_executor(None, self.client.get_funding_rate_with_cache, symbol),
+                    loop.run_in_executor(None, self.client.get_open_interest, symbol)
+                )
+
+        if not self.use_websocket or not self.ws_manager or not self._initial_load_complete or use_rest_fallback:
+            # REST API 模式或首次加载 / 回退模式
             loop = asyncio.get_event_loop()
             
             tasks = [
