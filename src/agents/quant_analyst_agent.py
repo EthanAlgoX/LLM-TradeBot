@@ -146,14 +146,14 @@ class QuantAnalystAgent:
             has_data = True
             oi_value = float(b_oi['open_interest'])
             
-            # 获取历史OI数据计算变化
+            # Get symbol for tracking
             symbol = getattr(snapshot, 'symbol', 'BTCUSDT')
             
-            # Record current OI and get 24h change
-            oi_tracker.record(symbol, oi_value)
+            # 🔴 CRITICAL FIX: Check for anomaly BEFORE recording
+            # Get 24h change WITHOUT recording current value first
             oi_change_24h = oi_tracker.get_change_pct(symbol, hours=24)
             
-            # 🔴 OI Anomaly Detection (Critical Fix)
+            # OI Anomaly Detection
             # Values > 200% or < -80% are likely data errors and should be filtered
             OI_ANOMALY_THRESHOLD_HIGH = 200.0  # >200% = data error
             OI_ANOMALY_THRESHOLD_LOW = -80.0   # <-80% = data error
@@ -164,10 +164,16 @@ class QuantAnalystAgent:
                     oi_is_anomaly = True
                     details['oi_anomaly'] = True
                     details['oi_anomaly_value'] = oi_change_24h
-                    details['oi_signal'] = f"⚠️ DATA_ANOMALY ({oi_change_24h:.1f}% > {OI_ANOMALY_THRESHOLD_HIGH}%)"
-                    log.warning(f"[{symbol}] OI Anomaly detected: {oi_change_24h:.1f}% - filtering from analysis")
+                    details['oi_signal'] = f"⚠️ DATA_ANOMALY ({oi_change_24h:.1f}% exceeds threshold)"
+                    log.warning(f"[{symbol}] OI Anomaly detected: {oi_change_24h:.1f}% - NOT recording to tracker")
                     # Reset to None to prevent downstream corruption
                     oi_change_24h = None
+            
+            # ✅ Only record if NOT anomalous
+            if not oi_is_anomaly:
+                oi_tracker.record(symbol, oi_value)
+                # Recalculate after recording
+                oi_change_24h = oi_tracker.get_change_pct(symbol, hours=24)
             
             if oi_change_24h is not None and not oi_is_anomaly:
                 details['oi_change_24h_pct'] = oi_change_24h

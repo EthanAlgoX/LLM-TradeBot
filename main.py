@@ -639,6 +639,14 @@ class MultiAgentTradingBot:
                         four_layer_result['kdj_j'] = kdj_j
                         four_layer_result['bb_position'] = 'upper' if close_15m > bb_upper else 'lower' if close_15m < bb_lower else 'middle'
                         
+                        # 🔴 Bug #3 Fix: Add explicit kdj_zone field
+                        if kdj_j > 80 or close_15m > bb_upper:
+                            four_layer_result['kdj_zone'] = 'overbought'
+                        elif kdj_j < 20 or close_15m < bb_lower:
+                            four_layer_result['kdj_zone'] = 'oversold'
+                        else:
+                            four_layer_result['kdj_zone'] = 'neutral'
+                        
                         # Specification logic for long setup
                         if trend_1h == 'long':
                             # Filter: Too high (overbought)
@@ -1016,7 +1024,19 @@ class MultiAgentTradingBot:
                 if 'vote_details' not in decision_dict:
                     decision_dict['vote_details'] = {}
                 decision_dict['vote_details']['oi_fuel'] = quant_analysis.get('sentiment', {}).get('oi_fuel', {})
-                decision_dict['vote_details']['kdj_zone'] = global_state.four_layer_result.get('bb_position', 'unknown')
+                
+                # 🔴 Bug #6 Fix: Use explicit kdj_zone if available, else map bb_position
+                kdj_zone = global_state.four_layer_result.get('kdj_zone')
+                if not kdj_zone:
+                    bb_position = global_state.four_layer_result.get('bb_position', 'unknown')
+                    bb_to_zone_map = {
+                        'upper': 'overbought',
+                        'lower': 'oversold',
+                        'middle': 'neutral',
+                        'unknown': 'unknown'
+                    }
+                    kdj_zone = bb_to_zone_map.get(bb_position, 'unknown')
+                decision_dict['vote_details']['kdj_zone'] = kdj_zone
                 
                 # Update Market Context
                 if vote_result.regime:
@@ -1152,7 +1172,19 @@ class MultiAgentTradingBot:
             if 'vote_details' not in decision_dict:
                 decision_dict['vote_details'] = {}
             decision_dict['vote_details']['oi_fuel'] = quant_analysis.get('sentiment', {}).get('oi_fuel', {})
-            decision_dict['vote_details']['kdj_zone'] = global_state.four_layer_result.get('bb_position', 'unknown')
+            
+            # 🔴 Bug #6 Fix: Use explicit kdj_zone if available, else map bb_position
+            kdj_zone = global_state.four_layer_result.get('kdj_zone')
+            if not kdj_zone:
+                bb_position = global_state.four_layer_result.get('bb_position', 'unknown')
+                bb_to_zone_map = {
+                    'upper': 'overbought',
+                    'lower': 'oversold',
+                    'middle': 'neutral',
+                    'unknown': 'unknown'
+                }
+                kdj_zone = bb_to_zone_map.get(bb_position, 'unknown')
+            decision_dict['vote_details']['kdj_zone'] = kdj_zone
             
             # Update Market Context
             if vote_result.regime:
