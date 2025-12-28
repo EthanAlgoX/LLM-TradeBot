@@ -355,8 +355,10 @@ function renderDecisionTable(history, positions = []) {
 
         // Position with semantic icons
         let posHtml = '<span class="cell-na">-</span>';
-        if (d.position && d.position.location) {
-            let pos = (d.position.location || 'unknown').toLowerCase();
+        // Fallback: try d.position first, then d.regime if it has position_pct
+        let positionData = d.position || (d.regime && d.regime.position_pct !== undefined ? d.regime : null);
+        if (positionData && positionData.location) {
+            let pos = (positionData.location || 'unknown').toLowerCase();
             let icon = '➖';
             let cls = 'neutral';
 
@@ -366,8 +368,8 @@ function renderDecisionTable(history, positions = []) {
                 icon = '🔻'; cls = 'pos';
             }
 
-            let posPct = d.position.position_pct !== undefined ? parseFloat(d.position.position_pct).toFixed(0) : '?';
-            posHtml = `<span class="val ${cls}" title="${d.position.location}: ${posPct}%" style="font-size:0.8em">${icon}${posPct}%</span>`;
+            let posPct = positionData.position_pct !== undefined ? parseFloat(positionData.position_pct).toFixed(0) : '?';
+            posHtml = `<span class="val ${cls}" title="${positionData.location}: ${posPct}%" style="font-size:0.8em">${icon}${posPct}%</span>`;
         }
 
         // === NEW: KDJ Zone ===

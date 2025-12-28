@@ -577,22 +577,26 @@ class MultiAgentTradingBot:
                 four_layer_result['blocking_reason'] = f"Weak Trend Strength (ADX {adx_value:.0f} < 20)"
                 log.info(f"❌ Layer 1 FAIL: ADX={adx_value:.0f} < 20, trend not strong enough")
             elif trend_1h == 'long' and oi_change < -5.0:
-                four_layer_result['blocking_reason'] = f"OI Divergence: Trend UP but OI {oi_change:.1f}% (禁止开仓)"
+                four_layer_result['blocking_reason'] = f"OI Divergence: Trend UP but OI {oi_change:.1f}%"
                 log.warning(f"🚨 Layer 1 FAIL: OI Divergence - Price up but OI {oi_change:.1f}%")
             elif trend_1h == 'short' and oi_change > 5.0:
-                four_layer_result['blocking_reason'] = f"OI Divergence: Trend DOWN but OI +{oi_change:.1f}% (禁止开仓)"
+                four_layer_result['blocking_reason'] = f"OI Divergence: Trend DOWN but OI +{oi_change:.1f}%"
                 log.warning(f"🚨 Layer 1 FAIL: OI Divergence - Price down but OI +{oi_change:.1f}%")
-            # Specification: Weak Fuel - abs(OI) < 1.0% means low volatility, not worth trading
-            elif abs(oi_change) < 1.0:
-                four_layer_result['blocking_reason'] = f"Weak Fuel (OI {oi_change:.1f}% < 1%)"
-                log.info(f"❌ Layer 1 FAIL: Weak fuel - OI change too low")
             elif trend_1h == 'long' and oi_fuel.get('whale_trap_risk', False):
                 four_layer_result['blocking_reason'] = f"Whale trap detected (OI {oi_change:.1f}%)"
                 log.warning(f"🐋 Layer 1 FAIL: Whale exit trap")
             else:
                 four_layer_result['layer1_pass'] = True
-                # Specification: Strong Fuel > 3%, Moderate 1-3%
-                fuel_strength = 'Strong' if abs(oi_change) > 3.0 else 'Moderate'
+                
+                # 🔴 Issue #3 Fix: Weak Fuel is WARNING, not BLOCK
+                if abs(oi_change) < 1.0:
+                    four_layer_result['fuel_warning'] = f"Weak Fuel (OI {oi_change:.1f}%)"
+                    four_layer_result['confidence_penalty'] = -10
+                    log.warning(f"⚠️ Layer 1 WARNING: Weak fuel - OI {oi_change:.1f}% (proceed with caution)")
+                    fuel_strength = 'Weak'
+                else:
+                    # Specification: Strong Fuel > 3%, Moderate 1-3%
+                    fuel_strength = 'Strong' if abs(oi_change) > 3.0 else 'Moderate'
                 log.info(f"✅ Layer 1 PASS: {trend_1h.upper()} trend + {fuel_strength} Fuel (OI {oi_change:+.1f}%)")
                 
                 # Layer 2: AI Prediction Filter
@@ -647,35 +651,42 @@ class MultiAgentTradingBot:
                         else:
                             four_layer_result['kdj_zone'] = 'neutral'
                         
+                        # 🔴 Issue #2 Fix: Pullback Strategy (Buy the Dip)
                         # Specification logic for long setup
                         if trend_1h == 'long':
-                            # Filter: Too high (overbought)
+                            # Filter: Too high (overbought) - WAIT for pullback
                             if close_15m > bb_upper or kdj_j > 80:
                                 setup_ready = False
-                                four_layer_result['blocking_reason'] = f"15m overbought (J={kdj_j:.0f} or Close>{bb_upper:.0f})"
-                                log.info(f"⏳ Layer 3 WAIT: Overbought - J={kdj_j:.0f}, Close vs BB_upper")
-                            # Ready: Pullback position
+                                four_layer_result['blocking_reason'] = f"15m overbought (J={kdj_j:.0f}) - wait for pullback"
+                                log.info(f"⏳ Layer 3 WAIT: Overbought - waiting for pullback")
+                            # IDEAL: Pullback position (best entry in uptrend!)
                             elif close_15m < bb_middle or kdj_j < 40:
                                 setup_ready = True
-                                log.info(f"✅ Layer 3 READY: Pullback - J={kdj_j:.0f} < 40 or Close < BB_middle")
+                                four_layer_result['setup_quality'] = 'IDEAL'
+                                log.info(f"✅ Layer 3 READY: IDEAL PULLBACK - J={kdj_j:.0f} < 40 or Close < BB_middle")
+                            # Acceptable: Neutral/mid-range (not ideal but OK)
                             else:
-                                setup_ready = False
-                                four_layer_result['blocking_reason'] = f"15m neutral position (J={kdj_j:.0f})"
-                                log.info(f"⏳ Layer 3 WAIT: Neutral - J={kdj_j:.0f} (need < 40)")
+                                setup_ready = True  # ✅ Changed from False
+                                four_layer_result['setup_quality'] = 'ACCEPTABLE'
+                                log.info(f"✅ Layer 3 READY: Acceptable mid-range entry (J={kdj_j:.0f})")
                         
                         # Specification logic for short setup
                         elif trend_1h == 'short':
-                            # Filter: Too low (oversold)
+                            # Filter: Too low (oversold) - WAIT for rally
                             if close_15m < bb_lower or kdj_j < 20:
                                 setup_ready = False
-                                four_layer_result['blocking_reason'] = f"15m oversold (J={kdj_j:.0f} or Close<{bb_lower:.0f})"
-                            # Ready: Rally position
+                                four_layer_result['blocking_reason'] = f"15m oversold (J={kdj_j:.0f}) - wait for rally"
+                                log.info(f"⏳ Layer 3 WAIT: Oversold - waiting for rally")
+                            # IDEAL: Rally position (best entry in downtrend!)
                             elif close_15m > bb_middle or kdj_j > 60:
                                 setup_ready = True
-                                log.info(f"✅ Layer 3 READY: Rally - J={kdj_j:.0f} > 60 or Close > BB_middle")
+                                four_layer_result['setup_quality'] = 'IDEAL'
+                                log.info(f"✅ Layer 3 READY: IDEAL RALLY - J={kdj_j:.0f} > 60 or Close > BB_middle")
+                            # Acceptable: Neutral/mid-range
                             else:
-                                setup_ready = False
-                                four_layer_result['blocking_reason'] = f"15m neutral position (J={kdj_j:.0f})"
+                                setup_ready = True  # ✅ Changed from False
+                                four_layer_result['setup_quality'] = 'ACCEPTABLE'
+                                log.info(f"✅ Layer 3 READY: Acceptable mid-range entry (J={kdj_j:.0f})")
                         else:
                             setup_ready = False
                     
@@ -1796,6 +1807,9 @@ class MultiAgentTradingBot:
 - Current Price: ${current_price:,.2f}
 
 {position_section}
+
+- **MACD (15m)**: {macd_semantic} (Diff: {macd_15m if macd_15m else 'N/A'})
+  - Histogram: {'Expanding ↗' if macd_15m and macd_15m > 0 else 'Contracting ↘' if macd_15m else 'N/A'}
 
 ## 2. Four-Layer Strategy Status
 """
