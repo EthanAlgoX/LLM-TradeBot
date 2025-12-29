@@ -322,7 +322,8 @@ class PredictAgent:
             prob_down = 1.0 - prob_up
         
         # 计算置信度 (基于信号强度)
-        confidence = min(1.0, (bullish_score + bearish_score) / 0.5)
+        # 🔧 FIX C2: Cap rule-based confidence at 70% to prevent over-aggressive AI Veto
+        confidence = min(0.70, (bullish_score + bearish_score) / 0.5)
         
         return PredictResult(
             probability_up=round(prob_up, 4),

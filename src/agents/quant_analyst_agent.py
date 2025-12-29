@@ -158,6 +158,8 @@ class QuantAnalystAgent:
                 vol_ratio = current_vol / avg_vol
                 # Convert ratio to percentage change for compatibility: 1.5x -> +50%
                 vol_change_pct = (vol_ratio - 1) * 100
+                # 🔧 FIX C1: Clamp extreme values to prevent display issues
+                vol_change_pct = max(min(vol_change_pct, 200), -100)
             else:
                 vol_change_pct = 0
             

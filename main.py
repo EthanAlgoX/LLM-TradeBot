@@ -200,7 +200,9 @@ class MultiAgentTradingBot:
         )
         self.processor = MarketDataProcessor()  # ✅ 初始化数据处理器
         self.feature_engineer = TechnicalFeatureEngineer()  # 🔮 特征工程器 for Prophet
-        # self.regime_detector = RegimeDetector()  # 📊 市场状态检测器 (Integrated into QuantAnalystAgent)
+        # 🔧 FIX M4: Cache RegimeDetector to avoid per-cycle reinstantiation
+        from src.agents.regime_detector import RegimeDetector
+        self.regime_detector = RegimeDetector()  # 📊 市场状态检测器
         
         # 🔮 为每个币种创建独立的 PredictAgent
         self.predict_agents = {}
@@ -577,10 +579,9 @@ class MultiAgentTradingBot:
             if funding_rate is None: funding_rate = 0
             
             # 🆕 Get ADX from RegimeDetector for trend strength validation
-            from src.agents.regime_detector import RegimeDetector
-            regime_detector = RegimeDetector()
+            # 🔧 FIX M4: Use cached regime_detector instead of creating new instance
             df_1h = processed_dfs['1h']
-            regime_result = regime_detector.detect_regime(df_1h) if len(df_1h) >= 20 else {'adx': 20, 'regime': 'unknown'}
+            regime_result = self.regime_detector.detect_regime(df_1h) if len(df_1h) >= 20 else {'adx': 20, 'regime': 'unknown'}
             adx_value = regime_result.get('adx', 20)
             
             # Initialize filter results with enhanced fields
