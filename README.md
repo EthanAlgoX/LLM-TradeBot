@@ -320,92 +320,66 @@ LLM-TradeBot/
 
 ## 🎯 Core Architecture
 
-### Adversarial Multi-Agent Workflow
+### 12-Agent Collaborative Framework + Four-Layer Strategy
 
-1. **🕵️ DataSyncAgent (The Oracle)**
-    - **Role**: Unified Data Provider.
-    - **Action**: Asynchronously fetches and aligns multi-timeframe K-lines (5m, 15m, 1h) and external quant data (Netflow, LSR) to ensure a consistent market snapshot.
+The system uses a **Four-Layer Strategy Filter** architecture with 12 specialized Agents collaborating to make trading decisions:
 
-2. **👨‍🔬 QuantAnalystAgent (The Strategist)**
-    - **Role**: Signal Generator (Technical Analysis).
-    - **Composition**:
-        - `TrendSubAgent`: Analyzes EMA/MACD across timeframes.
-        - `OscillatorSubAgent`: Detects reversal zones using RSI/Bollinger Bands.
-        - `SentimentSubAgent`: Incorporates external data like Funding Rates and Open Interest.
-    - **Output**: A raw comprehensive score and detailed sub-signal breakdown.
+#### Data Layer Agents
 
-3. **🔮 PredictAgent (The Prophet)**
-    - **Role**: **Future Predictor (ML Model)**.
-    - **Action**:
-        - Uses **LightGBM** machine learning model trained on historical data.
-        - Analyzes 50+ technical features to predict price direction for the next **30 minutes**.
-        - Supports auto-retraining (every 2h) to adapt to changing market conditions.
-    - **Output**: Probability of price increase (P_Up) and confidence score.
+| Agent | Role | Responsibility |
+|-------|------|----------------|
+| **🕵️ DataSyncAgent** | The Oracle | Async concurrent fetch of 5m/15m/1h K-lines, ensuring snapshot consistency |
+| **👨‍🔬 QuantAnalystAgent** | The Strategist | Generates trend scores, oscillators, sentiment, and OI Fuel (Volume Proxy) |
 
-4. **🐂 Bull Agent (The Optimist)**
-    - **Role**: Bullish Market Advocate.
-    - **Action**: Analyzes the same market data but focuses **exclusively on bullish signals**.
-    - **Output**:
-        - `stance`: `STRONGLY_BULLISH` / `SLIGHTLY_BULLISH` / `NEUTRAL` / `UNCERTAIN`
-        - `bullish_reasons`: Key observations supporting a long position
-        - `bull_confidence`: 0-100% confidence in the bullish case
+#### Prediction Layer Agents
 
-5. **🐻 Bear Agent (The Pessimist)**
-    - **Role**: Bearish Market Advocate.
-    - **Action**: Analyzes the same market data but focuses **exclusively on bearish signals**.
-    - **Output**:
-        - `stance`: `STRONGLY_BEARISH` / `SLIGHTLY_BEARISH` / `NEUTRAL` / `UNCERTAIN`
-        - `bearish_reasons`: Key observations supporting a short position
-        - `bear_confidence`: 0-100% confidence in the bearish case
+| Agent | Role | Responsibility |
+|-------|------|----------------|
+| **🔮 PredictAgent** | The Prophet | Predicts price probability using Rule-based/ML scoring |
+| **🎯 RegimeDetector** | Regime Analyzer | Detects market state (Trending/Choppy) and ADX strength |
+| **🤖 AIFilter** | AI Validator | AI-Trend alignment verification with veto power |
 
-6. **⚖️ DecisionCoreAgent (The Critic)**
-    - **Role**: **Adversarial Judge**.
-    - **Action**:
-        - **Contextualization**: Uses `RegimeDetector` to identify market state (Trending/Choppy) and `PositionAnalyzer` to locate price relative to history.
-        - **Adversarial Input**: Receives **both Bull and Bear perspectives** to make balanced decisions.
-        - **Integration**: Combines Strategist's technical signals with Prophet's ML predictions and Bull/Bear viewpoints.
-        - **Weighted Voting**: Re-evaluates granular signals with dynamic weights adapted to the current regime.
-        - **Output**: The final trading intent (Long/Short/Wait) with a confidence score.
+#### Semantic Analysis Layer Agents (LLM Context Generation)
 
-7. **🛡️ RiskAuditAgent (The Guardian)**
-    - **Role**: Risk Controller.
-    - **Action**: Physically independent audit layer. Checks Max Drawdown protection, R/R requirements, and exposure limits. Has **Veto Power** to block high-risk trades regardless of high confidence.
+| Agent | Role | Responsibility |
+|-------|------|----------------|
+| **📈 TrendAgent** | Trend Summarizer | Generates trend semantic analysis (UPTREND/DOWNTREND) |
+| **📊 SetupAgent** | Setup Analyzer | Generates entry zone analysis (PULLBACK_ZONE/OVERBOUGHT) |
+| **⚡ TriggerAgent** | Trigger Reporter | Generates trigger signal analysis (CONFIRMED/WAITING) |
 
-8. **🧠 ReflectionAgent (The Philosopher)** 🆕
-    - **Role**: Trading Retrospection Analyst.
-    - **Trigger**: Automatically runs after every **10 completed trades**.
-    - **Action**:
-        - Analyzes recent trade history for patterns (winning/losing conditions).
-        - Identifies confidence calibration issues (over/under-confident decisions).
-        - Generates actionable recommendations for improvement.
-    - **Integration**: Reflection insights are injected into the Decision Agent's prompt to influence future decisions.
-    - **Output**: Structured analysis with patterns, recommendations, and market insights.
+#### Decision & Execution Layer Agents
 
-9. **🚀 ExecutionEngine**
-    - **Role**: Sniper.
-    - **Action**: Precision execution within the closing seconds of the candle, handling order lifecycle and state updates.
+| Agent | Role | Responsibility |
+|-------|------|----------------|
+| **🧠 StrategyEngine** | LLM Decision | DeepSeek LLM Bull/Bear debate decision engine |
+| **👮 RiskAuditAgent** | The Guardian | Risk audit with absolute veto power |
+| **🧠 ReflectionAgent** | The Philosopher | Trade reflection, provides historical lessons to LLM |
+| **🚀 ExecutionEngine** | The Executor | Precision order execution and state management |
 
-### Collaboration Sequence
+### Four-Layer Strategy Filter
 
-![Multi-Agent Sequence](./docs/multi_agent_sequence_9agents.png)
-
-*9 Agents working together: Oracle → Strategist → Prophet → Bull/Bear → Philosopher → Critic → Guardian → Executor*
+```text
+Layer 1: Trend + Fuel (1h EMA + Volume Proxy)
+    ↓ PASS/FAIL
+Layer 2: AI Filter (PredictAgent direction alignment)
+    ↓ PASS/VETO
+Layer 3: Setup (15m KDJ + Bollinger Bands entry zone)
+    ↓ READY/WAIT
+Layer 4: Trigger (5m Pattern + RVOL volume confirmation)
+    ↓ CONFIRMED/WAITING
+    ↓
+🧠 LLM Decision (DeepSeek Bull/Bear Debate)
+    ↓
+👮 Risk Audit (Veto Power)
+    ↓
+🚀 Execution
+```
 
 ### Data Flow Architecture
 
 ![Data Flow Architecture](./docs/data_flow_diagram_9agents.png)
 
 **Architecture Details**:
-
-1. **Data Collection Layer** (Blue): DataSyncAgent async concurrent collection
-2. **Quant Analysis Layer** (Green): QuantAnalystAgent with 3 parallel Sub-Agents
-3. **Prediction Layer** (Magenta): PredictAgent with LightGBM ML model
-4. **Bull/Bear Adversarial Layer** (Yellow): 🐂 Bull Agent + 🐻 Bear Agent provide opposing perspectives
-5. **Reflection Layer** (Cyan): 🧠 ReflectionAgent analyzes trade history every 10 trades 🆕
-6. **Decision Adversarial Layer** (Orange): DecisionCoreAgent with regime-aware weighted voting + Bull/Bear + Reflection input
-7. **Risk Audit Layer** (Red): RiskAuditAgent final check and auto-correction
-8. **Execution Layer** (Purple): ExecutionEngine order execution
-9. **Visualization Layer**: Recent Decisions table showing full Agent data
 
 #### Detailed Flowchart
 

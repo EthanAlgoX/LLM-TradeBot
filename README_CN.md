@@ -173,38 +173,60 @@ LLM-TradeBot/
 
 ## 🎯 核心架构
 
-### 对抗式 Multi-Agent 协作流程
+### 12-Agent 协作框架 + 四层策略过滤
 
-1. **🕵️ DataSyncAgent (The Oracle)**
-    - **角色**: 统一数据提供者。
-    - **职责**: 异步并发采集并对齐多周期 K 线 (5m, 15m, 1h) 及外部量化数据 (网络流量, 多空比)，确保市场快照的一致性。
+本系统采用 **四层策略过滤 (Four-Layer Strategy)** 架构，结合 12 个专业化 Agent 协作完成交易决策：
 
-2. **👨‍🔬 QuantAnalystAgent (The Strategist)**
-    - **角色**: 信号生成器。
-    - **组成**:
-        - `TrendSubAgent`: 跨周期分析 EMA/MACD。
-        - `OscillatorSubAgent`: 利用 RSI/布林带检测反转区间。
-        - `SentimentSubAgent`: 整合资金费率、持仓量等外部数据。
-    - **输出**: 原始综合得分及详细的子信号拆解。
+#### 数据层 Agents
 
-3. **⚖️ DecisionCoreAgent (The Critic)**
-    - **角色**: **对抗式判官**。
-    - **职责**:
-        - **环境感知**: 使用 `RegimeDetector` 识别市场状态 (趋势/震荡) 并利用 `PositionAnalyzer` 定位价格历史位置。
-        - **加权投票**: 结合当前市场状态，动态调整权重，对策略师的细粒度信号进行二次评估。
-        - **输出**: 最终交易意图 (做多/做空/观望) 及信心评分。
+| Agent | 角色 | 职责 |
+|-------|------|------|
+| **🕵️ DataSyncAgent** | The Oracle | 异步并发采集 5m/15m/1h K线数据，确保市场快照一致性 |
+| **👨‍🔬 QuantAnalystAgent** | The Strategist | 生成趋势评分、震荡指标、情绪分析及 OI Fuel |
 
-4. **🛡️ RiskAuditAgent (The Guardian)**
-    - **角色**: 风控官。
-    - **职责**: 物理独立的审计层。检查最大回撤保护、盈亏比 (R/R) 要求及风险敞口限制。拥有 **一票否决权**，可阻断高信心但高风险的交易。
+#### 预测层 Agents
 
-5. **🚀 ExecutionEngine**
-    - **角色**: 狙击手。
-    - **职责**: 在 K 线收盘前的最后几秒内精准执行，并管理订单生命周期及状态更新。
+| Agent | 角色 | 职责 |
+|-------|------|------|
+| **🔮 PredictAgent** | The Prophet | 基于技术特征预测价格上涨概率 (Rule-based/ML) |
+| **🎯 RegimeDetector** | Regime Analyzer | 检测市场状态 (趋势/震荡) 及 ADX 强度 |
+| **🤖 AIFilter** | AI Validator | AI 预测与趋势方向一致性验证，拥有否决权 |
 
-### 协作时序图
+#### 语义分析层 Agents (LLM 上下文生成)
 
-![Multi-Agent 协作时序](./docs/multi_agent_sequence_1766232561419.png)
+| Agent | 角色 | 职责 |
+|-------|------|------|
+| **📈 TrendAgent** | Trend Summarizer | 生成趋势方向语义分析 (UPTREND/DOWNTREND) |
+| **📊 SetupAgent** | Setup Analyzer | 生成入场位置语义分析 (PULLBACK_ZONE/OVERBOUGHT) |
+| **⚡ TriggerAgent** | Trigger Reporter | 生成触发信号语义分析 (CONFIRMED/WAITING) |
+
+#### 决策与执行层 Agents
+
+| Agent | 角色 | 职责 |
+|-------|------|------|
+| **🧠 StrategyEngine** | LLM Decision | DeepSeek LLM 多空辩论决策引擎 |
+| **👮 RiskAuditAgent** | The Guardian | 风控审计，拥有一票否决权 |
+| **🧠 ReflectionAgent** | The Philosopher | 交易反思，为 LLM 提供历史教训 |
+| **🚀 ExecutionEngine** | The Executor | 精准执行订单及状态管理 |
+
+### 四层策略过滤 (Four-Layer Strategy)
+
+```text
+Layer 1: Trend + Fuel (1h EMA + Volume Proxy)
+    ↓ PASS/FAIL
+Layer 2: AI Filter (PredictAgent 方向一致性验证)
+    ↓ PASS/VETO
+Layer 3: Setup (15m KDJ + Bollinger Bands 入场位置)
+    ↓ READY/WAIT
+Layer 4: Trigger (5m 形态 + RVOL 放量确认)
+    ↓ CONFIRMED/WAITING
+    ↓
+🧠 LLM Decision (DeepSeek 多空辩论)
+    ↓
+👮 Risk Audit (一票否决)
+    ↓
+🚀 Execution
+```
 
 ### 数据流转架构
 
