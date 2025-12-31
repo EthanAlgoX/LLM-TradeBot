@@ -5,303 +5,155 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login - LLM-TradeBot</title>
-    <link
-        href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600&display=swap"
-        rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
     <style>
-        :root {
-            --bg-color: #0f1115;
-            --card-bg: rgba(23, 15, 30, 0.6);
-            --primary: #00ff9d;
-            --danger: #ff4757;
-            --text-main: #e2e8f0;
-            --text-dim: #94a3b8;
-        }
-
         body {
-            margin: 0;
-            padding: 0;
-            font-family: 'Inter', sans-serif;
-            background-color: var(--bg-color);
-            background-image:
-                radial-gradient(circle at 15% 50%, rgba(0, 255, 157, 0.08), transparent 25%),
-                radial-gradient(circle at 85% 30%, rgba(66, 153, 225, 0.08), transparent 25%);
-            color: var(--text-main);
-            height: 100vh;
             display: flex;
-            align-items: center;
             justify-content: center;
-            overflow: hidden;
+            align-items: center;
+            min-height: 100vh;
+            background: var(--bg-primary);
+            margin: 0;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
         }
 
-        .login-container {
+        .login-card {
+            background: var(--bg-secondary);
+            padding: 2.5rem;
+            border-radius: 16px;
             width: 100%;
             max-width: 400px;
-            padding: 40px;
-            background: var(--card-bg);
-            backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 16px;
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+            border: 1px solid var(--border-color);
             text-align: center;
-            animation: fadeIn 0.6s ease-out;
-        }
-
-        @keyframes fadeIn {
-            from {
-                opacity: 0;
-                transform: translateY(20px);
-            }
-
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
         }
 
         .logo {
-            font-size: 48px;
-            margin-bottom: 20px;
-            display: inline-block;
-            animation: float 6s ease-in-out infinite;
-        }
-
-        @keyframes float {
-
-            0%,
-            100% {
-                transform: translateY(0);
-            }
-
-            50% {
-                transform: translateY(-10px);
-            }
+            font-size: 3rem;
+            margin-bottom: 1rem;
         }
 
         h1 {
-            font-size: 24px;
-            font-weight: 600;
-            margin: 0 0 8px 0;
-            background: linear-gradient(135deg, #fff 0%, #a0aec0 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
+            color: var(--text-primary);
+            margin-bottom: 0.5rem;
+            font-size: 1.5rem;
         }
 
-        p.subtitle {
-            margin: 0 0 30px 0;
-            color: var(--text-dim);
-            font-size: 14px;
+        p {
+            color: var(--text-secondary);
+            margin-bottom: 2rem;
+            font-size: 0.9rem;
         }
 
         .form-group {
-            margin-bottom: 20px;
+            margin-bottom: 1.5rem;
             text-align: left;
         }
 
         label {
             display: block;
-            margin-bottom: 8px;
-            font-size: 12px;
-            color: var(--text-dim);
-            text-transform: uppercase;
-            letter-spacing: 1px;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
         }
 
-        input[type="password"] {
+        input {
             width: 100%;
-            padding: 12px 16px;
-            background: rgba(0, 0, 0, 0.3);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 12px;
             border-radius: 8px;
-            color: #fff;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 16px;
-            outline: none;
-            transition: all 0.2s;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            font-size: 1rem;
             box-sizing: border-box;
+            transition: border-color 0.2s;
         }
 
-        input[type="password"]:focus {
-            border-color: var(--primary);
-            box-shadow: 0 0 0 2px rgba(0, 255, 157, 0.2);
+        input:focus {
+            outline: none;
+            border-color: var(--accent);
         }
 
-        button.btn-login {
+        button {
             width: 100%;
-            padding: 14px;
-            background: linear-gradient(135deg, #00ff9d 0%, #00cc7a 100%);
-            border: none;
+            padding: 12px;
             border-radius: 8px;
-            color: #000;
-            font-weight: 700;
-            font-size: 16px;
+            background: var(--accent);
+            color: white;
+            border: none;
+            font-size: 1rem;
+            font-weight: 600;
             cursor: pointer;
-            transition: transform 0.1s, filter 0.2s;
+            transition: opacity 0.2s;
         }
 
-        button.btn-login:hover {
-            filter: brightness(1.1);
+        button:hover {
+            opacity: 0.9;
         }
 
-        button.btn-login:active {
-            transform: scale(0.98);
-        }
-
-        button.btn-login:disabled {
-            background: #2d3748;
-            color: #718096;
+        button:disabled {
+            opacity: 0.7;
             cursor: not-allowed;
-            filter: none;
         }
 
         .error-msg {
-            margin-top: 15px;
-            color: var(--danger);
-            font-size: 13px;
-            min-height: 20px;
-            opacity: 0;
-            transition: opacity 0.3s;
-        }
-
-        .footer {
-            margin-top: 30px;
-            font-size: 12px;
-            color: #4a5568;
+            color: #ef4444;
+            font-size: 0.9rem;
+            margin-top: 1rem;
+            min-height: 1.2em;
         }
     </style>
 </head>
 
 <body>
-    <div class="login-container">
-        <div class="logo">🔐</div>
-        <h1>Welcome to LLM-TradeBot</h1>
-        <p class="subtitle">AI-Powered Trading Dashboard</p>
+    <div class="login-card">
+        <div class="logo">🤖</div>
+        <h1>LLM-TradeBot</h1>
+        <p>Please log in to access the dashboard</p>
 
-        <form id="login-form">
+        <form id="loginForm" onsubmit="handleLogin(event)">
             <div class="form-group">
                 <label for="password">Password</label>
-                <input type="password" id="password" placeholder="Enter access code..." autofocus>
-
-                <!-- Login Hint (Railway Only) -->
-                <div id="login-hint"
-                    style="display: none; margin-top: 10px; font-size: 13px; color: rgba(255,255,255,0.5); line-height: 1.5; text-align: left;">
-                    <strong style="color:rgba(255,255,255,0.8)">Login Modes:</strong><br>
-                    • <strong>User:</strong> Default login (Read-Only Access)<br>
-                    • <strong>Admin:</strong> Change password for Full Control
-                </div>
+                <input type="password" id="password" required autofocus placeholder="Enter access password">
             </div>
-            <button type="submit" id="btn-submit" class="btn-login">Unlock Dashboard</button>
+            <button type="submit" id="submitBtn">Login</button>
+            <div class="error-msg" id="errorMsg"></div>
         </form>
-
-        <div id="error-msg" class="error-msg">Invalid password</div>
-
-        <div class="footer">
-            &copy; 2025 LLM-TradeBot System
-        </div>
     </div>
 
     <script>
-        const form = document.getElementById('login-form');
-        const input = document.getElementById('password');
-        const btn = document.getElementById('btn-submit');
-        const errorEl = document.getElementById('error-msg');
-        const hintEl = document.getElementById('login-hint');
-
-        // Clear stale session
-        localStorage.removeItem('user_role');
-
-        // Check Deployment Mode
-        async function checkMode() {
-            try {
-                // Method 1: Check URL hostname (Railway domains contain 'railway.app')
-                const isRailwayByUrl = window.location.hostname.includes('railway.app');
-
-                // Method 2: Check backend API
-                const res = await fetch('/api/info');
-                const data = await res.json();
-                const isRailwayByApi = data.deployment_mode === 'railway';
-
-                // Use either method (URL is more reliable for Railway)
-                const isRailway = isRailwayByUrl || isRailwayByApi;
-
-                console.log('🌍 Deployment Detection:', {
-                    hostname: window.location.hostname,
-                    isRailwayByUrl,
-                    isRailwayByApi,
-                    finalMode: isRailway ? 'railway' : 'local'
-                });
-
-                if (isRailway) {
-                    hintEl.style.display = 'block';
-                    // Railway: Default autofill 'guest' (User Role)
-                    input.value = 'guest';
-                } else {
-                    // Local: Default autofill 'EthanAlgoX' (Admin Role) for convenience
-                    input.value = 'EthanAlgoX';
-                }
-            } catch (e) {
-                console.error('Failed to check mode:', e);
-            }
-        }
-        checkMode();
-
-        form.addEventListener('submit', async (e) => {
+        async function handleLogin(e) {
             e.preventDefault();
-            const password = input.value;
 
-            // Allow empty password for User Role (Railway Mode)
-            // if (!password) return;
+            const password = document.getElementById('password').value;
+            const btn = document.getElementById('submitBtn');
+            const errorMsg = document.getElementById('errorMsg');
 
-            // UI Loading State
             btn.disabled = true;
             btn.textContent = 'Verifying...';
-            errorEl.style.opacity = '0';
-            input.disabled = true;
+            errorMsg.textContent = '';
 
             try {
-                const res = await fetch('/api/login', {
+                const response = await fetch('/api/login', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ password })
                 });
 
-                const data = await res.json();
-
-                if (res.ok && data.status === 'success') {
-                    // Store role
-                    if (data.role) {
-                        localStorage.setItem('user_role', data.role);
-                    }
-
-                    // Success animation
-                    btn.textContent = 'Success!';
-                    btn.style.background = '#00ff9d';
-                    setTimeout(() => {
-                        window.location.href = '/';
-                    }, 500);
+                if (response.ok) {
+                    window.location.href = '/';
                 } else {
-                    throw new Error(data.detail || 'Access denied');
+                    const data = await response.json();
+                    errorMsg.textContent = data.detail || 'Login failed';
                 }
-            } catch (err) {
-                // Error State
-                errorEl.textContent = err.message || 'Invalid password';
-                errorEl.style.opacity = '1';
-
-                // Shake animation
-                const container = document.querySelector('.login-container');
-                container.style.transform = 'translateX(5px)';
-                setTimeout(() => container.style.transform = 'translateX(-5px)', 50);
-                setTimeout(() => container.style.transform = 'translateX(5px)', 100);
-                setTimeout(() => container.style.transform = 'translateX(0)', 150);
-
-                // Reset
+            } catch (error) {
+                console.error('Login error:', error);
+                errorMsg.textContent = 'Connection error. Please try again.';
+            } finally {
                 btn.disabled = false;
-                btn.textContent = 'Unlock Dashboard';
-                input.disabled = false;
-                input.value = '';
-                input.focus();
+                btn.textContent = 'Login';
             }
-        });
+        }
     </script>
 </body>
 

@@ -64,6 +64,13 @@ class BacktestResult:
             'metrics': self.metrics.to_dict(),
             'total_trades': len(self.trades),
             'duration_seconds': self.duration_seconds,
+            'decisions': [
+                {k: v for k, v in d.items() if k in ['timestamp', 'action', 'confidence', 'reason', 'price', 'vote_details']} 
+                for d in self.decisions[-50:]  # Last 50 decisions
+            ] + [
+                {k: v for k, v in d.items() if k in ['timestamp', 'action', 'confidence', 'reason', 'price', 'vote_details']}
+                for d in self.decisions if d.get('action') != 'hold'
+            ], # + All non-hold decisions (deduplication needed on frontend or here if strictly necessary, but concatenation is safer for now)
         }
 
 
@@ -261,7 +268,11 @@ class BacktestEngine:
         """执行策略并返回决策"""
         try:
             # 调用策略函数
+            # DEBUG LOG
+            log.info(f"DEBUG: execute_strategy mode={self.config.strategy_mode} runner={self.agent_runner}")
+            
             if self.config.strategy_mode == "agent" and self.agent_runner:
+                log.info("DEBUG: Entering agent runner step")
                 decision = await self.agent_runner.step(snapshot)
             else:
                 decision = await self.strategy_fn(

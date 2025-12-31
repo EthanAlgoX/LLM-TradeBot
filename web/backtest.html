@@ -675,15 +675,7 @@
                                     <option value="bnb">BNB Discount (10% off)</option>
                                 </select>
                             </div>
-                            <div class="form-group">
-                                <label data-i18n="backtest.strategy">Strategy Mode</label>
-                                <select id="strategyMode">
-                                    <option value="technical" data-i18n="backtest.strategy.technical" selected>📊
-                                        Technical (EMA)</option>
-                                    <option value="agent" data-i18n="backtest.strategy.agent">🤖 Multi-Agent (Simulated)
-                                    </option>
-                                </select>
-                            </div>
+
                             <div class="form-group">
                                 <label style="display:flex; align-items:center; gap:8px;">
                                     <input type="checkbox" id="includeFunding" checked style="width:auto;">
@@ -713,6 +705,12 @@
             <!-- Results Section -->
             <div class="results-section" id="resultsSection">
                 <!-- Metrics Cards -->
+                <div class="result-header"
+                    style="margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between;">
+                    <h2 style="margin:0;">Backtest Result</h2>
+                    <span id="resultIdDisplay"
+                        style="background:var(--accent-dim); color:var(--accent); padding:4px 8px; border-radius:4px; font-weight:600; display:none;"></span>
+                </div>
                 <div class="metrics-grid">
                     <div class="metric-card">
                         <h3 data-i18n="backtest.results">📈 Returns</h3>
@@ -1010,7 +1008,7 @@
                     contract_type: document.getElementById('contractType')?.value || 'linear',
                     fee_tier: document.getElementById('feeTier')?.value || 'vip0',
                     include_funding: document.getElementById('includeFunding')?.checked ?? true,
-                    strategy_mode: document.getElementById('strategyMode')?.value || 'technical'
+                    strategy_mode: 'agent' // Forced by user request
                 };
 
                 // Validate dates
@@ -1127,6 +1125,15 @@
                 updateMetric('longTrades', `${m.long_trades} (${m.long_win_rate})`);
                 updateMetric('shortTrades', `${m.short_trades} (${m.short_win_rate})`);
                 updateMetric('avgHoldTime', m.avg_holding_time);
+
+                // Update ID display
+                const idEl = document.getElementById('resultIdDisplay');
+                if (result.id) {
+                    idEl.textContent = 'Run #' + result.id;
+                    idEl.style.display = 'block';
+                } else {
+                    idEl.style.display = 'none';
+                }
 
                 // Render charts
                 renderCharts(result.equity_curve);
@@ -1248,7 +1255,7 @@
 
             function saveToHistory(config, result) {
                 const entry = {
-                    id: result.id, // Store DB ID
+                    id: result.id, // Backend database ID
                     runId: result.run_id,
                     runTime: new Date().toISOString(),
                     symbol: config.symbol,
@@ -1383,6 +1390,15 @@
                 document.getElementById('winRate').textContent = h.winRate ? `${h.winRate}%` : '-';
                 document.getElementById('totalTrades').textContent = h.trades || '-';
                 document.getElementById('profitFactor').textContent = h.profitFactor || '-';
+
+                // Update ID display
+                const idEl = document.getElementById('resultIdDisplay');
+                if (h.id) {
+                    idEl.textContent = 'Run #' + h.id;
+                    idEl.style.display = 'block';
+                } else {
+                    idEl.style.display = 'none';
+                }
 
                 // Force destroy old charts before rendering new ones
                 if (equityChartInstance) {

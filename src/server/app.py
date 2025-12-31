@@ -459,7 +459,8 @@ async def run_backtest(config: BacktestRequest, authenticated: bool = Depends(ve
             step=config.step,
             stop_loss_pct=config.stop_loss_pct,
             take_profit_pct=config.take_profit_pct,
-            strategy_mode=config.strategy_mode
+            # strategy_mode=config.strategy_mode 
+            strategy_mode='agent' # Force Multi-Agent Mode as per user request
         )
         
         engine = BacktestEngine(bt_config)
@@ -509,6 +510,24 @@ async def run_backtest(config: BacktestRequest, authenticated: bool = Depends(ve
                             'holding_time': float(t.holding_time or 0),
                             'close_reason': t.close_reason
                         })
+
+                    # --- Extract Decisions ---
+                    decisions = []
+                    # Filter: Last 50 + any non-hold action
+                    filtered_decisions = [d for d in result.decisions if d.get('action') != 'hold']
+                    filtered_decisions += result.decisions[-50:] # Add last 50
+                    
+                    # Deduplicate by timestamp if needed, but simple list is fine for now
+                    # Sanitize
+                    for d in filtered_decisions:
+                         decisions.append({
+                            'timestamp': d.get('timestamp').isoformat() if hasattr(d.get('timestamp'), 'isoformat') else str(d.get('timestamp')),
+                            'action': d.get('action'),
+                            'confidence': d.get('confidence'),
+                            'reason': d.get('reason'),
+                            'vote_details': d.get('vote_details'),
+                            'price': float(d.get('price', 0))
+                         })
                     
                     # Helper for NaNs
                     def recursive_clean(obj):
@@ -525,7 +544,8 @@ async def run_backtest(config: BacktestRequest, authenticated: bool = Depends(ve
                         'metrics': result.metrics.to_dict(),
                         'equity_curve': equity_curve,
                         'trades': trades,
-                        'duration_seconds': result.duration_seconds
+                        'duration_seconds': result.duration_seconds,
+                        'decisions': decisions
                     })
 
                     # --- 1. JSON File Logging ---
@@ -636,8 +656,19 @@ async def get_backtest_history(authenticated: bool = Depends(verify_auth)):
 async def protect_backtest_page(request: Request, call_next):
     """Protect backtest.html from direct access without authentication"""
     # Check if accessing backtest.html directly
-    if request.url.path == "/static/backtest.html":
+    # --- AUTHENTICATION MIDDLEWARE ---
+    path = request.url.path
+    
+    # Define protected extensions and exempt paths
+    is_protected_type = path.endswith('.html') or path == '/' or path == '/backtest'
+    exempt_paths = ['/login', '/login.html', '/api/login', '/api/info']
+    
+    # Allow assets (js, css, etc.)
+    is_asset = path.startswith('/static/') and not path.endswith('.html')
+    
+    if is_protected_type and path not in exempt_paths and not is_asset:
         try:
+            # Check cookie
             verify_auth(request)
         except HTTPException:
             # Redirect to login if not authenticated
