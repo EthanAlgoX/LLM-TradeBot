@@ -475,14 +475,17 @@ async def run_backtest(config: BacktestRequest, authenticated: bool = Depends(ve
             queue = asyncio.Queue()
             
             # Progress callback (Async)
-            async def progress_callback(current, total, pct):
+            async def progress_callback(current, total, pct, **kwargs):
                 # Simple throttling: send every 2% or every 10 steps
                 if current % 10 == 0 or current == total - 1:
                     await queue.put({
                         "type": "progress",
                         "current": current,
                         "total": total,
-                        "percent": round(pct, 1)
+                        "percent": round(pct, 1),
+                        "current_equity": kwargs.get('current_equity'),
+                        "profit": kwargs.get('profit'),
+                        "profit_pct": kwargs.get('profit_pct')
                     })
             
             # Run engine in background task

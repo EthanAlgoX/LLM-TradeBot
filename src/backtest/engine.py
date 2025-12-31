@@ -209,12 +209,27 @@ class BacktestEngine:
                 # 记录净值
                 self.portfolio.record_equity(timestamp, prices)
                 
-                # 进度回调
+                
+                # 进度回调（包含实时收益数据）
                 if progress_callback:
+                    current_equity = self.portfolio.get_current_equity(prices)
+                    profit = current_equity - self.config.initial_capital
+                    profit_pct = (profit / self.config.initial_capital) * 100
+                    
                     if asyncio.iscoroutinefunction(progress_callback):
-                         await progress_callback(i, total, i / total * 100)
+                         await progress_callback(
+                             i, total, i / total * 100,
+                             current_equity=current_equity,
+                             profit=profit,
+                             profit_pct=profit_pct
+                         )
                     else:
-                        progress_callback(i, total, i / total * 100)
+                        progress_callback(
+                            i, total, i / total * 100,
+                            current_equity=current_equity,
+                            profit=profit,
+                            profit_pct=profit_pct
+                        )
                     
             except Exception as e:
                 log.warning(f"Error at {timestamp}: {e}")

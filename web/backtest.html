@@ -132,6 +132,33 @@
             transform: none;
         }
 
+        .stop-btn {
+            background: linear-gradient(135deg, #dc3545, #c82333);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .stop-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 20px rgba(220, 53, 69, 0.4);
+            background: linear-gradient(135deg, #c82333, #bd2130);
+        }
+
+        .stop-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
         /* Progress Section */
         .progress-section {
             background: var(--bg-card);
@@ -166,6 +193,41 @@
             text-align: center;
             color: var(--text-secondary);
             font-size: 0.9rem;
+        }
+
+        .realtime-metrics {
+            background: rgba(0, 153, 255, 0.05);
+            border-radius: 8px;
+            padding: 12px;
+            display: none;
+            flex-direction: column;
+            gap: 8px;
+            margin-top: 15px;
+        }
+
+        .metric-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .metric-label {
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        .metric-value {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .metric-value.positive {
+            color: #10b981 !important;
+        }
+
+        .metric-value.negative {
+            color: #ef4444 !important;
         }
 
         /* Results Section */
@@ -689,6 +751,10 @@
                         <button class="run-btn" id="runBtn" onclick="runBacktest()" data-i18n="backtest.run">
                             ▶️ Run Backtest
                         </button>
+                        <button class="stop-btn" id="stopBtn" onclick="stopBacktest()"
+                            style="display: none; margin-left: 10px;">
+                            ⏹️ Stop
+                        </button>
                     </div>
                 </div>
             </div>
@@ -700,6 +766,17 @@
                     <div class="progress-bar" id="progressBar"></div>
                 </div>
                 <div class="progress-text" id="progressText">Initializing...</div>
+                <!-- Real-time Metrics -->
+                <div class="realtime-metrics" id="realtimeMetrics">
+                    <div class="metric-row">
+                        <span class="metric-label">当前净值:</span>
+                        <span class="metric-value" id="currentEquity">$0.00</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">收益:</span>
+                        <span class="metric-value" id="currentProfit" style="color: #888;">$0.00 (0.00%)</span>
+                    </div>
+                </div>
             </div>
 
             <!-- Results Section -->
@@ -981,10 +1058,17 @@
                 renderHistory();
             });
 
+            // Global AbortController for cancellation
+            let backtestAbortController = null;
+
             async function runBacktest() {
                 const btn = document.getElementById('runBtn');
+                const stopBtn = document.getElementById('stopBtn');
                 const progressSection = document.getElementById('progressSection');
                 const resultsSection = document.getElementById('resultsSection');
+
+                // Create new AbortController
+                backtestAbortController = new AbortController();
 
                 // Get selected symbols
                 const symbols = getSelectedSymbols();
@@ -1008,7 +1092,10 @@
                     contract_type: document.getElementById('contractType')?.value || 'linear',
                     fee_tier: document.getElementById('feeTier')?.value || 'vip0',
                     include_funding: document.getElementById('includeFunding')?.checked ?? true,
-                    strategy_mode: 'agent' // Forced by user request
+                    strategy_mode: 'agent', // Forced by user request
+                    use_llm: true,  // Enable LLM calls in backtest
+                    llm_cache: true,  // Cache LLM responses
+                    llm_throttle_ms: 100  // Throttle between LLM calls
                 };
 
                 // Validate dates
@@ -1020,17 +1107,20 @@
                 // Update UI
                 btn.disabled = true;
                 btn.innerHTML = '<span class="spinner"></span> Running...';
+                stopBtn.style.display = 'inline-block';  // Show stop button
+                stopBtn.disabled = false;
                 progressSection.classList.add('active');
                 resultsSection.classList.remove('active');
 
                 // Update progress
-                updateProgress(0, 'Initializing...');
+                updateProgress(5, 'Initializing...');
 
                 try {
                     const response = await fetch('/api/backtest/run', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(config)
+                        body: JSON.stringify(config),
+                        signal: backtestAbortController.signal  // Add abort signal
                     });
 
                     if (!response.ok) {
@@ -1060,10 +1150,29 @@
 
                                 if (msg.type === 'progress') {
                                     updateProgress(msg.percent, `Running... ${msg.percent}%`);
+
+                                    // Update real-time profit display
+                                    if (msg.current_equity !== undefined && msg.current_equity !== null) {
+                                        const metricsDiv = document.getElementById('realtimeMetrics');
+                                        metricsDiv.style.display = 'flex';
+
+                                        document.getElementById('currentEquity').textContent =
+                                            `$${msg.current_equity.toFixed(2)}`;
+
+                                        const profitEl = document.getElementById('currentProfit');
+                                        const profit = msg.profit || 0;
+                                        const profitPct = msg.profit_pct || 0;
+
+                                        profitEl.textContent =
+                                            `${profit >= 0 ? '+' : ''}$${profit.toFixed(2)} (${profitPct >= 0 ? '+' : ''}${profitPct.toFixed(2)}%)`;
+
+                                        profitEl.className = 'metric-value ' + (profit >= 0 ? 'positive' : 'negative');
+                                    }
                                 } else if (msg.type === 'result') {
                                     // Final result
                                     const result = msg.data;
                                     progressSection.classList.remove('active');
+                                    document.getElementById('realtimeMetrics').style.display = 'none';
                                     resultsSection.classList.add('active');
 
                                     // Use i18n for text if available, fallback to English
@@ -1084,11 +1193,22 @@
                     }
 
                 } catch (error) {
-                    console.error('Backtest failed:', error);
-                    alert(`Backtest failed: ${error.message}`);
-                    progressSection.classList.remove('active');
+                    if (error.name === 'AbortError') {
+                        console.log('Backtest cancelled by user');
+                        alert('回测已停止');
+                        progressSection.classList.remove('active');
+                        document.getElementById('realtimeMetrics').style.display = 'none';
+                        updateProgress(0, 'Cancelled');
+                    } else {
+                        console.error('Backtest failed:', error);
+                        alert(`Backtest failed: ${error.message}`);
+                        progressSection.classList.remove('active');
+                        document.getElementById('realtimeMetrics').style.display = 'none';
+                    }
                 } finally {
                     btn.disabled = false;
+                    stopBtn.style.display = 'none';  // Hide stop button
+                    backtestAbortController = null;
                     btn.innerHTML = '▶️ Run Backtest';
                     // Re-apply language to button text
                     if (window.applyLanguage) window.applyLanguage();
