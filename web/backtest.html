@@ -1666,6 +1666,11 @@
                 const idEl = document.getElementById('resultIdDisplay');
                 if (result.id) {
                     idEl.textContent = 'Run #' + result.id;
+                    idEl.title = `DB ID: ${result.id}\nUUID: ${result.run_id || 'N/A'}`;
+                    idEl.style.display = 'block';
+                } else if (result.run_id) {
+                    idEl.textContent = 'Run ' + result.run_id.substring(3, 9);
+                    idEl.title = `UUID: ${result.run_id}`;
                     idEl.style.display = 'block';
                 } else {
                     idEl.style.display = 'none';
@@ -1856,7 +1861,7 @@
                     const capitalDisplay = h.initialCapital ? `$${h.initialCapital.toLocaleString()}` : 'N/A';
                     const hasData = h.equityCurve && h.equityCurve.length > 0;
 
-                    const idDisplay = h.id ? `#${h.id}` : '';
+                    const idDisplay = h.id ? `#${h.id}` : (h.runId ? `${h.runId.substring(3, 9)}..` : '');
 
                     const symbols = Array.isArray(h.symbols) ? h.symbols : [h.symbol];
                     const symbolsDisplay = symbols.join(', ');
@@ -1866,7 +1871,7 @@
                     <div class="history-item ${hasData ? 'clickable' : ''}" 
                          ${hasData ? `onclick="showHistoryDetail(${index})"` : ''}
                          style="${hasData ? 'cursor:pointer;' : ''}" 
-                         title="${hasData ? t('backtest.clickview') : 'No detail data available'}">
+                         title="${hasData ? t('backtest.clickview') : 'No detail data available'}\nID: ${h.id || '-'}\nUUID: ${h.runId || '-'}">
                         <div class="history-info">
                             <div class="history-main-row">
                                 <span class="run-time" style="font-weight:600; color:var(--accent);">
@@ -1931,6 +1936,11 @@
                 const idEl = document.getElementById('resultIdDisplay');
                 if (h.id) {
                     idEl.textContent = 'Run #' + h.id;
+                    idEl.title = `DB ID: ${h.id}\nUUID: ${h.runId || 'N/A'}`;
+                    idEl.style.display = 'block';
+                } else if (h.runId) {
+                    idEl.textContent = 'Run ' + h.runId.substring(3, 9);
+                    idEl.title = `UUID: ${h.runId}`;
                     idEl.style.display = 'block';
                 } else {
                     idEl.style.display = 'none';

@@ -559,37 +559,13 @@ async def run_backtest(config: BacktestRequest, authenticated: bool = Depends(ve
                         'decisions': decisions
                     })
 
-                    # --- 1. JSON File Logging ---
-                    try:
-                        log_dir = os.path.join(BASE_DIR, 'logs', 'backtest')
-                        os.makedirs(log_dir, exist_ok=True)
-                        
-                        run_time = datetime.now()
-                        log_filename = f"backtest_{config.symbol}_{run_time.strftime('%Y%m%d_%H%M%S')}.json"
-                        log_path = os.path.join(log_dir, log_filename)
-                        
-                        log_data = {
-                            'run_time': run_time.isoformat(),
-                            'config': config.dict(),
-                            'metrics': response_data['metrics'],
-                            'trades_summary': {
-                                'total': len(trades),
-                                'trades': trades[-20:] if len(trades) > 20 else trades
-                            },
-                            'duration_seconds': result.duration_seconds
-                        }
-                        
-                        with open(log_path, 'w', encoding='utf-8') as f:
-                            json.dump(log_data, f, indent=2, ensure_ascii=False)
-                        print(f"📝 Backtest log saved: {log_path}")
-                    except Exception as log_err:
-                        print(f"⚠️ Log save failed: {log_err}")
-
-                    # --- 2. Database Storage ---
+                    # --- 1. Database Storage (First to get ID) ---
+                    db_id = None
+                    run_id = f"bt_{uuid.uuid4().hex[:12]}"
+                    
                     try:
                         from src.backtest.storage import BacktestStorage
                         storage = BacktestStorage()
-                        run_id = f"bt_{uuid.uuid4().hex[:12]}"
                         
                         db_id = storage.save_backtest(
                             run_id=run_id,
@@ -607,10 +583,41 @@ async def run_backtest(config: BacktestRequest, authenticated: bool = Depends(ve
                              print(f"⚠️ Backtest save returned None")
                              
                     except Exception as db_err:
-                        # Log full traceback for DB error
-                        # import traceback
-                        # traceback.print_exc()
                         print(f"⚠️ DB save failed: {db_err}")
+
+                    # --- 2. JSON File Logging (Now uses DB ID) ---
+                    try:
+                        log_dir = os.path.join(BASE_DIR, 'logs', 'backtest')
+                        os.makedirs(log_dir, exist_ok=True)
+                        
+                        run_time = datetime.now()
+                        # Optimization: Filename includes ID and Start Date
+                        # Format: backtest_{id}_{symbol}_{start_date}_{run_time}.json
+                        # Start date from config (e.g. 20240101)
+                        clean_start = config.start_date.replace('-', '').replace('/', '')
+                        id_str = f"#{db_id}" if db_id else "no_id"
+                        
+                        log_filename = f"backtest_{id_str}_{config.symbol}_{clean_start}_{run_time.strftime('%H%M%S')}.json"
+                        log_path = os.path.join(log_dir, log_filename)
+                        
+                        log_data = {
+                            'id': db_id,
+                            'run_id': run_id,
+                            'run_time': run_time.isoformat(),
+                            'config': config.dict(),
+                            'metrics': response_data['metrics'],
+                            'trades_summary': {
+                                'total': len(trades),
+                                'trades': trades[-20:] if len(trades) > 20 else trades
+                            },
+                            'duration_seconds': result.duration_seconds
+                        }
+                        
+                        with open(log_path, 'w', encoding='utf-8') as f:
+                            json.dump(log_data, f, indent=2, ensure_ascii=False)
+                        print(f"📝 Backtest log saved: {log_path}")
+                    except Exception as log_err:
+                        print(f"⚠️ Log save failed: {log_err}")
 
                     # --- 3. Send Final Result ---
                     await queue.put({
