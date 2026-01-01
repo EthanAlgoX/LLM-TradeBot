@@ -1450,6 +1450,13 @@
 
             let backtestAbortController = null;
 
+            function stopBacktest() {
+                if (backtestAbortController) {
+                    backtestAbortController.abort();
+                    // UI reset is handled in the catch block of runBacktest
+                }
+            }
+
             async function runBacktest() {
                 const btn = document.getElementById('runBtn');
                 const stopBtn = document.getElementById('stopBtn');

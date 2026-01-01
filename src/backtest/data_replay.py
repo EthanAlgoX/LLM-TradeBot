@@ -74,7 +74,9 @@ class DataReplayAgent:
         """
         self.symbol = symbol
         self.start_date = datetime.strptime(start_date, "%Y-%m-%d")
-        self.end_date = datetime.strptime(end_date, "%Y-%m-%d")
+        # CRITICAL FIX: Add 1 day to end_date to include all K-lines from that day
+        # end_date "2026-01-01" becomes "2026-01-02 00:00:00", so filter with < includes all of 2026-01-01
+        self.end_date = datetime.strptime(end_date, "%Y-%m-%d") + timedelta(days=1)
         self.client = client or BinanceClient()
         
         # 数据缓存
@@ -126,16 +128,18 @@ class DataReplayAgent:
     def _get_cache_path(self) -> str:
         """生成缓存文件路径"""
         start_str = self.start_date.strftime("%Y%m%d")
-        end_str = self.end_date.strftime("%Y%m%d")
+        # Use the original end_date for cache file name, not the extended one
+        original_end_date_str = (self.end_date - timedelta(days=1)).strftime("%Y%m%d")
         return os.path.join(
             self.CACHE_DIR,
-            f"{self.symbol}_{start_str}_{end_str}.parquet"
+            f"{self.symbol}_{start_str}_{original_end_date_str}.parquet"
         )
     
     async def _fetch_from_api(self):
         """从 Binance API 获取历史数据"""
         # 计算需要的 K 线数量
-        days = (self.end_date - self.start_date).days + 1
+        # Use the original end_date for calculation, not the extended one
+        days = (self.end_date - timedelta(days=1) - self.start_date).days + 1
         
         # 5m K线：每天 288 根
         limit_5m = days * 288
@@ -288,7 +292,8 @@ class DataReplayAgent:
         """过滤日期范围"""
         if df.empty:
             return df
-        return df[(df.index >= self.start_date) & (df.index <= self.end_date)]
+        # Use < instead of <= since end_date is now start of next day
+        return df[(df.index >= self.start_date) & (df.index < self.end_date)]
     
     def _save_to_cache(self, cache_path: str):
         """保存数据到缓存"""
