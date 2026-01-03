@@ -93,12 +93,16 @@ async def login(response: Response, data: LoginRequest):
     if role:
         session_id = secrets.token_urlsafe(32)
         VALID_SESSIONS[session_id] = role
+        
+        # Cookie settings for both local (HTTP) and Railway (HTTPS) deployment
+        is_production = DEPLOYMENT_MODE != "local"
         response.set_cookie(
             key=SESSION_COOKIE_NAME, 
             value=session_id, 
             httponly=True, 
-            max_age=86400 * 7, # 7 days
-            samesite="lax"
+            max_age=86400 * 7,  # 7 days
+            samesite="none" if is_production else "lax",  # "none" required for cross-site HTTPS
+            secure=is_production  # Must be True for HTTPS (Railway)
         )
         return {"status": "success", "role": role}
     else:
