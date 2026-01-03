@@ -34,9 +34,9 @@ class ConfigManager:
                 "gemini_api_key": self._mask_key(env_vars.get('GEMINI_API_KEY', ''))
             },
             "trading": {
-                "symbol": env_vars.get('TRADING_SYMBOLS', env_vars.get('TRADING_SYMBOL', 'BTCUSDT')),
+                "symbol": env_vars.get('TRADING_SYMBOLS', env_vars.get('TRADING_SYMBOL', 'AI500_TOP5')),
                 "timeframe": env_vars.get('TRADING_TIMEFRAME', '15m'),
-                "leverage": int(env_vars.get('LEVERAGE', 1)),
+                "leverage": int(env_vars.get('LEVERAGE', 5)),
                 "run_mode": env_vars.get('RUN_MODE', 'test')
             },
             "llm": {
