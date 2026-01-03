@@ -22,6 +22,9 @@ class SharedState:
     cycle_positions_opened: int = 0  # Positions opened in current cycle
     symbols: List[str] = field(default_factory=list)  # 🆕 Active trading symbols (supports AI500 Top5)
     
+    # Config Reload Flag (for Railway runtime config changes)
+    config_changed: bool = False  # Set to True when config is updated via API
+    
     # Market Data
     current_price: float = 0.0
     market_regime: str = "Unknown"

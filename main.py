@@ -262,7 +262,11 @@ class MultiAgentTradingBot:
 
     def _reload_symbols(self):
         """Reload trading symbols from environment/config without restart"""
-        load_dotenv(override=True)
+        # Note: On Railway, os.environ is already updated by config_manager.
+        # On local, load_dotenv refreshes from .env file.
+        if self._env_exists:
+            load_dotenv(override=True)
+        
         env_symbols = os.environ.get('TRADING_SYMBOLS', '').strip()
         
         old_symbols = self.symbols.copy()
@@ -289,6 +293,9 @@ class MultiAgentTradingBot:
             
         if set(self.symbols) != set(old_symbols):
             log.info(f"🔄 Trading symbols reloaded: {', '.join(self.symbols)}")
+            global_state.add_log(f"[🔄 CONFIG] Symbols reloaded: {', '.join(self.symbols)}")
+            # Update global state
+            global_state.symbols = self.symbols
             # Initialize PredictAgent for any new symbols
             for symbol in self.symbols:
                 if symbol not in self.predict_agents:
@@ -2209,7 +2216,8 @@ class MultiAgentTradingBot:
         
         try:
             while global_state.is_running:
-                # 🔄 Check for configuration changes (skip if .env doesn't exist, e.g. Railway)
+                # 🔄 Check for configuration changes
+                # Method 1: .env file changed (Local mode)
                 if self._env_exists:
                     try:
                         current_mtime = os.path.getmtime(self._env_path)
@@ -2220,6 +2228,12 @@ class MultiAgentTradingBot:
                             self._env_mtime = current_mtime
                     except Exception as e:
                         log.warning(f"Error checking .env mtime: {e}")
+                
+                # Method 2: Runtime config changed (Railway mode)
+                if global_state.config_changed:
+                    log.info("⚙️ Runtime config change detected, reloading symbols...")
+                    self._reload_symbols()
+                    global_state.config_changed = False  # Reset flag
 
                 # Check stop state FIRST - must break before continue
                 if global_state.execution_mode == 'Stopped':

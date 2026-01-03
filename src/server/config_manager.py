@@ -92,6 +92,13 @@ class ConfigManager:
                     # Also apply to os.environ for immediate effect
                     os.environ[key] = val
                 
+                # Signal to main loop that config has changed
+                try:
+                    from src.server.state import global_state
+                    global_state.config_changed = True
+                except Exception as e:
+                    print(f"[ConfigManager] Warning: Could not set config_changed flag: {e}")
+                
                 print(f"[ConfigManager] Runtime config applied (Railway mode): {list(flat_updates.keys())}")
                 return True
             
