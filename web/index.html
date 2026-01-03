@@ -515,7 +515,7 @@
                                 </button>
                                 <button type="button" class="btn-sm" onclick="selectPreset('ai500')"
                                     style="background:#553c9a; color:#fff; border:1px solid rgba(255,255,255,0.2); border-radius:4px; padding:4px 8px; cursor:pointer;">
-                                    🤖 AI500 Top 10
+                                    🤖 AI500 Top 5
                                 </button>
                                 <button type="button" class="btn-sm" onclick="selectPreset('all')"
                                     style="background:#2d3748; color:#fff; border:1px solid rgba(255,255,255,0.2); border-radius:4px; padding:4px 8px; cursor:pointer;">
@@ -551,12 +551,12 @@
                                 <div style="display: grid; grid-template-columns: 1fr; gap: 5px;">
                                     <label
                                         style="cursor:pointer; display:flex; align-items:center; background:rgba(85, 60, 154, 0.2); padding:8px; border-radius:4px; border:1px solid rgba(85, 60, 154, 0.4);">
-                                        <input type="checkbox" name="cfg-symbol" value="AI500_TOP10"
+                                        <input type="checkbox" name="cfg-symbol" value="AI500_TOP5"
                                             style="margin-right:10px;">
                                         <span>
-                                            <strong style="color:#b794f4;">🤖 AI500 Top 10 Dynamic</strong>
+                                            <strong style="color:#b794f4;">🤖 AI500 Top 5 Dynamic</strong>
                                             <br>
-                                            <span style="font-size:0.8em; color:#a0aec0;">Automatically selects Top 10
+                                            <span style="font-size:0.8em; color:#a0aec0;">Automatically selects Top 5
                                                 AI coins by 24h Volume from 30+ candidates (FET, RENDER, TAO, NEAR,
                                                 etc.)</span>
                                         </span>
@@ -575,7 +575,7 @@
                                         else if (type === 'major') cb.checked = majorCoins.includes(cb.value);
                                         // Specific handling for AI preset button if user clicks it
                                         else if (type === 'ai500') {
-                                            if (cb.value === 'AI500_TOP10') cb.checked = true;
+                                            if (cb.value === 'AI500_TOP5') cb.checked = true;
                                         }
                                     });
                                 }

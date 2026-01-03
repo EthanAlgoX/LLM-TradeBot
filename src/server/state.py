@@ -20,7 +20,7 @@ class SharedState:
     current_cycle_id: str = ""  # Current cycle identifier (cycle_NNNN_timestamp)
     cycle_interval: int = 3  # Cycle interval in minutes (default 3)
     cycle_positions_opened: int = 0  # Positions opened in current cycle
-    symbols: List[str] = field(default_factory=list)  # 🆕 Active trading symbols (supports AI500 Top10)
+    symbols: List[str] = field(default_factory=list)  # 🆕 Active trading symbols (supports AI500 Top5)
     
     # Market Data
     current_price: float = 0.0

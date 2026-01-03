@@ -152,13 +152,21 @@ class MultiAgentTradingBot:
                     self.symbols = [symbol_str]
 
         # 🤖 AI500 Dynamic Resolution
-        if 'AI500_TOP10' in self.symbols:
-            self.symbols.remove('AI500_TOP10')
-            ai_top10 = self._resolve_ai500_symbols()
+        self.use_ai500 = 'AI500_TOP5' in self.symbols
+        self.ai500_last_update = None
+        self.ai500_update_interval = 6 * 3600  # 6 hours in seconds
+        
+        if self.use_ai500:
+            self.symbols.remove('AI500_TOP5')
+            ai_top5 = self._resolve_ai500_symbols()
             # Merge and deduplicate
-            self.symbols = list(set(self.symbols + ai_top10))
+            self.symbols = list(set(self.symbols + ai_top5))
             # Sort to keep stable order
             self.symbols.sort()
+            self.ai500_last_update = time.time()
+            
+            # Start background thread for periodic updates
+            self._start_ai500_updater()
                 
         # 🔧 Primary symbol must be in the symbols list
         configured_primary = self.config.get('trading.primary_symbol', 'BTCUSDT')
@@ -273,10 +281,10 @@ class MultiAgentTradingBot:
                     self.symbols = [symbol_str]
 
         # 🤖 AI500 Dynamic Resolution
-        if 'AI500_TOP10' in self.symbols:
-            self.symbols.remove('AI500_TOP10')
-            ai_top10 = self._resolve_ai500_symbols()
-            self.symbols = list(set(self.symbols + ai_top10))
+        if 'AI500_TOP5' in self.symbols:
+            self.symbols.remove('AI500_TOP5')
+            ai_top5 = self._resolve_ai500_symbols()
+            self.symbols = list(set(self.symbols + ai_top5))
             self.symbols.sort()
             
         if set(self.symbols) != set(old_symbols):
@@ -289,7 +297,7 @@ class MultiAgentTradingBot:
                     log.info(f"🆕 Initialized PredictAgent for {symbol}")
 
     def _resolve_ai500_symbols(self):
-        """Dynamic resolution of AI500_TOP10 tag"""
+        """Dynamic resolution of AI500_TOP5 tag"""
         # AI Candidates List (30+ Major AI/Data/Compute Coins)
         AI_CANDIDATES = [
             "FETUSDT", "RENDERUSDT", "TAOUSDT", "NEARUSDT", "GRTUSDT", 
@@ -320,16 +328,61 @@ class MultiAgentTradingBot:
             # Sort by Volume desc
             ai_stats.sort(key=lambda x: x[1], reverse=True)
             
-            # Take Top 10
-            top_10 = [x[0] for x in ai_stats[:10]]
+            # Take Top 5
+            top_5 = [x[0] for x in ai_stats[:5]]
             
-            print(f"✅ AI500 Top 10 Selected (by Vol): {', '.join(top_10)}")
-            return top_10
+            print(f"✅ AI500 Top 5 Selected (by Vol): {', '.join(top_5)}")
+            return top_5
             
         except Exception as e:
             log.error(f"Failed to resolve AI500 symbols: {e}")
-            # Fallback to defaults
-            return ["FETUSDT", "RENDERUSDT", "TAOUSDT", "NEARUSDT", "GRTUSDT", "WLDUSDT", "ARKMUSDT", "LPTUSDT", "THETAUSDT", "ROSEUSDT"]
+            # Fallback to defaults (Top 5)
+            return ["FETUSDT", "RENDERUSDT", "TAOUSDT", "NEARUSDT", "GRTUSDT"]
+    
+    def _start_ai500_updater(self):
+        """启动 AI500 定时更新后台线程"""
+        def updater_loop():
+            while True:
+                try:
+                    # Sleep for 6 hours
+                    time.sleep(self.ai500_update_interval)
+                    
+                    if self.use_ai500:
+                        log.info("🔄 AI500 Top5 - Starting scheduled update (every 6h)")
+                        new_top5 = self._resolve_ai500_symbols()
+                        
+                        # Update symbols list
+                        old_symbols = set(self.symbols)
+                        # Remove old AI coins and add new ones
+                        # Keep non-AI coins unchanged
+                        major_coins = {'BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT'}
+                        non_ai_symbols = [s for s in self.symbols if s in major_coins]
+                        
+                        # Merge with new AI top5
+                        self.symbols = list(set(non_ai_symbols + new_top5))
+                        self.symbols.sort()
+                        
+                        # Update global state
+                        global_state.symbols = self.symbols
+                        self.ai500_last_update = time.time()
+                        
+                        # Log changes
+                        added = set(self.symbols) - old_symbols
+                        removed = old_symbols - set(self.symbols)
+                        if added or removed:
+                            log.info(f"📊 AI500 Updated - Added: {added}, Removed: {removed}")
+                            log.info(f"📋 Current symbols: {', '.join(self.symbols)}")
+                        else:
+                            log.info("✅ AI500 Updated - No changes in Top5")
+                            
+                except Exception as e:
+                    log.error(f"AI500 updater error: {e}")
+        
+        # Start daemon thread
+        updater_thread = threading.Thread(target=updater_loop, daemon=True, name="AI500-Updater")
+        updater_thread.start()
+        log.info(f"🚀 AI500 Auto-updater started (interval: 6 hours)")
+    
     
     def _init_accounts(self):
         """

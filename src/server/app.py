@@ -150,7 +150,7 @@ async def get_status(authenticated: bool = Depends(verify_auth)):
             "current_cycle_id": global_state.current_cycle_id,
             "uptime_start": global_state.start_time,
             "last_heartbeat": global_state.last_update,
-            "symbols": global_state.symbols  # 🆕 Active trading symbols (AI500 Top10 support)
+            "symbols": global_state.symbols  # 🆕 Active trading symbols (AI500 Top5 support)
         },
         "demo": {
             "demo_mode_active": global_state.demo_mode_active,
