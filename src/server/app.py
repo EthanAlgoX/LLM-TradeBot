@@ -301,7 +301,14 @@ async def update_config_endpoint(data: dict = Body(...), authenticated: bool = D
     if success:
         return {"status": "success", "message": "Configuration updated. Please restart the bot if you changed API keys."}
     else:
-        raise HTTPException(status_code=500, detail="Failed to update configuration")
+        # Check if running on Railway where .env file doesn't exist
+        if IS_RAILWAY:
+            raise HTTPException(
+                status_code=400, 
+                detail="⚠️ Railway deployment: Please configure environment variables directly in Railway Dashboard → Variables tab. File-based config is read-only on cloud platforms."
+            )
+        else:
+            raise HTTPException(status_code=500, detail="Failed to update configuration")
 
 @app.post("/api/config/prompt")
 async def update_prompt_text(data: dict = Body(...), authenticated: bool = Depends(verify_admin)):
