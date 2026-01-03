@@ -714,8 +714,54 @@ body {
 
 table {
     width: 100%;
-    border-collapse: separate;
+    border-collapse: collapse;
     border-spacing: 0;
+    font-size: 0.8rem;
+}
+
+/* 决策表格样式 */
+#decision-table {
+    min-width: 1300px;
+    table-layout: fixed;
+}
+
+#decision-table th,
+#decision-table td {
+    text-align: center;
+    vertical-align: middle;
+    padding: 8px 6px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+#decision-table tbody td {
+    font-size: 0.75rem;
+    white-space: nowrap;
+}
+
+/* Reason 列特殊处理 - 倒数第二列 */
+#decision-table tbody td:nth-last-child(2) {
+    text-align: left;
+    white-space: normal;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* 交易历史表格样式 */
+#trade-table {
+    min-width: 880px;
+    table-layout: fixed;
+}
+
+#trade-table th,
+#trade-table td {
+    text-align: center;
+    vertical-align: middle;
+    white-space: nowrap;
+    padding: 8px 10px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+#trade-table tbody td {
     font-size: 0.8rem;
 }
 

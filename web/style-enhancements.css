@@ -51,35 +51,15 @@ body::after {
     }
 }
 
-/* 3. 表格行悬停效果 */
+/* 3. 表格行悬停效果 - 简化版（移除了干扰列对齐的 ::before 伪元素） */
 #decision-table tbody tr,
 #trade-table tbody tr {
-    transition: all 0.2s ease;
-    position: relative;
-}
-
-#decision-table tbody tr::before,
-#trade-table tbody tr::before {
-    content: '';
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 3px;
-    height: 100%;
-    background: linear-gradient(180deg, #6366f1, #8b5cf6);
-    opacity: 0;
-    transition: opacity 0.2s ease;
+    transition: background 0.2s ease;
 }
 
 #decision-table tbody tr:hover,
 #trade-table tbody tr:hover {
-    background: rgba(99, 102, 241, 0.08);
-    transform: translateX(4px);
-}
-
-#decision-table tbody tr:hover::before,
-#trade-table tbody tr:hover::before {
-    opacity: 1;
+    background: rgba(99, 102, 241, 0.1);
 }
 
 /* 4. 按钮波纹效果 */

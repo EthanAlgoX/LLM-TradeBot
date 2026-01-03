@@ -5,8 +5,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LLM-TradeBot Dashboard</title>
-    <link rel="stylesheet" href="/static/style.css?v=42">
-    <link rel="stylesheet" href="/static/style-enhancements.css?v=2">
+    <link rel="stylesheet" href="/static/style.css?v=46">
+    <link rel="stylesheet" href="/static/style-enhancements.css?v=3">
     <link
         href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600&display=swap"
         rel="stylesheet">
@@ -115,11 +115,7 @@
                             <h2 style="margin: 0;" data-i18n="section.kline">📉 Real-time K-Line</h2>
                             <select id="symbol-selector"
                                 style="padding: 5px 10px; margin-left: 20px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 4px; color: #fff; font-size: 0.9rem; cursor: pointer;">
-                                <option value="BTCUSDT" selected>BTC/USDT</option>
-                                <option value="ETHUSDT">ETH/USDT</option>
-                                <option value="BNBUSDT">BNB/USDT</option>
-                                <option value="SOLUSDT">SOL/USDT</option>
-                                <option value="ADAUSDT">ADA/USDT</option>
+                                <option value="" disabled selected>Loading...</option>
                             </select>
                         </div>
                     </div>
@@ -130,7 +126,10 @@
                             <script type="text/javascript">
                                 // 动态 TradingView 加载器
                                 let tvWidget = null;
+                                let chartInitialized = false;
+
                                 function loadTradingViewChart(symbol) {
+                                    if (!symbol) return;
                                     const container = document.getElementById('tradingview_b8265');
                                     container.innerHTML = ''; // 清空旧图表
                                     tvWidget = new TradingView.widget({
@@ -148,13 +147,17 @@
                                         "save_image": false,
                                         "container_id": "tradingview_b8265"
                                     });
+                                    chartInitialized = true;
                                 }
-                                // 初始化加载 BTC
-                                loadTradingViewChart('BTCUSDT');
+
+                                // 等待 API 返回配置的交易对后再初始化
+                                // (由 app.js 中的 updateSymbolSelector 触发)
 
                                 // 监听选择器变化
                                 document.getElementById('symbol-selector').addEventListener('change', function (e) {
-                                    loadTradingViewChart(e.target.value);
+                                    if (e.target.value) {
+                                        loadTradingViewChart(e.target.value);
+                                    }
                                 });
                             </script>
                         </div>
@@ -226,6 +229,26 @@
                     </div>
                     <div class="table-container">
                         <table id="decision-table">
+                            <!-- 列宽定义 - 17列 -->
+                            <colgroup>
+                                <col style="width: 70px;"> <!-- Time (HH:MM:SS) -->
+                                <col style="width: 50px;"> <!-- Cycle -->
+                                <col style="width: 85px;"> <!-- Symbol -->
+                                <col style="width: 70px;"> <!-- Layers -->
+                                <col style="width: 55px;"> <!-- ADX -->
+                                <col style="width: 70px;"> <!-- OI -->
+                                <col style="width: 60px;"> <!-- Regime -->
+                                <col style="width: 60px;"> <!-- Position -->
+                                <col style="width: 50px;"> <!-- Zone -->
+                                <col style="width: 60px;"> <!-- Signal -->
+                                <col style="width: 60px;"> <!-- P(Up) -->
+                                <col style="width: 55px;"> <!-- Bull -->
+                                <col style="width: 55px;"> <!-- Bear -->
+                                <col style="width: 65px;"> <!-- Result -->
+                                <col style="width: 50px;"> <!-- Conf -->
+                                <col style="width: 200px;"> <!-- Reason -->
+                                <col style="width: 65px;"> <!-- Guard -->
+                            </colgroup>
                             <thead>
                                 <!-- Agent Group Header Row -->
                                 <tr class="agent-group-row">
@@ -277,6 +300,18 @@
                     <h2 data-i18n="section.trades">📜 Trade History</h2>
                     <div class="table-container">
                         <table id="trade-table">
+                            <!-- 列宽定义 - 9列 -->
+                            <colgroup>
+                                <col style="width: 80px;"> <!-- Time -->
+                                <col style="width: 90px;"> <!-- Open -->
+                                <col style="width: 90px;"> <!-- Close -->
+                                <col style="width: 100px;"> <!-- Symbol -->
+                                <col style="width: 110px;"> <!-- Entry Price -->
+                                <col style="width: 110px;"> <!-- Pos Value -->
+                                <col style="width: 110px;"> <!-- Exit Price -->
+                                <col style="width: 100px;"> <!-- PnL -->
+                                <col style="width: 90px;"> <!-- PnL % -->
+                            </colgroup>
                             <thead>
                                 <tr>
                                     <th title="交易记录时间" data-i18n="trade.time">Time</th>
@@ -835,7 +870,7 @@
         }
     </style>
     </style>
-    <script src="/static/app.js?v=agent_docs_i18n"></script>
+    <script src="/static/app.js?v=table_fix_v2"></script>
     <script>
         // EMERGENCY FIX & LOGIC V3
         (function () {

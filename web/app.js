@@ -321,7 +321,11 @@ function renderDecisionTable(history, positions = []) {
     if (!tbody) return;
 
     tbody.innerHTML = history.map(d => {
-        const time = d.timestamp || 'Just now';
+        // 只显示时分秒 (HH:MM:SS)
+        let time = d.timestamp || 'Just now';
+        if (time.includes(' ')) {
+            time = time.split(' ')[1] || time; // 提取时间部分
+        }
         const symbol = d.symbol || 'BTCUSDT';
         const action = (d.action || 'HOLD').toUpperCase();
         const conf = d.confidence ? ((d.confidence > 1 ? d.confidence : d.confidence * 100).toFixed(0) + '%') : '-';
@@ -853,11 +857,17 @@ function updateSymbolSelector(symbols) {
     // Restore previous selection if it still exists
     if (symbols.includes(currentSymbol)) {
         selector.value = currentSymbol;
+        // Still load chart on first call even if symbol was preserved
+        if (!window.chartSymbolInitialized && typeof loadTradingViewChart === 'function') {
+            loadTradingViewChart(currentSymbol);
+            window.chartSymbolInitialized = true;
+        }
     } else {
         // Default to first symbol and reload chart
         selector.value = symbols[0];
         if (typeof loadTradingViewChart === 'function') {
             loadTradingViewChart(symbols[0]);
+            window.chartSymbolInitialized = true;
         }
     }
 }
