@@ -199,7 +199,7 @@ window.logout = function () {
 };
 
 function updateDashboard() {
-    fetch(API_URL)
+    apiFetch(API_URL)
         .then(response => {
             if (response.status === 401 || response.status === 403) {
                 // Session expired or unauthorized
@@ -1509,7 +1509,8 @@ function setupEventListeners() {
 
                 const response = await fetch('/api/upload_prompt', {
                     method: 'POST',
-                    body: formData
+                    body: formData,
+                    credentials: 'include'
                 });
 
                 const result = await response.json();
@@ -1721,7 +1722,7 @@ function initSettings() {
         btnReset.addEventListener('click', async () => {
             if (confirm('Are you sure you want to reset the System Prompt to default? This will overwrite your current edits.')) {
                 try {
-                    const res = await fetch('/api/config/default_prompt');
+                    const res = await apiFetch('/api/config/default_prompt');
                     if (res.ok) {
                         const data = await res.json();
                         document.getElementById('cfg-prompt').value = data.content;
@@ -1738,7 +1739,7 @@ function initSettings() {
 
 async function loadSettings() {
     try {
-        const res = await fetch('/api/config');
+        const res = await apiFetch('/api/config');
         const config = await res.json();
 
         // Fill Form
@@ -1789,14 +1790,14 @@ async function loadSettings() {
         document.getElementById('cfg-run-mode').value = safeVal(config.trading.run_mode || 'test');
 
         // Load Prompt
-        const promptRes = await fetch('/api/config/prompt');
+        const promptRes = await apiFetch('/api/config/prompt');
         const promptData = await promptRes.json();
 
         // Auto-load default prompt if empty
         if (!promptData.content || promptData.content.trim().length === 0) {
             console.log("Empty prompt detected, fetching default...");
             try {
-                const defaultRes = await fetch('/api/config/default_prompt');
+                const defaultRes = await apiFetch('/api/config/default_prompt');
                 if (defaultRes.ok) {
                     const defaultData = await defaultRes.json();
                     document.getElementById('cfg-prompt').value = defaultData.content;
@@ -1855,9 +1856,8 @@ async function saveSettings() {
         }
     };
 
-    const res = await fetch('/api/config', {
+    const res = await apiFetch('/api/config', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
     });
 
@@ -1869,9 +1869,8 @@ async function saveSettings() {
 
 async function savePrompt() {
     const content = document.getElementById('cfg-prompt').value;
-    const res = await fetch('/api/config/prompt', {
+    const res = await apiFetch('/api/config/prompt', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content })
     });
 
@@ -1932,7 +1931,7 @@ async function loadAccounts() {
     container.innerHTML = '<p style="color: #718096; text-align: center;">Loading...</p>';
 
     try {
-        const res = await fetch('/api/accounts');
+        const res = await apiFetch('/api/accounts');
         const data = await res.json();
 
         if (data.accounts && data.accounts.length > 0) {
@@ -1960,7 +1959,7 @@ async function deleteAccount(accountId) {
     if (!confirm(`Are you sure you want to remove this account?`)) return;
 
     try {
-        const res = await fetch(`/api/accounts/${accountId}`, { method: 'DELETE' });
+        const res = await apiFetch(`/api/accounts/${accountId}`, { method: 'DELETE' });
         if (res.ok) {
             await loadAccounts();
         } else {
@@ -1990,9 +1989,8 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             try {
-                const res = await fetch('/api/accounts', {
+                const res = await apiFetch('/api/accounts', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ id, name, exchange, testnet, enabled: true })
                 });
 
