@@ -657,3 +657,30 @@ class DataSaver:
         except Exception as e:
             log.error(f"更新交易记录失败: {e}")
             return False
+    def save_virtual_account(self, balance: float, positions: Dict):
+        """持久化模拟账户状态"""
+        try:
+            path = os.path.join(self.base_dir, 'agents', 'virtual_account.json')
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            data = {
+                'balance': balance,
+                'positions': positions,
+                'updated_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            }
+            with open(path, 'w', encoding='utf-8') as f:
+                json.dump(data, f, indent=2, cls=CustomJSONEncoder)
+            log.debug(f"模拟账户已持久化: {path}")
+        except Exception as e:
+            log.error(f"持久化模拟账户失败: {e}")
+
+    def load_virtual_account(self) -> Optional[Dict]:
+        """加载模拟账户状态"""
+        try:
+            path = os.path.join(self.base_dir, 'agents', 'virtual_account.json')
+            if os.path.exists(path):
+                with open(path, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+            return None
+        except Exception as e:
+            log.error(f"加载模拟账户失败: {e}")
+            return None

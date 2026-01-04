@@ -26,14 +26,14 @@ class SharedState:
     config_changed: bool = False  # Set to True when config is updated via API
     
     # Market Data
-    current_price: float = 0.0
-    market_regime: str = "Unknown"
-    price_position: str = "Unknown"
+    current_price: Dict[str, float] = field(default_factory=dict)
+    market_regime: Dict[str, str] = field(default_factory=dict)
+    price_position: Dict[str, str] = field(default_factory=dict)
     
     # Agent Status
     oracle_status: str = "Waiting"
     prophet_probability: float = 0.0  # PredictAgent 上涨概率
-    critic_confidence: float = 0.0
+    critic_confidence: Dict[str, float] = field(default_factory=dict)
     guardian_status: str = "Standing By"
     
     # Account Data
@@ -66,7 +66,7 @@ class SharedState:
     initial_balance: float = 0.0  # Initial balance when trading started
     
     # Latest Decision & History
-    latest_decision: Dict[str, Any] = field(default_factory=dict)
+    latest_decision: Dict[str, Any] = field(default_factory=dict) # Keyed by symbol now
     decision_history: List[Dict] = field(default_factory=list)
     
     # History
@@ -78,10 +78,10 @@ class SharedState:
     last_reflection: Optional[Dict] = None
     last_reflection_text: Optional[str] = None
     
-    def update_market(self, price: float, regime: str, position: str):
-        self.current_price = price
-        self.market_regime = regime
-        self.price_position = position
+    def update_market(self, symbol: str, price: float, regime: str, position: str):
+        self.current_price[symbol] = price
+        self.market_regime[symbol] = regime
+        self.price_position[symbol] = position
         self.last_update = datetime.now().strftime("%H:%M:%S")
 
     def update_account(self, equity: float, available: float, wallet: float, pnl: float):
@@ -138,8 +138,9 @@ class SharedState:
         # Clean non-serializable objects to prevent JSON errors
         decision = self._serialize_obj(decision)
         
-        self.latest_decision = decision
-        self.critic_confidence = decision.get('confidence', 0.0)
+        symbol = decision.get('symbol', 'UNKNOWN')
+        self.latest_decision[symbol] = decision
+        self.critic_confidence[symbol] = decision.get('confidence', 0.0)
         
         # Add timestamp to decision if not present
         if 'timestamp' not in decision:

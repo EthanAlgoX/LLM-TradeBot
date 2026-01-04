@@ -194,6 +194,14 @@ class MultiAgentTradingBot:
         self.risk_manager = RiskManager()
         self.execution_engine = ExecutionEngine(self.client, self.risk_manager)
         self.saver = DataSaver() # ✅ 初始化 Multi-Agent 数据保存器
+
+        # 💰 Persistent Virtual Account (Test Mode)
+        if self.test_mode:
+            saved_va = self.saver.load_virtual_account()
+            if saved_va:
+                global_state.virtual_balance = saved_va.get('balance', 1000.0)
+                global_state.virtual_positions = saved_va.get('positions', {})
+                log.info(f"💰 Loaded persistent virtual account: Bal=${global_state.virtual_balance:.2f}, Pos={list(global_state.virtual_positions.keys())}")
         global_state.saver = self.saver # ✅ 将 saver 共享到全局状态，供各 Agent 使用
         
         
@@ -447,7 +455,7 @@ class MultiAgentTradingBot:
         return await self.account_manager.get_trader(account_id)
 
 
-    async def run_trading_cycle(self) -> Dict:
+    async def run_trading_cycle(self, analyze_only: bool = False) -> Dict:
         """
         执行完整的交易循环（异步版本）
         Returns:
@@ -1453,6 +1461,18 @@ class MultiAgentTradingBot:
                     },
                     'current_price': current_price
                 }
+
+            # Decoupling: If analyze_only is True, skip execution for OPEN actions
+            if analyze_only and vote_result.action in ('open_long', 'open_short'):
+                log.info(f"🔍 [Analyze Only] Strategy suggests {vote_result.action.upper()} for {self.current_symbol}, skipping execution for selector")
+                return {
+                    'status': 'suggested',
+                    'action': vote_result.action,
+                    'confidence': vote_result.confidence,
+                    'order_params': order_params,
+                    'vote_result': vote_result,
+                    'current_price': current_price
+                }
             # Step 5: 执行引擎
             if self.test_mode:
                 print("\n[Step 5/5] 🧪 TestMode - 模拟执行...")
@@ -1498,6 +1518,7 @@ class MultiAgentTradingBot:
                             
                             # Remove position
                             del global_state.virtual_positions[self.current_symbol]
+                            self._save_virtual_state()
                             
                             log.info(f"💰 [TEST] Closed {side} {self.current_symbol}: PnL=${realized_pnl:.2f}, Bal=${global_state.virtual_balance:.2f}")
                             
@@ -1521,6 +1542,7 @@ class MultiAgentTradingBot:
                             'leverage': order_params.get('leverage', 1),
                             'position_value': position_value  # 用于计算可用余额
                         }
+                        self._save_virtual_state()
                         log.info(f"💰 [TEST] Opened {side} {self.current_symbol} @ ${current_price:,.2f}")
                         
                         # Record trade to history -> MOVED TO UNIFIED BLOCK BELOW
@@ -2299,16 +2321,15 @@ class MultiAgentTradingBot:
                 for symbol in self.symbols:
                     self.current_symbol = symbol  # 设置当前处理的交易对
                     
-                    # Use asyncio.run for the async cycle
-                    result = asyncio.run(self.run_trading_cycle())
+                    # Analyze each symbol first without executing OPEN actions
+                    result = asyncio.run(self.run_trading_cycle(analyze_only=True))
                     
-                    # Capture price from global state (updated inside run_trading_cycle)
-                    latest_prices[symbol] = global_state.current_price
+                    latest_prices[symbol] = global_state.current_price.get(symbol, 0)
                     
                     print(f"  [{symbol}] 结果: {result['status']}")
                     
-                    # 如果是开仓决策，收集起来
-                    if result.get('action') in ['open_long', 'open_short'] and result.get('status') == 'success':
+                    # Collect viable open opportunities
+                    if result.get('status') == 'suggested':
                         all_decisions.append({
                             'symbol': symbol,
                             'result': result,
@@ -2421,6 +2442,15 @@ class MultiAgentTradingBot:
             wallet=global_state.virtual_balance,
             pnl=real_total_pnl  # ✅ Fix: Pass total profit/loss from start
         )
+
+
+    def _save_virtual_state(self):
+        """Helper to persist virtual account state"""
+        if self.test_mode:
+            self.saver.save_virtual_account(
+                balance=global_state.virtual_balance,
+                positions=global_state.virtual_positions
+            )
 
 def start_server():
     """Start FastAPI server in a separate thread"""
