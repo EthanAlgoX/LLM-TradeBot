@@ -177,7 +177,7 @@ async def get_status(authenticated: bool = Depends(verify_auth)):
             "is_test_mode": global_state.is_test_mode,
             "initial_balance": global_state.virtual_initial_balance,
             "current_balance": global_state.virtual_balance,
-            "available_balance": global_state.virtual_balance - sum(pos.get('position_value', 0) for pos in global_state.virtual_positions.values()),
+            "available_balance": global_state.virtual_balance - sum((pos.get('position_value', 0) / pos.get('leverage', 1)) for pos in global_state.virtual_positions.values()),
             "positions": global_state.virtual_positions,
             "total_unrealized_pnl": sum(pos.get('unrealized_pnl', 0) for pos in global_state.virtual_positions.values())
         },
