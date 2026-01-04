@@ -1509,6 +1509,8 @@ class MultiAgentTradingBot:
                     # Open Logic
                     elif 'long' in action_lower or 'short' in action_lower:
                         side = 'LONG' if 'long' in action_lower else 'SHORT'
+                        # 计算持仓价值
+                        position_value = order_params['quantity'] * current_price
                         global_state.virtual_positions[self.current_symbol] = {
                             'entry_price': current_price,
                             'quantity': order_params['quantity'],
@@ -1516,7 +1518,8 @@ class MultiAgentTradingBot:
                             'entry_time': datetime.now().isoformat(),
                             'stop_loss': order_params.get('stop_loss_price', 0),
                             'take_profit': order_params.get('take_profit_price', 0),
-                            'leverage': order_params.get('leverage', 1)
+                            'leverage': order_params.get('leverage', 1),
+                            'position_value': position_value  # 用于计算可用余额
                         }
                         log.info(f"💰 [TEST] Opened {side} {self.current_symbol} @ ${current_price:,.2f}")
                         
