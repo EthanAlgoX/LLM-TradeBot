@@ -195,28 +195,44 @@ class RiskAuditAgent:
         if is_short and isinstance(t_1h, (int, float)) and isinstance(t_15m, (int, float)) and osc_min is not None:
             if t_1h <= -60 and t_15m <= -20 and osc_min <= -40 and 'uptrend' not in regime_name:
                 short_strong_setup = True
+        # 🔧 OPTIMIZATION Priority 2: Lower SHORT confidence from 85% to 75%
+        short_confidence = confidence >= 75  # Was 85
         if is_short and not short_confidence:
-            return self._block_decision('total_blocks', f"空头信心不足({confidence:.1f} < 85)，拦截做空")
+            return self._block_decision('total_blocks', f"空头信心不足({confidence:.1f} < 75)，拦截做空")
         if is_short and not short_strong_setup:
             return self._block_decision('total_blocks', "空头信号未达到强共振条件，拦截做空")
+        # 🔧 OPTIMIZATION: Relax symbol-specific filters (was blocking all trades)
+        # Changed from hard blocks to conditional warnings
         symbol = decision.get('symbol')
         symbol_upper = str(symbol).upper() if symbol else ""
+        
+        # FILUSDT: Discourage SHORT but allow with high confidence
         if symbol_upper == "FILUSDT":
-            if is_short:
-                return self._block_decision('total_blocks', "FILUSDT策略收紧：禁止做空")
+            if is_short and confidence < 80:  # Changed from blanket ban
+                return self._block_decision('total_blocks', "FILUSDT做空需高信心(≥80%)")
+            elif is_short:
+                warnings.append("⚠️ FILUSDT做空风险较高，谨慎操作")
+        
+        # FETUSDT: Similar relaxation
         if symbol_upper == "FETUSDT":
-            if is_short:
-                return self._block_decision('total_blocks', "FETUSDT策略收紧：禁止做空")
+            if is_short and confidence < 80:
+                return self._block_decision('total_blocks', "FETUSDT做空需高信心(≥80%)")
+        
+        # NEARUSDT: Keep strict ban (this one might have fundamental issues)
         if symbol_upper == "NEARUSDT" and action_lower in ['long', 'short', 'open_long', 'open_short', 'add_position']:
             return self._block_decision('total_blocks', "NEARUSDT策略收紧：禁止交易")
 
+        # 🔧 OPTIMIZATION: Relax LINKUSDT/FILUSDT LONG requirements
+        # Changed from 85% confidence requirement to 75%
         strict_long_symbols = {"FILUSDT", "LINKUSDT"}
         if is_long and symbol_upper in strict_long_symbols:
-            if not long_strong_setup or confidence < 85:
+            if not long_strong_setup and confidence < 75:  # Lowered from 85%
                 return self._block_decision(
                     'total_blocks',
-                    f"{symbol_upper}策略收紧：做多需强共振且高信心(>=85)"
+                    f"{symbol_upper}做多需强信号或高信心(≥75%)"
                 )
+            elif confidence < 75:
+                warnings.append(f"⚠️ {symbol_upper}做多信心偏低({confidence:.1f}% < 75%)")
 
         # 0.3 价格位置拦截 (Position Filter)
         if position:
@@ -230,7 +246,8 @@ class RiskAuditAgent:
 
             if location == 'middle' or 40 <= pos_pct <= 60:
                 if not ((is_short and short_strong_setup and short_pos_pct >= short_pos_threshold) or (is_long and long_strong_setup)):
-                    if confidence < 80:
+                    # 🔧 OPTIMIZATION Priority 3: Widen price zones (80% → 70%)
+                    if confidence < 70:  # Was 80
                         return self._block_decision('total_blocks', f"价格处于区间中部({pos_pct:.1f}%)，R/R极差，禁止开仓")
                     warnings.append(f"⚠️ 价格处于区间中部({pos_pct:.1f}%)，R/R偏弱，谨慎开仓")
             
