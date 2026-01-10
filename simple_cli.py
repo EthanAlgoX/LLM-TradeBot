@@ -11,6 +11,9 @@ load_dotenv(override=True)
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '.')))
 
+# 版本号: v+日期+迭代次数
+VERSION = "v20260111_1"
+
 from src.api.binance_client import BinanceClient
 from src.execution.engine import ExecutionEngine
 from src.risk.manager import RiskManager
@@ -26,7 +29,7 @@ class SimpleTradingBot:
     
     def __init__(self, symbols=None, test_mode=True):
         print("="*60)
-        print("🤖 Simple Trading Bot - Minimal CLI Mode")
+        print(f"🤖 Simple Trading Bot - Minimal CLI Mode ({VERSION})")
         print("="*60)
         
         # 从 .env 读取默认币种配置

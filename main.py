@@ -20,6 +20,9 @@ Author: AI Trader Team
 Date: 2025-12-19
 """
 
+# 版本号: v+日期+迭代次数
+VERSION = "v20260111_1"
+
 import asyncio
 import sys
 import os
@@ -138,7 +141,7 @@ class MultiAgentTradingBot:
             test_mode: 测试模式（不执行真实交易）
         """
         print("\n" + "="*80)
-        print(f"🤖 AI Trader - DeepSeek LLM Decision Mode")
+        print(f"🤖 AI Trader - DeepSeek LLM Decision Mode ({VERSION})")
         print("="*80)
         
         self.config = Config()
