@@ -10,6 +10,7 @@ LLM 模块
 - Claude (Anthropic)
 - Qwen (通义千问)
 - Gemini (Google)
+- BlockRun (x402 micropayments - GPT-4o, Claude, Gemini, DeepSeek via single wallet)
 
 使用示例：
 
@@ -36,6 +37,7 @@ from .deepseek_client import DeepSeekClient
 from .claude_client import ClaudeClient
 from .qwen_client import QwenClient
 from .gemini_client import GeminiClient
+from .blockrun_client import BlockRunClient
 
 __all__ = [
     # 核心接口
@@ -52,4 +54,5 @@ __all__ = [
     "ClaudeClient",
     "QwenClient",
     "GeminiClient",
+    "BlockRunClient",
 ]
