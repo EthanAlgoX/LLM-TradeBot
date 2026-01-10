@@ -12,6 +12,7 @@ from .deepseek_client import DeepSeekClient
 from .claude_client import ClaudeClient
 from .qwen_client import QwenClient
 from .gemini_client import GeminiClient
+from .blockrun_client import BlockRunClient
 
 
 # 注册所有支持的提供商
@@ -21,6 +22,7 @@ PROVIDERS: Dict[str, Type[BaseLLMClient]] = {
     "claude": ClaudeClient,
     "qwen": QwenClient,
     "gemini": GeminiClient,
+    "blockrun": BlockRunClient,
 }
 
 
