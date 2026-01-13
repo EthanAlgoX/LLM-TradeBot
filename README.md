@@ -82,8 +82,11 @@ Intelligent Multi-Agent Quantitative Trading Bot based on the **Adversarial Deci
 | **OpenAI (GPT)** | ✅ Supported | [Get API Key](https://platform.openai.com) |
 | **Claude** | ✅ Supported | [Get API Key](https://console.anthropic.com) |
 | **Gemini** | ✅ Supported | [Get API Key](https://aistudio.google.com) |
+| **BlockRun.AI** | ✅ Supported | [Get Started](https://blockrun.ai/docs) |
 | **Grok** | 🗓️ Coming Soon | [Get API Key](https://console.x.ai) |
 | **Kimi** | 🗓️ Coming Soon | [Get API Key](https://platform.moonshot.cn) |
+
+> **BlockRun.AI**: Pay-per-request via USDC micropayments on Base chain. Access GPT-4o, Claude, Gemini, DeepSeek through a single wallet - no API keys needed. Your private key never leaves your machine.
 
 ---
 
@@ -446,6 +449,7 @@ LLM-TradeBot/
 │   │   ├── claude_client.py  # Anthropic Claude
 │   │   ├── qwen_client.py    # Alibaba Qwen
 │   │   ├── gemini_client.py  # Google Gemini
+│   │   ├── blockrun_client.py # BlockRun.AI (x402 micropayments)
 │   │   └── factory.py    # LLM Factory
 │   ├── monitoring/        # Monitoring & Logging
 │   ├── risk/              # Risk Management
