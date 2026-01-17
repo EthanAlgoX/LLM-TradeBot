@@ -502,7 +502,7 @@ function renderDecisionTable(history, positions = []) {
         let signalHtml = '<span class="cell-na">-</span>';
         if (d.four_layer_status && d.four_layer_status.layer4_pass !== undefined) {
             const pass = d.four_layer_status.layer4_pass;
-            const pattern = d.vote_details?.trigger_pattern || '';
+            const pattern = d.trigger_pattern || d.four_layer_status?.trigger_pattern || d.vote_details?.trigger_pattern || '';
             if (pass) {
                 signalHtml = `<span class="val pos" title="Trigger: ${pattern || 'CONFIRMED'}" style="font-size:0.8em">✅GO</span>`;
             } else {
@@ -929,6 +929,13 @@ function updateAgentFramework(system, decision, agents) {
         if (el) el.textContent = value || '--';
     };
 
+    const formatNumber = (value, digits = 2) => {
+        if (value === undefined || value === null) return '--';
+        const num = Number(value);
+        if (!Number.isFinite(num)) return '--';
+        return digits === null ? String(num) : num.toFixed(digits);
+    };
+
     // DataSync Agent - Always show as completed when we have data
     if (system.mode === 'Running') {
         setAgentStatus('flow-datasync', 'Done');
@@ -941,13 +948,37 @@ function updateAgentFramework(system, decision, agents) {
     }
 
     // Quant Analyst - Show indicators from decision
-    if (decision.vote_details) {
+    const indicatorSnapshot = decision.indicator_snapshot || null;
+    if (indicatorSnapshot || decision.vote_details) {
         setAgentStatus('flow-quant', 'Done');
-        // These would come from backend if available
-        setOutput('out-ema', '--');
-        setOutput('out-rsi', '--');
-        setOutput('out-macd', '--');
-        setOutput('out-bb', '--');
+        if (indicatorSnapshot) {
+            const emaStatusMap = {
+                bullish: 'Bullish',
+                bearish: 'Bearish',
+                bullish_bias: 'Bullish Bias',
+                bearish_bias: 'Bearish Bias',
+                mixed: 'Mixed'
+            };
+            const bbMap = {
+                upper: 'Upper',
+                lower: 'Lower',
+                middle: 'Middle'
+            };
+            const emaLabel = emaStatusMap[indicatorSnapshot.ema_status] || '--';
+            const rsiValue = formatNumber(indicatorSnapshot.rsi, 1);
+            const macdValue = formatNumber(indicatorSnapshot.macd_diff, 2);
+            const bbLabel = bbMap[indicatorSnapshot.bb_position] || '--';
+
+            setOutput('out-ema', emaLabel);
+            setOutput('out-rsi', rsiValue);
+            setOutput('out-macd', macdValue);
+            setOutput('out-bb', bbLabel);
+        } else {
+            setOutput('out-ema', '--');
+            setOutput('out-rsi', '--');
+            setOutput('out-macd', '--');
+            setOutput('out-bb', '--');
+        }
     }
 
     // Regime Detector
@@ -960,9 +991,13 @@ function updateAgentFramework(system, decision, agents) {
         setAgentStatus('flow-regime', 'Done');
         const regime = decision.regime.regime || 'Unknown';
         const adx = decision.regime.adx !== undefined ? decision.regime.adx.toFixed(1) : '--';
+        const confValue = decision.regime.confidence;
+        const conf = confValue !== undefined && confValue !== null
+            ? `${(confValue <= 1 ? confValue * 100 : confValue).toFixed(0)}%`
+            : '--';
         setOutput('out-regime', regime);
         setOutput('out-adx', adx);
-        setOutput('out-regime-conf', '--');
+        setOutput('out-regime-conf', conf);
     } else {
         setAgentStatus('flow-regime', 'Idle');
         setOutput('out-regime', '--');
@@ -1024,9 +1059,32 @@ function updateAgentFramework(system, decision, agents) {
         setAgentStatus('flow-risk', 'Done');
         const riskLevel = decision.risk_level || 'unknown';
         setOutput('out-risk', riskLevel.toUpperCase());
-        setOutput('out-size', '--');
-        setOutput('out-sl', '--');
-        setOutput('out-tp', '--');
+        const params = decision.order_params || decision.params || decision.details || null;
+        const entry = params ? (params.entry_price ?? params.price) : null;
+        const sl = params ? (params.stop_loss_price ?? params.stop_loss) : null;
+        const tp = params ? (params.take_profit_price ?? params.take_profit) : null;
+        const qty = params ? params.quantity : null;
+
+        let sizeLabel = '--';
+        if (qty !== undefined && qty !== null && decision.symbol) {
+            const base = decision.symbol.replace(/(USDT|BUSD|USDC)$/i, '');
+            sizeLabel = `${formatNumber(qty, 4)} ${base || decision.symbol}`;
+        } else if (qty !== undefined && qty !== null) {
+            sizeLabel = formatNumber(qty, 4);
+        }
+
+        const slPct = entry && sl ? -Math.abs(((sl - entry) / entry) * 100) : null;
+        const tpPct = entry && tp ? Math.abs(((tp - entry) / entry) * 100) : null;
+
+        const fmtPct = (value) => {
+            if (value === undefined || value === null || !Number.isFinite(value)) return '--';
+            const sign = value > 0 ? '+' : value < 0 ? '' : '';
+            return `${sign}${value.toFixed(1)}%`;
+        };
+
+        setOutput('out-size', sizeLabel);
+        setOutput('out-sl', fmtPct(slPct));
+        setOutput('out-tp', fmtPct(tpPct));
     }
 
     // Final Output
@@ -1035,10 +1093,19 @@ function updateAgentFramework(system, decision, agents) {
         const actionDiv = finalEl.querySelector('.final-action');
         const symbolSpan = document.getElementById('final-symbol');
         const sizeSpan = document.getElementById('final-size');
+        const params = decision.order_params || decision.params || decision.details || null;
+        const qty = params ? params.quantity : null;
+        let sizeLabel = '--';
+        if (qty !== undefined && qty !== null && decision.symbol) {
+            const base = decision.symbol.replace(/(USDT|BUSD|USDC)$/i, '');
+            sizeLabel = `${formatNumber(qty, 4)} ${base || decision.symbol}`;
+        } else if (qty !== undefined && qty !== null) {
+            sizeLabel = formatNumber(qty, 4);
+        }
 
         if (actionDiv) actionDiv.textContent = decision.action.toUpperCase();
         if (symbolSpan) symbolSpan.textContent = decision.symbol || '--';
-        if (sizeSpan) sizeSpan.textContent = '--';
+        if (sizeSpan) sizeSpan.textContent = sizeLabel;
     }
 
     // 🆕 Symbol Selector Agent
@@ -1100,17 +1167,36 @@ function updateAgentFramework(system, decision, agents) {
         setOutput('out-zone', '--');
         setOutput('out-sr', '--');
         setOutput('out-range', '--');
-    } else if (decision.position_zone !== undefined || decision.position) {
-        setAgentStatus('flow-position-analyzer', 'Done');
-        const zone = decision.position_zone || decision.position?.location || '--';
-        setOutput('out-zone', zone);
-        setOutput('out-sr', '--');
-        setOutput('out-range', '--');
     } else {
-        setAgentStatus('flow-position-analyzer', 'Idle');
-        setOutput('out-zone', '--');
-        setOutput('out-sr', '--');
-        setOutput('out-range', '--');
+        const positionInfo = decision.order_params?.position_1h || decision.position || null;
+        if (decision.position_zone !== undefined || positionInfo) {
+            setAgentStatus('flow-position-analyzer', 'Done');
+            const zone = decision.position_zone || positionInfo?.location || '--';
+            const rangeLow = positionInfo?.range_low;
+            const rangeHigh = positionInfo?.range_high;
+            const rangeSize = positionInfo?.range_size;
+            const posPct = positionInfo?.position_pct;
+
+            const srLabel = (rangeLow !== undefined && rangeLow !== null && rangeHigh !== undefined && rangeHigh !== null)
+                ? `${formatNumber(rangeLow, 2)} - ${formatNumber(rangeHigh, 2)}`
+                : '--';
+
+            let rangeLabel = '--';
+            if (rangeSize !== undefined && rangeSize !== null) {
+                rangeLabel = formatNumber(rangeSize, 2);
+            } else if (posPct !== undefined && posPct !== null) {
+                rangeLabel = `${formatNumber(posPct, 0)}%`;
+            }
+
+            setOutput('out-zone', zone);
+            setOutput('out-sr', srLabel);
+            setOutput('out-range', rangeLabel);
+        } else {
+            setAgentStatus('flow-position-analyzer', 'Idle');
+            setOutput('out-zone', '--');
+            setOutput('out-sr', '--');
+            setOutput('out-range', '--');
+        }
     }
 
     // 🆕 Trend Agent (LLM)

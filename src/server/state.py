@@ -77,6 +77,9 @@ class SharedState:
     reflection_count: int = 0
     last_reflection: Optional[Dict] = None
     last_reflection_text: Optional[str] = None
+
+    # Indicator snapshot (for UI)
+    indicator_snapshot: Dict[str, Any] = field(default_factory=dict)
     
     def update_market(self, symbol: str, price: float, regime: str, position: str):
         self.current_price[symbol] = price

@@ -463,6 +463,71 @@ class MultiAgentTradingBot:
                 'win_rate': win_rate
             }
 
+        indicator_snapshot = getattr(global_state, 'indicator_snapshot', None)
+        if indicator_snapshot:
+            snapshot = indicator_snapshot
+            if isinstance(indicator_snapshot, dict) and 'ema_status' not in indicator_snapshot:
+                symbol = decision_dict.get('symbol')
+                snapshot = indicator_snapshot.get(symbol) if symbol else None
+            if snapshot:
+                decision_dict['indicator_snapshot'] = snapshot
+
+    def _capture_indicator_snapshot(self, processed_dfs: Dict[str, "pd.DataFrame"], timeframe: str = '15m') -> Optional[Dict]:
+        """Capture lightweight indicator snapshot for UI."""
+        df = processed_dfs.get(timeframe)
+        if df is None or df.empty:
+            return None
+
+        latest = df.iloc[-1]
+
+        def _safe_float(value):
+            try:
+                val = float(value)
+            except (TypeError, ValueError):
+                return None
+            if val != val or val in (float('inf'), float('-inf')):
+                return None
+            return val
+
+        close = _safe_float(latest.get('close'))
+        ema20 = _safe_float(latest.get('ema_20'))
+        ema60 = _safe_float(latest.get('ema_60'))
+        rsi = _safe_float(latest.get('rsi'))
+        macd_diff = _safe_float(latest.get('macd_diff'))
+        bb_upper = _safe_float(latest.get('bb_upper'))
+        bb_lower = _safe_float(latest.get('bb_lower'))
+        bb_middle = _safe_float(latest.get('bb_middle'))
+
+        ema_status = None
+        if close is not None and ema20 is not None and ema60 is not None:
+            if close > ema20 > ema60:
+                ema_status = 'bullish'
+            elif close < ema20 < ema60:
+                ema_status = 'bearish'
+            elif ema20 > ema60:
+                ema_status = 'bullish_bias'
+            elif ema20 < ema60:
+                ema_status = 'bearish_bias'
+            else:
+                ema_status = 'mixed'
+
+        bb_position = None
+        if close is not None and bb_upper is not None and bb_lower is not None and bb_middle is not None:
+            if close > bb_upper:
+                bb_position = 'upper'
+            elif close < bb_lower:
+                bb_position = 'lower'
+            else:
+                bb_position = 'middle'
+
+        return {
+            'timeframe': timeframe,
+            'ema_status': ema_status,
+            'rsi': rsi,
+            'macd_diff': macd_diff,
+            'bb_position': bb_position
+        }
+
     def _resolve_ai500_symbols(self):
         """Dynamic resolution of AI500_TOP5 tag"""
         # AI Candidates List (30+ Major AI/Data/Compute Coins)
@@ -980,7 +1045,15 @@ class MultiAgentTradingBot:
                         'confidence': 0
                     }
                 }
-            
+
+            indicator_snapshot = self._capture_indicator_snapshot(processed_dfs, timeframe='15m')
+            if indicator_snapshot:
+                snapshots = getattr(global_state, 'indicator_snapshot', {})
+                if not isinstance(snapshots, dict) or 'ema_status' in snapshots:
+                    snapshots = {}
+                snapshots[self.current_symbol] = indicator_snapshot
+                global_state.indicator_snapshot = snapshots
+
             # Step 2: Strategist
             if not (hasattr(self, '_headless_mode') and self._headless_mode):
                 print("[Step 2/4] 👨‍🔬 The Strategist (QuantAnalyst) - Analyzing data...")
@@ -1877,8 +1950,6 @@ class MultiAgentTradingBot:
                 # Safety clamp: ensure position_pct is 0-100
                 pos_pct = min(max(vote_result.position.get('position_pct', 0), 0), 100)
                 global_state.price_position = f"{pos_pct:.1f}% ({vote_result.position.get('location', 'Unknown')})"
-                
-            global_state.update_decision(decision_dict)
             
             # ✅ Save Risk Audit Report
             from dataclasses import asdict as dc_asdict
@@ -1912,6 +1983,9 @@ class MultiAgentTradingBot:
                 print(f"  ⚠️  警告信息:")
                 for warning in audit_result.warnings:
                     print(f"     {warning}")
+
+            decision_dict['order_params'] = order_params
+            global_state.update_decision(decision_dict)
             
             # 如果被拦截
             if not audit_result.passed:

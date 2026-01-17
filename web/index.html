@@ -175,8 +175,11 @@
             <!-- Row 1: Complete Agent Framework Visualization -->
             <section class="row-agent-framework">
                 <div class="glass-panel card agent-framework-card">
-                    <div class="card-header">
-                        <h2>🤖 Multi-Agent Decision Framework</h2>
+                    <div class="card-header framework-header">
+                        <div class="framework-title-block">
+                            <h2 class="framework-title">🤖 Multi-Agent Decision Framework</h2>
+                            <p class="framework-subtitle">Signal → Audit → Execute</p>
+                        </div>
                         <div class="framework-controls">
                             <span id="framework-cycle" class="cycle-badge">Cycle #0</span>
                             <span id="current-symbol-display" class="current-symbol-badge"
@@ -188,16 +191,12 @@
                     </div>
 
                     <!-- Agent Framework Layout: Selection Panel + Flow Diagram -->
-                    <div class="agent-framework-layout" style="display: flex; gap: 16px;">
+                    <div class="agent-framework-layout framework-grid">
 
                         <!-- Left: Optional Agent Selection Panel -->
-                        <div class="agent-selection-panel glass-panel"
-                            style="min-width: 200px; padding: 12px; border-radius: 8px;">
-                            <h3
-                                style="font-size: 0.9rem; color: var(--nofx-gold); margin-bottom: 12px; display: flex; align-items: center; gap: 6px;">
-                                ⚙️ Optional Agents
-                            </h3>
-                            <div class="agent-checkbox-list" style="display: flex; flex-direction: column; gap: 8px;">
+                        <div class="agent-selection-panel glass-panel">
+                            <h3 class="agent-selection-title">⚙️ Optional Agents</h3>
+                            <div class="agent-checkbox-list">
                                 <!-- ML/AI Prediction -->
                                 <label class="agent-checkbox-item">
                                     <input type="checkbox" id="cfg-predict-agent" name="agent-toggle"
@@ -257,21 +256,18 @@
                                 </label>
                             </div>
 
-                            <div
-                                style="margin-top: 12px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.1);">
-                                <button id="btn-apply-agents" class="apply-agents-btn"
-                                    style="width: 100%; padding: 8px; background: var(--nofx-gold); color: #000; border: none; border-radius: 6px; font-weight: 600; cursor: pointer;">
-                                    Apply Changes
-                                </button>
+                            <div class="agent-selection-actions">
+                                <button id="btn-apply-agents" class="apply-agents-btn">Apply Changes</button>
                             </div>
                         </div>
 
                         <!-- Right: Agent Flow Diagram -->
-                        <div class="agent-flow-container" style="flex: 1;">
+                        <div class="agent-flow-container">
                             <!-- Layer 1: Data Layer -->
                             <div class="flow-layer" data-layer="data">
-                                <div class="layer-label">📡 Data Layer</div>
-                                <div class="layer-agents">
+                                <div class="flow-layer-row">
+                                    <div class="layer-label">📡 Data Layer</div>
+                                    <div class="layer-agents">
                                     <div class="agent-box" id="flow-datasync">
                                         <div class="agent-header">
                                             <span class="agent-emoji">🕵️</span>
@@ -304,6 +300,7 @@
                                                     class="output-value" id="out-selector-score">--</span></div>
                                         </div>
                                     </div>
+                                    </div>
                                 </div>
                                 <div class="flow-connector vertical">
                                     <div class="flow-line"></div>
@@ -313,8 +310,9 @@
 
                             <!-- Layer 2: Analysis Layer -->
                             <div class="flow-layer" data-layer="analysis">
-                                <div class="layer-label">📊 Analysis Layer</div>
-                                <div class="layer-agents">
+                                <div class="flow-layer-row">
+                                    <div class="layer-label">📊 Analysis Layer</div>
+                                    <div class="layer-agents">
                                     <div class="agent-box" id="flow-quant">
                                         <div class="agent-header">
                                             <span class="agent-emoji">👨‍🔬</span>
@@ -392,6 +390,7 @@
                                                     class="output-value" id="out-signal">--</span></div>
                                         </div>
                                     </div>
+                                    </div>
                                 </div>
                                 <div class="flow-connector vertical merge">
                                     <div class="flow-line"></div>
@@ -401,8 +400,9 @@
 
                             <!-- Layer 2.5: LLM Strategy Layer -->
                             <div class="flow-layer" data-layer="strategy">
-                                <div class="layer-label">🧠 LLM Strategy Layer</div>
-                                <div class="layer-agents">
+                                <div class="flow-layer-row">
+                                    <div class="layer-label">🧠 LLM Strategy Layer</div>
+                                    <div class="layer-agents">
                                     <div class="agent-box" id="flow-trend-agent">
                                         <div class="agent-header">
                                             <span class="agent-emoji">📈</span>
@@ -448,6 +448,7 @@
                                                     class="output-value" id="out-ai-reason">--</span></div>
                                         </div>
                                     </div>
+                                    </div>
                                 </div>
                                 <div class="flow-connector vertical">
                                     <div class="flow-line"></div>
@@ -457,8 +458,9 @@
 
                             <!-- Layer 3: Decision Layer -->
                             <div class="flow-layer" data-layer="decision">
-                                <div class="layer-label">⚖️ Decision Layer</div>
-                                <div class="layer-agents">
+                                <div class="flow-layer-row">
+                                    <div class="layer-label">⚖️ Decision Layer</div>
+                                    <div class="layer-agents">
                                     <div class="agent-box decision-core" id="flow-decision">
                                         <div class="agent-header">
                                             <span class="agent-emoji">⚖️</span>
@@ -480,6 +482,7 @@
                                             </div>
                                         </div>
                                     </div>
+                                    </div>
                                 </div>
                                 <div class="flow-connector vertical">
                                     <div class="flow-line"></div>
@@ -489,8 +492,9 @@
 
                             <!-- Layer 4: Execution Layer -->
                             <div class="flow-layer" data-layer="execution">
-                                <div class="layer-label">🛡️ Execution Layer</div>
-                                <div class="layer-agents">
+                                <div class="flow-layer-row">
+                                    <div class="layer-label">🛡️ Execution Layer</div>
+                                    <div class="layer-agents">
                                     <div class="agent-box" id="flow-risk">
                                         <div class="agent-header">
                                             <span class="agent-emoji">🛡️</span>
@@ -535,6 +539,7 @@
                                             <div class="output-row"><span class="output-label">Insight:</span><span
                                                     class="output-value" id="out-insight">--</span></div>
                                         </div>
+                                    </div>
                                     </div>
                                 </div>
                             </div>
