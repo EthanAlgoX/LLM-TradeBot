@@ -1168,80 +1168,9 @@
         }
     </style>
     </style>
-    <script src="/static/app.js?v=20260117_0800"></script>
+    <script src="/static/app.js?v=20260117_0830"></script>
     <script>
-        // EMERGENCY FIX & LOGIC V3
-        (function () {
-            console.log(' 🚑 Emergency Inline Script Loaded v3'); window.addEventListener('load', function () {
-                const
-                btn = document.getElementById('btn-settings'); const modal = document.getElementById('settings-modal');
-                const closeBtn = document.getElementById('close-settings'); // 1. Button Logic if (btn && modal) {
-                btn.onclick = function (e) {
-                    e.preventDefault(); e.stopPropagation(); modal.style.display = 'flex'; if
-                        (typeof loadSettings === 'function') {
-                            loadSettings().then(() => {
-                                // Sync UI after load for current mode
-                                const ms = document.getElementById('cfg-run-mode');
-                                if (ms) {
-                                    const event = new Event('change');
-                                    ms.dispatchEvent(event);
-                                }
-                            }).catch(console.error);
-                    }
-                };
-                if (closeBtn) closeBtn.onclick = () => modal.style.display = 'none';
-            }
-
-                    // 2. Tab Logic
-                    const tabs = document.querySelectorAll('.tab-btn');
-            tabs.forEach(tab => {
-                tab.onclick = function () {
-                    document.querySelectorAll('.tab-btn').forEach(t => t.classList.remove('active'));
-                    document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
-
-                    this.classList.add('active');
-                    const paneId = this.getAttribute('data-tab');
-                    const pane = document.getElementById(paneId);
-                    if (pane) pane.classList.add('active');
-                };
-            });
-
-            // 3. Mode Logic (Show/Hide Binance)
-            const modeSel = document.getElementById('cfg-run-mode');
-            const binSec = document.getElementById('binance-config-section');
-
-            if (modeSel && binSec) {
-                const updateUI = () => {
-                    if (modeSel.value === 'test') {
-                        binSec.style.display = 'none';
-                    } else {
-                        binSec.style.display = 'block';
-                    }
-                };
-                modeSel.addEventListener('change', updateUI);
-                setInterval(updateUI, 500); // Poll backup
-            }
-
-            // 4. LLM Provider Logic (Show/Hide API Key Fields)
-            const llmProviderSel = document.getElementById('cfg-llm-provider');
-            const llmKeyFields = document.querySelectorAll('.llm-key-field');
-
-            if (llmProviderSel && llmKeyFields.length > 0) {
-                const updateLlmUI = () => {
-                    const selectedProvider = llmProviderSel.value;
-                    llmKeyFields.forEach(field => {
-                        if (field.dataset.provider === selectedProvider) {
-                            field.style.display = 'block';
-                        } else {
-                            field.style.display = 'none';
-                        }
-                    });
-                };
-                llmProviderSel.addEventListener('change', updateLlmUI);
-                updateLlmUI(); // Initial call
-            }
-        });
-                    }) ();
+        // Inline script removed (logic handled in app.js).
     </script>
 
                     <!-- Agent Pipeline Interactive Script -->

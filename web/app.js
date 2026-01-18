@@ -65,7 +65,9 @@ function initChart() {
         equityChart = null;
     }
 
-    const ctx = document.getElementById('equityChart').getContext('2d');
+    const canvas = document.getElementById('equityChart');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
     equityChart = new Chart(ctx, {
         type: 'line',
         data: {
