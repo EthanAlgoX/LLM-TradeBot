@@ -943,11 +943,11 @@ function normalizeAgentConfig(rawConfig) {
     ensure('trend_agent_llm', false);
     ensure('setup_agent_llm', false);
     ensure('trigger_agent_llm', false);
-    ensure('trend_agent_local', false);
-    ensure('setup_agent_local', false);
-    ensure('trigger_agent_local', false);
-    ensure('reflection_agent_llm', true);
-    ensure('reflection_agent_local', false);
+    ensure('trend_agent_local', true);
+    ensure('setup_agent_local', true);
+    ensure('trigger_agent_local', true);
+    ensure('reflection_agent_llm', false);
+    ensure('reflection_agent_local', true);
 
     config.trend_agent = Boolean(
         config.trend_agent_llm ||
@@ -3113,6 +3113,9 @@ function renderTradeHistory(trades) {
     // Load agent positions from localStorage
     function loadAgentPositions() {
         const positions = JSON.parse(localStorage.getItem('agentPositions') || '{}');
+        const viewportW = window.innerWidth;
+        const viewportH = window.innerHeight;
+        const safePositions = {};
 
         Object.entries(positions).forEach(([id, pos]) => {
             const element = document.getElementById(id);
@@ -3121,8 +3124,24 @@ function renderTradeHistory(trades) {
                 element.style.left = pos.left;
                 element.style.top = pos.top;
                 element.style.zIndex = '100';
+
+                const rect = element.getBoundingClientRect();
+                const outside = rect.right < 0 || rect.bottom < 0 || rect.left > viewportW || rect.top > viewportH;
+                if (outside) {
+                    element.style.position = '';
+                    element.style.left = '';
+                    element.style.top = '';
+                    element.style.width = '';
+                    element.style.zIndex = '';
+                } else {
+                    safePositions[id] = pos;
+                }
             }
         });
+
+        if (Object.keys(positions).length !== Object.keys(safePositions).length) {
+            localStorage.setItem('agentPositions', JSON.stringify(safePositions));
+        }
 
         if (Object.keys(positions).length > 0) {
             console.log('📂 Loaded', Object.keys(positions).length, 'agent positions');
@@ -3213,7 +3232,7 @@ function renderTradeHistory(trades) {
 // ========================================
 (function () {
     const btnApply = document.getElementById('btn-apply-agents');
-    if (!btnApply) return;
+    const llmToggleBtn = document.getElementById('btn-llm-toggle');
 
     // Map checkbox IDs to agent box IDs for visibility toggle
     const agentBoxMap = {
@@ -3236,6 +3255,21 @@ function renderTradeHistory(trades) {
         'symbol_selector_agent': 'flow-symbol-selector'
     };
 
+    const isLlmEnabled = (config) => Boolean(
+        config.trend_agent_llm ||
+        config.setup_agent_llm ||
+        config.trigger_agent_llm ||
+        config.reflection_agent_llm
+    );
+
+    function syncAgentToggles(config) {
+        document.querySelectorAll('input[name="agent-toggle"]').forEach(cb => {
+            if (config[cb.value] !== undefined) {
+                cb.checked = Boolean(config[cb.value]);
+            }
+        });
+    }
+
     // Function to toggle agent box visibility
     function updateAgentVisibility() {
         const boxStates = {};
@@ -3253,49 +3287,106 @@ function renderTradeHistory(trades) {
         });
     }
 
+    function updateLlmToggleButton(config) {
+        if (!llmToggleBtn) return;
+        const enabled = isLlmEnabled(config);
+        llmToggleBtn.textContent = enabled ? 'LLM: ON' : 'LLM: OFF';
+        llmToggleBtn.classList.toggle('on', enabled);
+    }
+
+    async function persistAgentConfig(agents) {
+        const merged = { ...(window.agentConfig || {}), ...agents };
+        const normalized = normalizeAgentConfig(merged);
+        window.agentConfig = normalized;
+        syncAgentToggles(normalized);
+        updateAgentVisibility();
+        updateLlmToggleButton(normalized);
+
+        const payload = { ...normalized };
+        ['trend_agent', 'setup_agent', 'trigger_agent', 'reflection_agent'].forEach((key) => {
+            delete payload[key];
+        });
+
+        const response = await apiFetch('/api/agents/config', {
+            method: 'POST',
+            body: JSON.stringify({ agents: payload })
+        });
+
+        return response;
+    }
+
     // Update visibility on checkbox change
     document.querySelectorAll('input[name="agent-toggle"]').forEach(cb => {
         cb.addEventListener('change', updateAgentVisibility);
     });
 
-    btnApply.addEventListener('click', async function () {
-        // Collect all agent states
-        const agents = {};
-        document.querySelectorAll('input[name="agent-toggle"]').forEach(cb => {
-            agents[cb.value] = cb.checked;
-        });
-
-        window.agentConfig = normalizeAgentConfig(agents);
-        console.log('🔧 Applying agent config:', agents);
-
-        // Send to backend
-        try {
-            const response = await apiFetch('/api/agents/config', {
-                method: 'POST',
-                body: JSON.stringify({ agents: agents })
+    if (btnApply) {
+        btnApply.addEventListener('click', async function () {
+            // Collect all agent states
+            const agents = {};
+            document.querySelectorAll('input[name="agent-toggle"]').forEach(cb => {
+                agents[cb.value] = cb.checked;
             });
 
-            // Update visibility
-            updateAgentVisibility();
+            console.log('🔧 Applying agent config:', agents);
 
-            // Visual feedback
-            btnApply.textContent = '✅ Applied!';
-            btnApply.style.background = 'var(--nofx-success)';
-            setTimeout(() => {
-                btnApply.textContent = 'Apply Changes';
-                btnApply.style.background = 'var(--nofx-gold)';
-            }, 2000);
+            // Send to backend
+            try {
+                const response = await persistAgentConfig(agents);
 
-            console.log('✅ Agent config saved:', response);
+                // Visual feedback
+                btnApply.textContent = '✅ Applied!';
+                btnApply.style.background = 'var(--nofx-success)';
+                setTimeout(() => {
+                    btnApply.textContent = 'Apply Changes';
+                    btnApply.style.background = 'var(--nofx-gold)';
+                }, 2000);
 
-        } catch (err) {
-            console.error('Failed to apply agent config:', err);
-            btnApply.textContent = '❌ Failed';
-            setTimeout(() => {
-                btnApply.textContent = 'Apply Changes';
-            }, 2000);
-        }
-    });
+                console.log('✅ Agent config saved:', response);
+
+            } catch (err) {
+                console.error('Failed to apply agent config:', err);
+                btnApply.textContent = '❌ Failed';
+                setTimeout(() => {
+                    btnApply.textContent = 'Apply Changes';
+                }, 2000);
+            }
+        });
+    }
+
+    if (llmToggleBtn) {
+        llmToggleBtn.addEventListener('click', async function () {
+            if (!window.agentConfig || Object.keys(window.agentConfig).length === 0) {
+                await loadAgentConfig();
+            }
+            if (!window.agentConfig || Object.keys(window.agentConfig).length === 0) {
+                console.warn('LLM toggle aborted: agent config not loaded');
+                return;
+            }
+            const current = normalizeAgentConfig(window.agentConfig || {});
+            const enableLlm = !isLlmEnabled(current);
+            const next = {
+                ...current,
+                trend_agent_llm: enableLlm,
+                setup_agent_llm: enableLlm,
+                trigger_agent_llm: enableLlm,
+                reflection_agent_llm: enableLlm,
+                trend_agent_local: !enableLlm,
+                setup_agent_local: !enableLlm,
+                trigger_agent_local: !enableLlm,
+                reflection_agent_local: !enableLlm
+            };
+
+            try {
+                llmToggleBtn.disabled = true;
+                await persistAgentConfig(next);
+            } catch (err) {
+                console.error('Failed to toggle LLM mode:', err);
+            } finally {
+                llmToggleBtn.disabled = false;
+            }
+        });
+    }
 
     // Load initial agent config from backend
     async function loadAgentConfig() {
@@ -3305,11 +3396,9 @@ function renderTradeHistory(trades) {
             if (data && data.agents) {
                 const normalized = normalizeAgentConfig(data.agents);
                 window.agentConfig = normalized;
-                Object.entries(normalized).forEach(([key, value]) => {
-                    const cb = document.querySelector(`input[name="agent-toggle"][value="${key}"]`);
-                    if (cb) cb.checked = value;
-                });
+                syncAgentToggles(normalized);
                 updateAgentVisibility();
+                updateLlmToggleButton(normalized);
                 console.log('📋 Agent config loaded from backend');
             }
         } catch (err) {

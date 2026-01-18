@@ -199,11 +199,11 @@ class ConfigManager:
             "trend_agent_llm": False,
             "setup_agent_llm": False,
             "trigger_agent_llm": False,
-            "trend_agent_local": False,
-            "setup_agent_local": False,
-            "trigger_agent_local": False,
-            "reflection_agent_llm": True,
-            "reflection_agent_local": False,
+            "trend_agent_local": True,
+            "setup_agent_local": True,
+            "trigger_agent_local": True,
+            "reflection_agent_llm": False,
+            "reflection_agent_local": True,
             "symbol_selector_agent": True
         }
         

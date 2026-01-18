@@ -77,13 +77,13 @@ agents:
   trigger_agent_llm: false         # 5m 触发 LLM 分析
   
   # 本地语义分析 (不调用 LLM)
-  trend_agent_local: false         # 1h 趋势规则分析
-  setup_agent_local: false         # 15m 入场规则分析
-  trigger_agent_local: false       # 5m 触发规则分析
+  trend_agent_local: true          # 1h 趋势规则分析
+  setup_agent_local: true          # 15m 入场规则分析
+  trigger_agent_local: true        # 5m 触发规则分析
   
   # 交易反思
-  reflection_agent_llm: true       # 每 10 笔交易后 LLM 反思
-  reflection_agent_local: false    # 本地规则反思
+  reflection_agent_llm: false      # 每 10 笔交易后 LLM 反思
+  reflection_agent_local: true     # 本地规则反思
   
   # 选币
   symbol_selector_agent: false     # AUTO3 自动选币 (需要回测)

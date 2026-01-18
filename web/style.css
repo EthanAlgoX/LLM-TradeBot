@@ -2105,7 +2105,7 @@ tr:first-child td {
 .agent-framework-card .card-header {
     display: flex;
     justify-content: space-between;
-    align-items: flex-start;
+    align-items: center;
     padding-bottom: 16px;
     border-bottom: 1px solid var(--panel-border);
     margin-bottom: 20px;
@@ -2123,7 +2123,8 @@ tr:first-child td {
 .framework-title-block {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 6px;
+    max-width: 60%;
 }
 
 .agent-framework-card .card-header h2 {
@@ -2151,7 +2152,7 @@ tr:first-child td {
 .framework-controls {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 10px;
     flex-wrap: wrap;
     justify-content: flex-end;
     position: relative;
@@ -2204,13 +2205,40 @@ tr:first-child td {
     cursor: not-allowed;
 }
 
+.llm-toggle-btn {
+    padding: 8px 18px;
+    background: linear-gradient(135deg, rgba(74, 85, 104, 0.35) 0%, rgba(26, 32, 44, 0.5) 100%);
+    border: 1px solid rgba(113, 128, 150, 0.4);
+    border-radius: 999px;
+    color: #e2e8f0;
+    font-size: 0.85rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    font-family: var(--font-display);
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-transform: uppercase;
+}
+
+.llm-toggle-btn.on {
+    background: linear-gradient(135deg, rgba(229, 62, 62, 0.28) 0%, rgba(229, 62, 62, 0.12) 100%);
+    border-color: rgba(229, 62, 62, 0.6);
+    color: #feb2b2;
+    box-shadow: 0 6px 16px rgba(229, 62, 62, 0.25);
+}
+
+.llm-toggle-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 18px rgba(45, 55, 72, 0.45);
+}
+
 /* Agent Flow Container */
 .agent-flow-container {
     display: flex;
     flex-direction: column;
-    gap: 14px;
+    gap: 12px;
     padding: 18px;
-    border-radius: 16px;
+    border-radius: 18px;
     background:
         linear-gradient(180deg, rgba(8, 11, 15, 0.7), rgba(5, 7, 10, 0.9)),
         rgba(8, 11, 15, 0.6);
@@ -2238,9 +2266,9 @@ tr:first-child td {
 .flow-layer {
     display: flex;
     flex-direction: column;
-    gap: 12px;
-    padding: 14px 16px;
-    border-radius: 14px;
+    gap: 10px;
+    padding: 12px 14px;
+    border-radius: 16px;
     border: 1px solid rgba(255, 255, 255, 0.06);
     background: linear-gradient(145deg, rgba(255, 255, 255, 0.03), rgba(0, 0, 0, 0.15));
     position: relative;
@@ -2260,9 +2288,9 @@ tr:first-child td {
 
 .flow-layer-row {
     display: grid;
-    grid-template-columns: minmax(120px, 160px) minmax(0, 1fr);
-    gap: 16px;
-    align-items: start;
+    grid-template-columns: minmax(110px, 150px) minmax(0, 1fr);
+    gap: 14px;
+    align-items: center;
     position: relative;
     z-index: 1;
 }
@@ -2288,23 +2316,25 @@ tr:first-child td {
 }
 
 .layer-label {
-    font-size: 0.72rem;
-    font-weight: 600;
+    font-size: 0.7rem;
+    font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.18em;
+    letter-spacing: 0.16em;
     color: var(--layer-accent, var(--nofx-gold));
     background: rgba(255, 255, 255, 0.04);
-    padding: 8px 12px;
+    padding: 6px 10px;
     border-radius: 999px;
     border: 1px solid rgba(255, 255, 255, 0.12);
     font-family: var(--font-display);
-    text-align: center;
+    text-align: left;
+    justify-self: start;
+    white-space: nowrap;
 }
 
 .layer-agents {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
-    gap: 14px;
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    gap: 12px;
     align-items: stretch;
 }
 
@@ -2313,7 +2343,7 @@ tr:first-child td {
     background: linear-gradient(145deg, rgba(7, 10, 14, 0.6), rgba(12, 16, 22, 0.4));
     border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 12px;
-    padding: 14px 18px;
+    padding: 12px 14px;
     min-width: 0;
     max-width: none;
     width: 100%;
@@ -2322,6 +2352,9 @@ tr:first-child td {
     user-select: none;
     position: relative;
     overflow: hidden;
+    min-height: 168px;
+    display: flex;
+    flex-direction: column;
 }
 
 .agent-box::before {
@@ -2438,8 +2471,8 @@ tr:first-child td {
     display: flex;
     align-items: center;
     gap: 8px;
-    margin-bottom: 10px;
-    padding-bottom: 8px;
+    margin-bottom: 8px;
+    padding-bottom: 6px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
@@ -2495,11 +2528,11 @@ tr:first-child td {
 .agent-output {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 3px;
 }
 
 .agent-summary {
-    margin-top: 10px;
+    margin-top: auto;
     padding-top: 8px;
     border-top: 1px dashed rgba(255, 255, 255, 0.08);
     font-size: 0.72rem;
@@ -3106,5 +3139,17 @@ tr:first-child td {
 
     .layer-label {
         justify-self: start;
+    }
+
+    .agent-box {
+        min-height: 0;
+    }
+
+    .framework-title-block {
+        max-width: 100%;
+    }
+
+    .framework-controls {
+        justify-content: flex-start;
     }
 }

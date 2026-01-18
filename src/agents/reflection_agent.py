@@ -151,8 +151,8 @@ class ReflectionAgentLLM:
                 self.reflection_count += 1
                 self.last_reflected_trade_count += len(trades)
                 self.last_reflection = result
-                
-            log.info(f"🧠 Reflection LLM #{self.reflection_count} generated successfully")
+
+                log.info(f"🧠 Reflection LLM #{self.reflection_count} generated successfully")
                 log.info(f"   Summary: {result.summary[:100]}...")
                 
                 # 🆕 保存反思日志

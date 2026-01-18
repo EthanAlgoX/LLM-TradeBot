@@ -21,7 +21,8 @@ class TestAgentConfigDefaults:
         assert config.predict_agent is True
         assert config.ai_prediction_filter_agent is True
         assert config.regime_detector_agent is True
-        assert config.reflection_agent_llm is True
+        assert config.reflection_agent_llm is False
+        assert config.reflection_agent_local is True
         assert config.trigger_detector_agent is True
         
     def test_default_disabled_agents(self):
@@ -32,9 +33,9 @@ class TestAgentConfigDefaults:
         assert config.trend_agent_llm is False
         assert config.setup_agent_llm is False
         assert config.trigger_agent_llm is False
-        assert config.trend_agent_local is False
-        assert config.setup_agent_local is False
-        assert config.trigger_agent_local is False
+        assert config.trend_agent_local is True
+        assert config.setup_agent_local is True
+        assert config.trigger_agent_local is True
         assert config.position_analyzer_agent is False
         assert config.symbol_selector_agent is False
 
@@ -47,6 +48,7 @@ class TestAgentConfigFromDict:
         config = AgentConfig.from_dict({})
         assert config.predict_agent is True
         assert config.trend_agent_llm is False
+        assert config.trend_agent_local is True
     
     def test_partial_config(self):
         """Partial config should override only specified values"""
@@ -60,7 +62,8 @@ class TestAgentConfigFromDict:
         assert config.predict_agent is False
         assert config.trend_agent_llm is True
         # Others should use defaults
-        assert config.reflection_agent_llm is True
+        assert config.reflection_agent_llm is False
+        assert config.reflection_agent_local is True
         assert config.trigger_agent_llm is False
     
     def test_full_config(self):

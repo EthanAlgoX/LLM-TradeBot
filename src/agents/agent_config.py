@@ -40,13 +40,13 @@ class AgentConfig:
     trigger_agent_llm: bool = False          # TriggerAgentLLM: 5m trigger LLM analysis
     
     # Local Semantic Analysis (no LLM)
-    trend_agent_local: bool = False          # TrendAgent: 1h trend rule-based analysis
-    setup_agent_local: bool = False          # SetupAgent: 15m setup rule-based analysis
-    trigger_agent_local: bool = False        # TriggerAgent: 5m trigger rule-based analysis
+    trend_agent_local: bool = True           # TrendAgent: 1h trend rule-based analysis
+    setup_agent_local: bool = True           # SetupAgent: 15m setup rule-based analysis
+    trigger_agent_local: bool = True         # TriggerAgent: 5m trigger rule-based analysis
     
     # Trading Retrospection
-    reflection_agent_llm: bool = True        # ReflectionAgentLLM: Trade reflection via LLM
-    reflection_agent_local: bool = False     # ReflectionAgent: Rule-based reflection
+    reflection_agent_llm: bool = False       # ReflectionAgentLLM: Trade reflection via LLM
+    reflection_agent_local: bool = True      # ReflectionAgent: Rule-based reflection
     
     # Symbol Selection
     symbol_selector_agent: bool = False      # SymbolSelectorAgent: AUTO3 selection
@@ -109,11 +109,11 @@ class AgentConfig:
             trend_agent_llm=resolve_llm_flag('trend_agent_llm', 'trend_agent', False),
             setup_agent_llm=resolve_llm_flag('setup_agent_llm', 'setup_agent', False),
             trigger_agent_llm=resolve_llm_flag('trigger_agent_llm', 'trigger_agent', False),
-            trend_agent_local=resolve_flag('trend_agent_local', False),
-            setup_agent_local=resolve_flag('setup_agent_local', False),
-            trigger_agent_local=resolve_flag('trigger_agent_local', False),
-            reflection_agent_llm=resolve_llm_flag('reflection_agent_llm', 'reflection_agent', True),
-            reflection_agent_local=resolve_flag('reflection_agent_local', False),
+            trend_agent_local=resolve_flag('trend_agent_local', True),
+            setup_agent_local=resolve_flag('setup_agent_local', True),
+            trigger_agent_local=resolve_flag('trigger_agent_local', True),
+            reflection_agent_llm=resolve_llm_flag('reflection_agent_llm', 'reflection_agent', False),
+            reflection_agent_local=resolve_flag('reflection_agent_local', True),
             symbol_selector_agent=resolve_flag('symbol_selector_agent', False),
         )
     

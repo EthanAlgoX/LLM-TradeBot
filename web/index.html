@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LLM-TradeBot Dashboard</title>
-    <link rel="stylesheet" href="/static/style.css?v=20260117_0750">
+    <link rel="stylesheet" href="/static/style.css?v=20260119_0300">
     <link rel="stylesheet" href="/static/style-enhancements.css?v=20260117_0750">
     <link
         href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Inter:wght@400;600&display=swap"
@@ -187,6 +187,7 @@
                                 📊 <span id="symbol-display-text">--</span>
                             </span>
                             <button id="btn-demo-flow" class="demo-flow-btn">▶️ Demo Flow</button>
+                            <button id="btn-llm-toggle" class="llm-toggle-btn" type="button">LLM: OFF</button>
                         </div>
                     </div>
 
@@ -770,21 +771,21 @@
                                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
                                     <label class="agent-checkbox"
                                         style="cursor:pointer; display:flex; align-items:center; padding:6px 8px; background:rgba(255,255,255,0.05); border-radius:4px;">
-                                        <input type="checkbox" name="agent-toggle" value="trend_agent_llm" checked
+                                        <input type="checkbox" name="agent-toggle" value="trend_agent_llm"
                                             style="margin-right:8px;">
                                         <span>TrendAgentLLM <span
                                                 style="color:#718096;font-size:0.8em;">(1h趋势LLM)</span></span>
                                     </label>
                                     <label class="agent-checkbox"
                                         style="cursor:pointer; display:flex; align-items:center; padding:6px 8px; background:rgba(255,255,255,0.05); border-radius:4px;">
-                                        <input type="checkbox" name="agent-toggle" value="setup_agent_llm" checked
+                                        <input type="checkbox" name="agent-toggle" value="setup_agent_llm"
                                             style="margin-right:8px;">
                                         <span>SetupAgentLLM <span
                                                 style="color:#718096;font-size:0.8em;">(15m入场LLM)</span></span>
                                     </label>
                                     <label class="agent-checkbox"
                                         style="cursor:pointer; display:flex; align-items:center; padding:6px 8px; background:rgba(255,255,255,0.05); border-radius:4px;">
-                                        <input type="checkbox" name="agent-toggle" value="trigger_agent_llm" checked
+                                        <input type="checkbox" name="agent-toggle" value="trigger_agent_llm"
                                             style="margin-right:8px;">
                                         <span>TriggerAgentLLM <span
                                                 style="color:#718096;font-size:0.8em;">(5m触发LLM)</span></span>
@@ -831,7 +832,7 @@
                                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
                                     <label class="agent-checkbox"
                                         style="cursor:pointer; display:flex; align-items:center; padding:6px 8px; background:rgba(255,255,255,0.05); border-radius:4px;">
-                                        <input type="checkbox" name="agent-toggle" value="reflection_agent_llm" checked
+                                        <input type="checkbox" name="agent-toggle" value="reflection_agent_llm"
                                             style="margin-right:8px;">
                                         <span>ReflectionAgentLLM <span
                                                 style="color:#718096;font-size:0.8em;">(交易反思LLM)</span></span>
@@ -1098,7 +1099,7 @@
         }
     </style>
     </style>
-    <script src="/static/app.js?v=20260117_0830"></script>
+    <script src="/static/app.js?v=20260119_0310"></script>
     <script>
         // Inline script removed (logic handled in app.js).
     </script>
