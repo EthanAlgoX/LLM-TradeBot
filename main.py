@@ -589,6 +589,56 @@ class MultiAgentTradingBot:
             'bb_position': bb_position
         }
 
+    def _detect_fast_trend_signal(
+        self,
+        df_5m: Optional["pd.DataFrame"],
+        window_minutes: int = 30,
+        threshold_pct: float = 0.8,
+        volume_ratio_threshold: float = 1.2
+    ) -> Optional[Dict]:
+        """Detect short-term momentum over the last 30m and return a fast entry signal."""
+        if df_5m is None or df_5m.empty:
+            return None
+        if 'close' not in df_5m.columns or 'volume' not in df_5m.columns:
+            return None
+
+        window_bars = max(2, int(window_minutes / 5))
+        if len(df_5m) < window_bars * 2:
+            return None
+
+        recent = df_5m.iloc[-window_bars:]
+        previous = df_5m.iloc[-window_bars * 2:-window_bars]
+        first_close = float(recent['close'].iloc[0])
+        last_close = float(recent['close'].iloc[-1])
+        if first_close <= 0:
+            return None
+
+        change_pct = ((last_close - first_close) / first_close) * 100.0
+        recent_volume = float(recent['volume'].sum())
+        prev_volume = float(previous['volume'].sum()) if not previous.empty else 0.0
+        volume_ratio = (recent_volume / prev_volume) if prev_volume > 0 else 1.0
+
+        if change_pct >= threshold_pct and volume_ratio >= volume_ratio_threshold:
+            action = 'open_long'
+        elif change_pct <= -threshold_pct and volume_ratio >= volume_ratio_threshold:
+            action = 'open_short'
+        else:
+            return None
+
+        change_over = max(0.0, abs(change_pct) - threshold_pct)
+        change_boost = min(15.0, change_over * 5.0)
+        vol_over = max(0.0, volume_ratio - volume_ratio_threshold)
+        vol_boost = min(10.0, vol_over * 10.0)
+        confidence = min(92.0, 70.0 + change_boost + vol_boost)
+
+        return {
+            'action': action,
+            'change_pct': change_pct,
+            'volume_ratio': volume_ratio,
+            'confidence': confidence,
+            'window_minutes': window_minutes
+        }
+
     def _resolve_ai500_symbols(self):
         """Dynamic resolution of AI500_TOP5 tag"""
         # AI Candidates List (30+ Major AI/Data/Compute Coins)
@@ -1624,7 +1674,7 @@ class MultiAgentTradingBot:
             else:
                 global_state.semantic_analyses = {}
             
-            # Step 3: DeepSeek
+            # Step 3: Decision (Fast trend first, then LLM fallback)
             market_data = {
                 'df_5m': processed_dfs['5m'],
                 'df_15m': processed_dfs['15m'],
@@ -1632,48 +1682,96 @@ class MultiAgentTradingBot:
                 'current_price': current_price
             }
             regime_info = quant_analysis.get('regime', {})
-            
-            if not (hasattr(self, '_headless_mode') and self._headless_mode):
-                print("[Step 3/5] 🧠 DeepSeek LLM - Making decision...")
-            
-            # Build Context with POSITION INFO
-            market_context_text = self._build_market_context(
-                quant_analysis=quant_analysis,
-                predict_result=predict_result,
-                market_data=market_data,
-                regime_info=regime_info,
-                position_info=current_position_info  # ✅ Pass Position Info
-            )
-            
-            market_context_data = {
-                'symbol': self.current_symbol,
-                'timestamp': datetime.now().isoformat(),
-                'current_price': current_price
-            }
-            
-            # 🧠 Check if reflection is needed (every 10 trades)
-            reflection_text = None
-            total_trades = len(global_state.trade_history)
-            if self.reflection_agent and self.reflection_agent.should_reflect(total_trades):
-                log.info(f"🧠 Triggering reflection after {total_trades} trades...")
-                trades_to_analyze = global_state.trade_history[-10:]
-                reflection_result = await self.reflection_agent.generate_reflection(trades_to_analyze)
-                if reflection_result:
-                    reflection_text = reflection_result.to_prompt_text()
-                    global_state.last_reflection = reflection_result.raw_response
-                    global_state.last_reflection_text = reflection_text
-                    global_state.reflection_count = self.reflection_agent.reflection_count
-                    global_state.add_log(f"🧠 Reflection #{self.reflection_agent.reflection_count} generated")
+
+            fast_signal = self._detect_fast_trend_signal(processed_dfs.get('5m'))
+            decision_source = 'llm'
+
+            if fast_signal:
+                decision_source = 'fast_trend'
+                change_pct = fast_signal['change_pct']
+                volume_ratio = fast_signal['volume_ratio']
+                fast_action = fast_signal['action']
+                fast_confidence = fast_signal['confidence']
+                fast_reason = f"30m trend {change_pct:+.2f}% | RVOL {volume_ratio:.2f}x"
+
+                if not (hasattr(self, '_headless_mode') and self._headless_mode):
+                    print("[Step 3/5] ⚡ Fast Trend Trigger - Immediate entry signal")
+
+                global_state.add_log(f"[⚡ FAST] {fast_action.upper()} | {fast_reason}")
+
+                if fast_action == 'open_long':
+                    bull_conf = fast_confidence
+                    bear_conf = max(0.0, 100.0 - fast_confidence)
+                    bull_stance = 'FAST_UP'
+                    bear_stance = 'HEDGE'
+                    bull_reason = fast_reason
+                    bear_reason = 'Short bias weak vs momentum'
+                else:
+                    bull_conf = max(0.0, 100.0 - fast_confidence)
+                    bear_conf = fast_confidence
+                    bull_stance = 'HEDGE'
+                    bear_stance = 'FAST_DN'
+                    bull_reason = 'Long bias weak vs momentum'
+                    bear_reason = fast_reason
+
+                llm_decision = {
+                    'action': fast_action,
+                    'confidence': fast_confidence,
+                    'position_size_pct': min(100.0, max(10.0, fast_confidence)),
+                    'reasoning': fast_reason,
+                    'bull_perspective': {
+                        'bull_confidence': bull_conf,
+                        'stance': bull_stance,
+                        'bullish_reasons': bull_reason
+                    },
+                    'bear_perspective': {
+                        'bear_confidence': bear_conf,
+                        'stance': bear_stance,
+                        'bearish_reasons': bear_reason
+                    }
+                }
             else:
-                # Use cached reflection if available
-                reflection_text = global_state.last_reflection_text
-            
-            # Call DeepSeek with optional reflection
-            llm_decision = self.strategy_engine.make_decision(
-                market_context_text=market_context_text,
-                market_context_data=market_context_data,
-                reflection=reflection_text
-            )
+                if not (hasattr(self, '_headless_mode') and self._headless_mode):
+                    print("[Step 3/5] 🧠 DeepSeek LLM - Making decision...")
+
+                # Build Context with POSITION INFO
+                market_context_text = self._build_market_context(
+                    quant_analysis=quant_analysis,
+                    predict_result=predict_result,
+                    market_data=market_data,
+                    regime_info=regime_info,
+                    position_info=current_position_info  # ✅ Pass Position Info
+                )
+
+                market_context_data = {
+                    'symbol': self.current_symbol,
+                    'timestamp': datetime.now().isoformat(),
+                    'current_price': current_price
+                }
+
+                # 🧠 Check if reflection is needed (every 10 trades)
+                reflection_text = None
+                total_trades = len(global_state.trade_history)
+                if self.reflection_agent and self.reflection_agent.should_reflect(total_trades):
+                    log.info(f"🧠 Triggering reflection after {total_trades} trades...")
+                    trades_to_analyze = global_state.trade_history[-10:]
+                    reflection_result = await self.reflection_agent.generate_reflection(trades_to_analyze)
+                    if reflection_result:
+                        reflection_text = reflection_result.to_prompt_text()
+                        global_state.last_reflection = reflection_result.raw_response
+                        global_state.last_reflection_text = reflection_text
+                        global_state.reflection_count = self.reflection_agent.reflection_count
+                        global_state.add_log(f"🧠 Reflection #{self.reflection_agent.reflection_count} generated")
+                else:
+                    # Use cached reflection if available
+                    reflection_text = global_state.last_reflection_text
+
+                # Call DeepSeek with optional reflection
+                llm_decision = self.strategy_engine.make_decision(
+                    market_context_text=market_context_text,
+                    market_context_data=market_context_data,
+                    reflection=reflection_text
+                )
             
             # ... Rest of logic stays similar ...
             
@@ -1714,6 +1812,11 @@ class MultiAgentTradingBot:
                 'bull_reasons': llm_decision.get('bull_perspective', {}).get('bullish_reasons', ''),
                 'bear_reasons': llm_decision.get('bear_perspective', {}).get('bearish_reasons', '')
             }
+
+            if fast_signal:
+                vote_details['fast_trend_change_pct'] = fast_signal.get('change_pct')
+                vote_details['fast_trend_volume_ratio'] = fast_signal.get('volume_ratio')
+                vote_details['fast_trend_window'] = fast_signal.get('window_minutes')
             
             # Determine Regime from Trend Score using Semantic Converter
             trend_score_total = quant_analysis.get('trend', {}).get('total_trend_score', 0)
@@ -1748,7 +1851,7 @@ class MultiAgentTradingBot:
             
             # 保存完整的 LLM 交互日志 (Input, Process, Output)
             # Only save detailed logs in local mode to conserve disk space on Railway
-            if os.environ.get('ENABLE_DETAILED_LLM_LOGS', 'false').lower() == 'true':
+            if decision_source == 'llm' and os.environ.get('ENABLE_DETAILED_LLM_LOGS', 'false').lower() == 'true':
                 full_log_content = f"""
 ================================================================================
 🕐 Timestamp: {datetime.now().isoformat()}
@@ -1792,8 +1895,9 @@ class MultiAgentTradingBot:
             global_state.add_log(f"[🐂 Long Case] [{bull_stance}] Conf={bull_conf}%")
             global_state.add_log(f"[🐻 Short Case] [{bear_stance}] Conf={bear_conf}%")
             
-            # LOG: LLM Decision Engine (generic, not tied to DeepSeek)
-            global_state.add_log(f"[⚖️ Final Decision] Action={vote_result.action.upper()} | Conf={llm_decision.get('confidence', 0)}%")
+            # LOG: Decision Engine (LLM or Fast trend)
+            decision_label = "FAST Decision" if decision_source == 'fast_trend' else "Final Decision"
+            global_state.add_log(f"[⚖️ {decision_label}] Action={vote_result.action.upper()} | Conf={llm_decision.get('confidence', 0)}%")
             
             # ✅ Decision Recording moved after Risk Audit for complete context
             # Saved to file still happens here for "raw" decision
@@ -2445,7 +2549,7 @@ class MultiAgentTradingBot:
         quantity = adjusted_position / current_price
         
         # 计算止损止盈
-        if action == 'long':
+        if action in ('long', 'open_long'):
             stop_loss = current_price * (1 - self.stop_loss_pct / 100)
             take_profit = current_price * (1 + self.take_profit_pct / 100)
         else:  # short
