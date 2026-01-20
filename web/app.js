@@ -1538,11 +1538,15 @@ function updateAgentFramework(system, decision, agents) {
             const bullStance = decision.vote_details.bull_stance || '';
             const bearStance = decision.vote_details.bear_stance || '';
 
-            setOutput('out-bull', bullConf !== undefined ? `${bullConf}% ${bullStance}` : '--');
-            setOutput('out-bear', bearConf !== undefined ? `${bearConf}% ${bearStance}` : '--');
+            const bullPct = bullConf !== undefined && bullConf !== null ? formatPercent(bullConf, 0) : '--';
+            const bearPct = bearConf !== undefined && bearConf !== null ? formatPercent(bearConf, 0) : '--';
+            const bullDisplay = bullPct !== '--' ? `${bullPct} ${bullStance}` : '--';
+            const bearDisplay = bearPct !== '--' ? `${bearPct} ${bearStance}` : '--';
+            setOutput('out-bull', bullDisplay);
+            setOutput('out-bear', bearDisplay);
 
-            const bullText = bullConf !== undefined && bullConf !== null ? `BULL ${bullConf}%` : 'BULL --';
-            const bearText = bearConf !== undefined && bearConf !== null ? `BEAR ${bearConf}%` : 'BEAR --';
+            const bullText = bullPct !== '--' ? `BULL ${bullPct}` : 'BULL --';
+            const bearText = bearPct !== '--' ? `BEAR ${bearPct}` : 'BEAR --';
             setSummary('sum-decision', `DECISION ${action} ${conf} | ${bullText} | ${bearText}.`);
         } else {
             setSummary('sum-decision', `DECISION ${action} ${conf}.`);
@@ -1583,15 +1587,27 @@ function updateAgentFramework(system, decision, agents) {
         setOutput('out-size', sizeLabel);
         setOutput('out-sl', fmtPct(slPct));
         setOutput('out-tp', fmtPct(tpPct));
+
+        // Get i18n helper
+        const lang = window.currentLang === 'zh' ? 'zh' : 'en';
+        const t = (key) => (window.i18n && window.i18n[lang] && window.i18n[lang][key]) || key;
+
         if (decision.guardian_passed === false) {
-            const reason = decision.guardian_reason || 'blocked by risk audit';
-            setSummary('sum-risk', `RISK BLOCKED: ${reason}.`);
+            const reason = decision.guardian_reason || t('summary.blocked.reason');
+            setSummary('sum-risk', `${t('summary.risk.blocked')} ${reason}.`);
         } else {
-            setSummary('sum-risk', `RISK ${riskLevel} | Size ${sizeLabel} | SL ${fmtPct(slPct)} | TP ${fmtPct(tpPct)}.`);
+            const fmt = t('summary.risk.format')
+                .replace('{level}', riskLevel.toUpperCase())
+                .replace('{size}', sizeLabel)
+                .replace('{sl}', fmtPct(slPct))
+                .replace('{tp}', fmtPct(tpPct));
+            setSummary('sum-risk', fmt);
         }
     } else {
+        const lang = window.currentLang === 'zh' ? 'zh' : 'en';
+        const t = (key) => (window.i18n && window.i18n[lang] && window.i18n[lang][key]) || key;
         setAgentStatus('flow-risk', 'Idle');
-        setSummary('sum-risk', 'Risk idle.');
+        setSummary('sum-risk', t('summary.risk.idle'));
     }
 
     // Final Output

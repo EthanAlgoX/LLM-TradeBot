@@ -310,7 +310,17 @@ const i18n = {
         'backtest.liveequity': '📈 Live Equity Curve',
         'backtest.livedrawdown': '📉 Live Drawdown',
         'backtest.livetrades': '💼 Recent Trades',
-        'trade.price': 'Price'
+        'trade.price': 'Price',
+
+        // Agent Dynamic Summaries
+        'summary.risk.idle': 'Risk idle.',
+        'summary.risk.blocked': 'RISK BLOCKED:',
+        'summary.risk.format': 'RISK {level} | Size {size} | SL {sl} | TP {tp}.',
+        'summary.output.pending': 'Output pending.',
+        'summary.output.blocked': 'EXEC BLOCKED',
+        'summary.output.format': 'EXEC {action} {symbol} {size}.',
+        'summary.decision.pending': 'Decision pending.',
+        'summary.blocked.reason': 'blocked by risk audit'
     },
 
     zh: {
@@ -623,7 +633,17 @@ const i18n = {
         'backtest.liveequity': '📈 实时净值曲线',
         'backtest.livedrawdown': '📉 实时回撤曲线',
         'backtest.livetrades': '💼 最近交易',
-        'trade.price': '价格'
+        'trade.price': '价格',
+
+        // Agent Dynamic Summaries
+        'summary.risk.idle': '风控待机',
+        'summary.risk.blocked': '风控拦截:',
+        'summary.risk.format': '风险 {level} | 仓位 {size} | 止损 {sl} | 止盈 {tp}',
+        'summary.output.pending': '等待输出',
+        'summary.output.blocked': '执行拦截',
+        'summary.output.format': '执行 {action} {symbol} {size}',
+        'summary.decision.pending': '等待决策',
+        'summary.blocked.reason': '被风控拦截'
     }
 };
 
