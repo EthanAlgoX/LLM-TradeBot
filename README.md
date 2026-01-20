@@ -214,7 +214,6 @@ You can also configure all settings from the Dashboard:
 ### 4. Start the Bot
 
 ![Dashboard Preview](./docs/dashboard_preview_1.png)
-![Live Log Output](./docs/dashboard_preview_2.png)
 Built-in modern real-time monitoring dashboard.
 
 #### 🧪 Test Mode (Recommended for beginners)
