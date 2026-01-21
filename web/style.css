@@ -2248,6 +2248,45 @@ tr:first-child td {
     position: relative;
 }
 
+.flow-beams {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 0;
+}
+
+.beam-path {
+    stroke: rgba(0, 240, 255, 0.45);
+    stroke-width: 1.6;
+    fill: none;
+    opacity: 0;
+    stroke-linecap: round;
+    stroke-dasharray: 8 12;
+}
+
+.beam-glow {
+    stroke: rgba(240, 185, 11, 0.25);
+    stroke-width: 6;
+    fill: none;
+    opacity: 0;
+    filter: blur(1px);
+}
+
+.beam-active {
+    opacity: 1;
+    animation: beamDash 1.4s linear infinite;
+}
+
+.beam-glow.beam-active {
+    animation: beamGlow 1.4s ease-in-out infinite;
+}
+
+.beam-arrow {
+    fill: rgba(0, 240, 255, 0.9);
+}
+
 .agent-flow-container::after {
     content: "";
     position: absolute;
@@ -2258,7 +2297,7 @@ tr:first-child td {
     pointer-events: none;
 }
 
-.agent-flow-container>* {
+.agent-flow-container > *:not(.flow-beams) {
     position: relative;
     z-index: 1;
 }
@@ -2386,7 +2425,7 @@ tr:first-child td {
     cursor: grab;
     user-select: none;
     position: relative;
-    overflow: hidden;
+    /* overflow: hidden; removed to allow meteor to fly out */
     min-height: 168px;
     display: flex;
     flex-direction: column;
@@ -2402,6 +2441,7 @@ tr:first-child td {
     background: transparent;
     opacity: 0;
     transition: opacity 0.3s ease, background 0.3s ease;
+    border-radius: inherit;
 }
 
 .agent-box::after {
@@ -2411,6 +2451,7 @@ tr:first-child td {
     background: linear-gradient(120deg, rgba(255, 255, 255, 0.05), transparent 60%);
     opacity: 0;
     transition: opacity 0.3s ease;
+    border-radius: inherit;
     pointer-events: none;
 }
 
@@ -2534,7 +2575,8 @@ tr:first-child td {
 .agent-box.flowing::after {
     opacity: 0.25;
     background: linear-gradient(120deg, transparent 0%, rgba(0, 240, 255, 0.18) 50%, transparent 100%);
-    animation: agentStream 1.2s ease-in-out infinite;
+    background-size: 200% 100%;
+    animation: agentStream 1.5s linear infinite;
 }
 
 .agent-box.flowing .agent-emoji {
@@ -2560,6 +2602,10 @@ tr:first-child td {
 }
 
 /* 🆕 Meteor arrow beam - flows between agents */
+.agent-box.meteor-sending {
+    z-index: 100;
+}
+
 .agent-box.meteor-sending::before {
     content: '▼';
     position: absolute;
@@ -3011,6 +3057,27 @@ tr:first-child td {
     }
 }
 
+@keyframes beamDash {
+    0% {
+        stroke-dashoffset: 0;
+    }
+
+    100% {
+        stroke-dashoffset: -40;
+    }
+}
+
+@keyframes beamGlow {
+    0%,
+    100% {
+        opacity: 0.35;
+    }
+
+    50% {
+        opacity: 0.7;
+    }
+}
+
 @keyframes flowLinePulse {
     0% {
         opacity: 0.5;
@@ -3126,11 +3193,11 @@ tr:first-child td {
 
 @keyframes agentStream {
     0% {
-        transform: translateX(-120%);
+        background-position: 200% 0;
     }
 
     100% {
-        transform: translateX(120%);
+        background-position: -200% 0;
     }
 }
 

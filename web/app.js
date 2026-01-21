@@ -1309,6 +1309,126 @@ function updateAgentFramework(system, decision, agents) {
         });
     };
 
+    const beamLinks = [
+        { id: 'beam-data-quant', from: 'flow-datasync', to: 'flow-quant' },
+        { id: 'beam-data-regime', from: 'flow-datasync', to: 'flow-regime' },
+        { id: 'beam-data-trigger', from: 'flow-datasync', to: 'flow-trigger-detector' },
+        { id: 'beam-data-position', from: 'flow-datasync', to: 'flow-position-analyzer' },
+        { id: 'beam-data-predict', from: 'flow-datasync', to: 'flow-predict' },
+        { id: 'beam-analysis-trend', from: 'flow-quant', to: 'flow-trend-agent' },
+        { id: 'beam-analysis-trigger', from: 'flow-trigger-detector', to: 'flow-trigger-agent' },
+        { id: 'beam-analysis-ai', from: 'flow-predict', to: 'flow-ai-filter' },
+        { id: 'beam-strategy-decision', from: 'flow-trend-agent', to: 'flow-decision' },
+        { id: 'beam-decision-risk', from: 'flow-decision', to: 'flow-risk' },
+        { id: 'beam-risk-output', from: 'flow-risk', to: 'flow-output' },
+        { id: 'beam-output-reflection', from: 'flow-output', to: 'flow-reflection' }
+    ];
+
+    const ensureFlowBeams = () => {
+        const container = document.querySelector('.agent-flow-container');
+        if (!container) return null;
+        const svg = document.getElementById('flow-beams');
+        if (!svg) return null;
+
+        if (!window.flowBeamState) {
+            window.flowBeamState = { svg, container, links: {} };
+        } else {
+            window.flowBeamState.svg = svg;
+            window.flowBeamState.container = container;
+        }
+
+        if (!svg.dataset.ready) {
+            svg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+            svg.setAttribute('preserveAspectRatio', 'none');
+            svg.innerHTML = '';
+
+            const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+            const marker = document.createElementNS('http://www.w3.org/2000/svg', 'marker');
+            marker.setAttribute('id', 'beam-arrow');
+            marker.setAttribute('markerWidth', '8');
+            marker.setAttribute('markerHeight', '8');
+            marker.setAttribute('refX', '6');
+            marker.setAttribute('refY', '3');
+            marker.setAttribute('orient', 'auto');
+            marker.setAttribute('markerUnits', 'strokeWidth');
+
+            const arrow = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            arrow.setAttribute('d', 'M0,0 L6,3 L0,6 Z');
+            arrow.setAttribute('class', 'beam-arrow');
+            marker.appendChild(arrow);
+            defs.appendChild(marker);
+            svg.appendChild(defs);
+
+            beamLinks.forEach(link => {
+                const glow = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                glow.setAttribute('data-beam', link.id);
+                glow.setAttribute('class', 'beam-glow');
+
+                const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                path.setAttribute('data-beam', link.id);
+                path.setAttribute('class', 'beam-path');
+                path.setAttribute('marker-end', 'url(#beam-arrow)');
+
+                svg.appendChild(glow);
+                svg.appendChild(path);
+
+                window.flowBeamState.links[link.id] = {
+                    link,
+                    glow,
+                    path
+                };
+            });
+
+            svg.dataset.ready = 'true';
+        }
+
+        return window.flowBeamState;
+    };
+
+    const getAnchorPoint = (box, containerRect, mode) => {
+        const rect = box.getBoundingClientRect();
+        const x = rect.left - containerRect.left + rect.width / 2;
+        const y = rect.top - containerRect.top + (mode === 'bottom' ? rect.height : 0);
+        return { x, y };
+    };
+
+    const updateFlowBeams = () => {
+        const state = ensureFlowBeams();
+        if (!state) return;
+
+        const { svg, container, links } = state;
+        const rect = container.getBoundingClientRect();
+        const width = rect.width;
+        const height = rect.height;
+        svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+        svg.setAttribute('width', `${width}`);
+        svg.setAttribute('height', `${height}`);
+
+        beamLinks.forEach(({ id, from, to }) => {
+            const linkState = links[id];
+            if (!linkState) return;
+            const fromEl = document.getElementById(from);
+            const toEl = document.getElementById(to);
+            if (!fromEl || !toEl || fromEl.classList.contains('hidden') || toEl.classList.contains('hidden')) {
+                linkState.glow.classList.remove('beam-active');
+                linkState.path.classList.remove('beam-active');
+                return;
+            }
+
+            const start = getAnchorPoint(fromEl, rect, 'bottom');
+            const end = getAnchorPoint(toEl, rect, 'top');
+            const midY = Math.max(30, (end.y - start.y) / 2);
+            const d = `M ${start.x.toFixed(1)} ${start.y.toFixed(1)} C ${start.x.toFixed(1)} ${(start.y + midY).toFixed(1)}, ${end.x.toFixed(1)} ${(end.y - midY).toFixed(1)}, ${end.x.toFixed(1)} ${end.y.toFixed(1)}`;
+
+            linkState.glow.setAttribute('d', d);
+            linkState.path.setAttribute('d', d);
+
+            const active = isActiveBox(from) && (isActiveBox(to) || isRunningMode);
+            linkState.glow.classList.toggle('beam-active', active);
+            linkState.path.classList.toggle('beam-active', active);
+        });
+    };
+
     const formatNumber = (value, digits = 2) => {
         if (value === undefined || value === null) return '--';
         const num = Number(value);
@@ -1406,6 +1526,9 @@ function updateAgentFramework(system, decision, agents) {
         setIdleOrOff('flow-risk', null, 'sum-risk', 'Risk idle.', 'Risk idle.', 'Risk running.');
         setIdleOrOff('flow-output', null, 'sum-output', 'Output pending.', 'Output pending.', runningSummary);
         setIdleOrOff('flow-reflection', 'reflection_agent', 'sum-reflection', 'Reflection idle.', 'Reflection off.', 'Reflection running.');
+
+        updateFlowConnectors();
+        updateFlowBeams();
     };
 
     const updateSymbolSelectorCard = () => {
@@ -1509,6 +1632,7 @@ function updateAgentFramework(system, decision, agents) {
         }, 1000);
         if (!decisionIsCurrent) {
             updateFlowConnectors();
+            updateFlowBeams();
             return;
         }
     }
@@ -1525,12 +1649,14 @@ function updateAgentFramework(system, decision, agents) {
                 resetFramework({ forceRunning: false });
                 updateSymbolSelectorCard();
                 updateFlowConnectors();
+                updateFlowBeams();
                 return;
             }
         } else {
             resetFramework({ forceRunning: false });
             updateSymbolSelectorCard();
             updateFlowConnectors();
+            updateFlowBeams();
             return;
         }
     }
@@ -1704,6 +1830,7 @@ function updateAgentFramework(system, decision, agents) {
     }
 
     updateFlowConnectors();
+    updateFlowBeams();
 
     // Risk Audit
     if (decision.guardian_passed !== undefined) {
