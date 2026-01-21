@@ -1058,6 +1058,48 @@ function updateAgentFramework(system, decision, agents) {
     const isRunningMode = modeLower === 'running' || modeLower === 'online' || modeLower === 'active';
     const isPausedMode = modeLower === 'paused';
     const isStoppedMode = modeLower === 'stopped';
+    const t = (key) => (window.i18n && window.i18n[lang] && window.i18n[lang][key]) || key;
+
+    const translateReason = (reason) => {
+        if (!reason) return reason;
+        if (lang === 'zh') return reason;
+        let text = String(reason).trim();
+        text = text.replace(/^风控拦截[:：]\s*/g, '');
+        text = text.replace(/【[^】]+】/g, '').trim();
+        const rules = [
+            { re: /回撤过大.*暂停交易/, out: 'Drawdown too large, trading paused.' },
+            { re: /连续亏损过多.*暂停交易/, out: 'Too many consecutive losses, trading paused.' },
+            { re: /市场状态不明确.*(交易|开仓)/, out: 'Market regime unclear, trade blocked.' },
+            { re: /市场高波动\\(ATR\\s*([\\d.]+)%\\).*风险.*(过大|拦截)/, out: 'High volatility (ATR $1%), risk too high.' },
+            { re: /震荡市.*信心不足\\(([^)]+)\\).*?(禁止|拦截)开仓/, out: 'Choppy market, confidence too low ($1), entry blocked.' },
+            { re: /空头信心不足\\(([^)]+)\\).*?拦截做空/, out: 'Bearish confidence too low ($1), short blocked.' },
+            { re: /空头信号未达到强共振条件.*拦截做空/, out: 'Bearish signal lacks strong confluence, short blocked.' },
+            { re: /做多位置过高\\(([^)]+)\\).*?风险/, out: 'Long entry too high ($1), pullback risk.' },
+            { re: /做空位置过低\\(([^)]+)\\).*?风险/, out: 'Short entry too low ($1), support risk.' },
+            { re: /风险回报比不足\\(([^)]+)\\)/, out: 'Risk-reward ratio too low ($1).' },
+            { re: /市场高波动.*风险控制拦截/, out: 'High volatility, risk control blocked.' },
+            { re: /震荡市信心不足.*拦截开仓/, out: 'Choppy market, low confidence, entry blocked.' },
+            { re: /未设置止损.*动态止损/, out: 'Stop-loss missing, auto-adjusted by ATR.' },
+            { re: /止损方向错误.*修正/, out: 'Stop-loss direction corrected.' },
+            { re: /持仓数量已达上限\\(([^)]+)\\).*禁止新开仓/, out: 'Position limit reached ($1), new entries blocked.' },
+            { re: /本周期已开仓\\(([^)]+)\\).*每周期最多开一个新仓位/, out: 'Cycle entry limit reached ($1), new entry blocked.' },
+            { re: /保证金不足/, out: 'Insufficient margin.' }
+        ];
+        for (const { re, out } of rules) {
+            const match = text.match(re);
+            if (match) {
+                let result = out;
+                match.slice(1).forEach((val, idx) => {
+                    result = result.replace(`$${idx + 1}`, val);
+                });
+                return result;
+            }
+        }
+        if (/[\u4e00-\u9fa5]/.test(text)) {
+            return t('summary.blocked.reason');
+        }
+        return text;
+    };
 
     // Update Cycle Number
     const cycleEl = document.getElementById('framework-cycle');
@@ -1823,8 +1865,6 @@ function updateAgentFramework(system, decision, agents) {
             setSummary('sum-decision', `DECISION ${action} ${conf}.`);
         }
     } else {
-        const lang = window.currentLang === 'zh' ? 'zh' : 'en';
-        const t = (key) => (window.i18n && window.i18n[lang] && window.i18n[lang][key]) || key;
         setAgentStatus('flow-decision', 'Idle');
         setSummary('sum-decision', t('summary.decision.pending'));
     }
@@ -1864,19 +1904,6 @@ function updateAgentFramework(system, decision, agents) {
         setOutput('out-sl', fmtPct(slPct));
         setOutput('out-tp', fmtPct(tpPct));
 
-        // Get i18n helper
-        const lang = window.currentLang === 'zh' ? 'zh' : 'en';
-        const t = (key) => (window.i18n && window.i18n[lang] && window.i18n[lang][key]) || key;
-
-        // Translate reason if needed (backend may return Chinese)
-        const translateReason = (reason) => {
-            if (!reason || lang === 'zh') return reason;
-            // Try to find translation for the reason
-            const key = 'reason.' + reason;
-            const translated = t(key);
-            return translated !== key ? translated : reason;
-        };
-
         if (decision.guardian_passed === false) {
             const rawReason = decision.guardian_reason || t('summary.blocked.reason');
             const reason = translateReason(rawReason);
@@ -1890,8 +1917,6 @@ function updateAgentFramework(system, decision, agents) {
             setSummary('sum-risk', fmt);
         }
     } else {
-        const lang = window.currentLang === 'zh' ? 'zh' : 'en';
-        const t = (key) => (window.i18n && window.i18n[lang] && window.i18n[lang][key]) || key;
         setAgentStatus('flow-risk', 'Idle');
         setSummary('sum-risk', t('summary.risk.idle'));
     }
@@ -1930,18 +1955,6 @@ function updateAgentFramework(system, decision, agents) {
         if (symbolSpan) symbolSpan.textContent = decision.symbol || '--';
         if (sizeSpan) sizeSpan.textContent = isBlocked ? '--' : sizeLabel;
 
-        // Get i18n helper
-        const lang = window.currentLang === 'zh' ? 'zh' : 'en';
-        const t = (key) => (window.i18n && window.i18n[lang] && window.i18n[lang][key]) || key;
-
-        // Translate reason if needed (backend may return Chinese)
-        const translateReason = (reason) => {
-            if (!reason || lang === 'zh') return reason;
-            const key = 'reason.' + reason;
-            const translated = t(key);
-            return translated !== key ? translated : reason;
-        };
-
         const symbolText = decision.symbol || '--';
         if (isBlocked) {
             const rawReason = decision.guardian_reason || t('summary.blocked.reason');
@@ -1955,8 +1968,6 @@ function updateAgentFramework(system, decision, agents) {
             setSummary('sum-output', fmt);
         }
     } else {
-        const lang = window.currentLang === 'zh' ? 'zh' : 'en';
-        const t = (key) => (window.i18n && window.i18n[lang] && window.i18n[lang][key]) || key;
         setAgentStatus('flow-output', 'Idle');
         setSummary('sum-output', t('summary.output.pending'));
     }

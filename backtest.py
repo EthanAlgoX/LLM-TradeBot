@@ -67,7 +67,7 @@ Examples:
         "--symbol",
         type=str,
         default="AUTO3",
-        help="交易对 (AUTO3=自动选币, 或指定如 BTCUSDT)"
+        help="交易对 (AUTO3=自动选币, AUTO1=动量选币, 或指定如 BTCUSDT)"
     )
     
     parser.add_argument(
@@ -199,9 +199,10 @@ async def main():
     from src.backtest.report import BacktestReport
     from src.agents.symbol_selector_agent import get_selector
     
-    # AUTO3 动态选币 (Phase 2: 默认启用)
+    # AUTO3/AUTO1 动态选币
     symbols_to_test = []
     use_auto3 = args.symbol == "AUTO3" and not args.no_auto3
+    use_auto1 = args.symbol == "AUTO1"
     
     if use_auto3:
         print("\n🔝 AUTO3 启动中 - 正在选择最佳交易币种...")
@@ -216,6 +217,20 @@ async def main():
                 symbols_to_test = ['BTCUSDT']
         except Exception as e:
             print(f"⚠️ AUTO3 选币异常: {e}，使用默认 BTCUSDT")
+            symbols_to_test = ['BTCUSDT']
+    elif use_auto1:
+        print("\n🎯 AUTO1 启动中 - 使用近期动量选币...")
+        try:
+            selector = get_selector()
+            selected = await selector.select_auto1_recent_momentum()
+            if selected:
+                symbols_to_test = selected
+                print(f"✅ AUTO1 选中: {', '.join(symbols_to_test)}")
+            else:
+                print("⚠️ AUTO1 选币失败，使用默认 BTCUSDT")
+                symbols_to_test = ['BTCUSDT']
+        except Exception as e:
+            print(f"⚠️ AUTO1 选币异常: {e}，使用默认 BTCUSDT")
             symbols_to_test = ['BTCUSDT']
     else:
         symbols_to_test = [args.symbol]
@@ -276,7 +291,12 @@ async def main():
         sys.exit(1)
     
     print("\n" + "=" * 60)
-    print("📊 回测结果汇总" + (" (AUTO3)" if use_auto3 else ""))
+    mode_label = ""
+    if use_auto3:
+        mode_label = " (AUTO3)"
+    elif use_auto1:
+        mode_label = " (AUTO1)"
+    print(f"📊 回测结果汇总{mode_label}")
     print("=" * 60)
     
     total_return_sum = 0

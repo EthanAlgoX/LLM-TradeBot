@@ -15,8 +15,8 @@ import json
 
 from src.utils.logger import log
 from src.utils.semantic_converter import SemanticConverter
-from src.agents.regime_detector import RegimeDetector
-from src.agents.trigger_detector import TriggerDetector
+from src.agents.regime_detector_agent import RegimeDetector
+from src.agents.trigger_detector_agent import TriggerDetector
 from src.server.state import global_state
 
 class StrategyComposer:
