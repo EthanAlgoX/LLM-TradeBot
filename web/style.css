@@ -3231,28 +3231,79 @@ tr:first-child td {
 
 /* Flow Legend */
 .flow-legend {
-    display: flex;
-    justify-content: center;
-    gap: 16px;
-    flex-wrap: wrap;
-    padding-top: 16px;
-    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+    padding: 14px 16px;
     margin-top: 16px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    background: linear-gradient(150deg, rgba(6, 9, 13, 0.65), rgba(10, 14, 20, 0.92));
     grid-column: 1 / -1;
+}
+
+.legend-header {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.legend-title {
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--nofx-gold);
+}
+
+.legend-subtitle {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+}
+
+.legend-section {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.legend-section-title {
+    font-size: 0.65rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+}
+
+.legend-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+    gap: 8px;
 }
 
 .legend-item {
     display: flex;
     align-items: center;
-    gap: 6px;
-    font-size: 0.75rem;
+    gap: 8px;
+    padding: 6px 8px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    background: rgba(6, 9, 13, 0.45);
+    font-size: 0.72rem;
     color: var(--text-muted);
+    min-width: 0;
+}
+
+.legend-item span:not(.legend-dot) {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .legend-dot {
-    width: 10px;
-    height: 10px;
+    width: 8px;
+    height: 8px;
     border-radius: 50%;
+    box-shadow: 0 0 8px rgba(0, 0, 0, 0.35);
 }
 
 .legend-dot.idle {
@@ -3286,7 +3337,7 @@ tr:first-child td {
     font-size: 0.75rem;
     cursor: pointer;
     transition: all 0.2s ease;
-    margin-left: 20px;
+    justify-self: start;
 }
 
 .reset-positions-btn:hover {
@@ -3389,21 +3440,18 @@ tr:first-child td {
         grid-column: 2;
         grid-row: 1;
         margin-top: 0;
-        padding-top: 0;
-        border-top: none;
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 10px;
-        padding: 14px;
-        border-radius: 12px;
-        border: 1px solid rgba(255, 255, 255, 0.06);
-        background: linear-gradient(160deg, rgba(6, 9, 13, 0.7), rgba(8, 12, 18, 0.9));
+        padding: 16px;
+        gap: 12px;
     }
 
     .reset-positions-btn {
         width: 100%;
         text-align: center;
-        margin-left: 0;
+        justify-self: stretch;
+    }
+
+    .legend-grid {
+        grid-template-columns: 1fr;
     }
 }
 
@@ -3831,8 +3879,8 @@ tr:first-child td {
     }
 
     .flow-legend {
-        gap: 12px;
-        padding-top: 12px;
+        gap: 10px;
+        padding: 12px 14px;
         margin-top: 12px;
     }
 

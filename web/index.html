@@ -506,11 +506,25 @@
 
                         <!-- Data Flow Legend -->
                         <div class="flow-legend">
-                            <div class="legend-item"><span class="legend-dot idle"></span><span data-i18n="framework.legend.idle">Idle</span></div>
-                            <div class="legend-item"><span class="legend-dot running"></span><span data-i18n="framework.legend.running">Running</span></div>
-                            <div class="legend-item"><span class="legend-dot completed"></span><span data-i18n="framework.legend.completed">Completed</span></div>
-                            <div class="legend-item"><span class="legend-dot long"></span><span data-i18n="framework.legend.long">LONG</span></div>
-                            <div class="legend-item"><span class="legend-dot short"></span><span data-i18n="framework.legend.short">SHORT</span></div>
+                            <div class="legend-header">
+                                <div class="legend-title" data-i18n="framework.legend.title">Status</div>
+                                <div class="legend-subtitle" data-i18n="framework.legend.subtitle">Agent + Signal</div>
+                            </div>
+                            <div class="legend-section">
+                                <div class="legend-section-title" data-i18n="framework.legend.section.agent">Agent State</div>
+                                <div class="legend-grid">
+                                    <div class="legend-item"><span class="legend-dot idle"></span><span data-i18n="framework.legend.idle">Idle</span></div>
+                                    <div class="legend-item"><span class="legend-dot running"></span><span data-i18n="framework.legend.running">Running</span></div>
+                                    <div class="legend-item"><span class="legend-dot completed"></span><span data-i18n="framework.legend.completed">Completed</span></div>
+                                </div>
+                            </div>
+                            <div class="legend-section">
+                                <div class="legend-section-title" data-i18n="framework.legend.section.signal">Signal</div>
+                                <div class="legend-grid">
+                                    <div class="legend-item"><span class="legend-dot long"></span><span data-i18n="framework.legend.long">LONG</span></div>
+                                    <div class="legend-item"><span class="legend-dot short"></span><span data-i18n="framework.legend.short">SHORT</span></div>
+                                </div>
+                            </div>
                             <button onclick="window.resetAgentPositions()" class="reset-positions-btn"
                                 title="Reset agent positions to default">🔄 Reset Layout</button>
                         </div>
