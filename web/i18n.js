@@ -28,13 +28,13 @@ const i18n = {
         'chart.current': 'Current Funds',
         'chart.available': 'Available',
         'chart.profit': 'Total Profit',
-        'chart.balance': 'Balance (USDT)',
+        'chart.balance': 'Total Revenue (USDT)',
         'chart.break_even': 'Break-even',
 
         // Account Summary (Condensed)
-        'account.wallet_balance': 'Wallet Balance',
-        'account.total_equity': 'Total Equity',
-        'account.total_pnl': 'Total PnL',
+        'account.initial_balance': 'Initial Balance',
+        'account.current_balance': 'Current Balance',
+        'account.pnl_amount': 'PnL Amount',
         'account.pnl_pct': 'PnL %',
 
         // Decision Table - Agent Groups
@@ -72,6 +72,7 @@ const i18n = {
         'trade.open': 'Open',
         'trade.close': 'Close',
         'trade.symbol': 'Symbol',
+        'trade.direction': 'Direction',
         'trade.entry': 'Entry Price',
         'trade.posvalue': 'Pos Value',
         'trade.exit': 'Exit Price',
@@ -381,13 +382,13 @@ const i18n = {
         'chart.current': '当前资金',
         'chart.available': '可用余额',
         'chart.profit': '总盈亏',
-        'chart.balance': '余额 (USDT)',
+        'chart.balance': '总营收 (USDT)',
         'chart.break_even': '盈亏平衡',
 
         // Account Summary (Condensed)
-        'account.wallet_balance': '钱包余额',
-        'account.total_equity': '总权益',
-        'account.total_pnl': '总盈亏',
+        'account.initial_balance': '初始金额',
+        'account.current_balance': '当前余额',
+        'account.pnl_amount': '盈亏金额',
         'account.pnl_pct': '盈亏比例',
 
         // Decision Table - Agent Groups
@@ -425,6 +426,7 @@ const i18n = {
         'trade.open': '开仓',
         'trade.close': '平仓',
         'trade.symbol': '交易对',
+        'trade.direction': '方向',
         'trade.entry': '开仓价',
         'trade.posvalue': '持仓价值',
         'trade.exit': '平仓价',

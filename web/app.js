@@ -77,6 +77,10 @@ function updateLanguageButton() {
 
 // Chart Instance
 let equityChart = null;
+let realtimeBalanceHistory = [];
+let lastCycleCounter = null;
+let curveBaselineBalance = null;
+let curveBaselineLabelKey = 'chart.initial';
 
 const CHART_COLORS = {
     pos: { line: '#00ff9d', fillTop: 'rgba(0, 255, 157, 0.35)', fillBottom: 'rgba(0, 255, 157, 0.02)' },
@@ -103,6 +107,17 @@ function extractDateTimeLabel(label) {
     const str = String(label);
     const match = str.match(/(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2})(?::\d{2})?/);
     return match ? `${match[1]} ${match[2]}` : str;
+}
+
+function formatTimestamp(date = new Date()) {
+    const pad = (num) => String(num).padStart(2, '0');
+    const year = date.getFullYear();
+    const month = pad(date.getMonth() + 1);
+    const day = pad(date.getDate());
+    const hours = pad(date.getHours());
+    const minutes = pad(date.getMinutes());
+    const seconds = pad(date.getSeconds());
+    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
 }
 
 function initChart() {
@@ -454,11 +469,13 @@ function updateDashboard() {
                 renderAccount(activeAccount);
                 updatePositionInfo(activeAccount, activePositions);
             }
-            updateRealtimeBalance({
+            const balanceSnapshot = updateRealtimeBalance({
                 account: activeAccount,
                 system: data.system,
                 virtualAccount: data.virtual_account,
-                chartData: data.chart_data
+                chartData: data.chart_data,
+                positions: activePositions,
+                trades: data.trade_history || []
             });
             updateAccountTradeStats(data.trade_history || []);
 
@@ -478,8 +495,25 @@ function updateDashboard() {
                 initialAmount = activeAccount.wallet_balance;
             }
 
-            if (data.chart_data && data.chart_data.equity) {
-                renderChart(data.chart_data.equity, initialAmount);
+            if (balanceSnapshot) {
+                const point = {
+                    time: formatTimestamp(),
+                    value: balanceSnapshot.realtimeBalance
+                };
+                if (!realtimeBalanceHistory.length || realtimeBalanceHistory[realtimeBalanceHistory.length - 1].time !== point.time) {
+                    realtimeBalanceHistory.push(point);
+                    if (realtimeBalanceHistory.length > 200) {
+                        realtimeBalanceHistory.shift();
+                    }
+                }
+            }
+
+            const curveData = realtimeBalanceHistory.length
+                ? realtimeBalanceHistory
+                : (data.chart_data && data.chart_data.equity ? data.chart_data.equity : null);
+
+            if (curveData) {
+                renderChart(curveData, balanceSnapshot?.initial ?? initialAmount);
             }
 
             // Layout v2 Renderers with Filtering
@@ -830,7 +864,93 @@ function renderAccount(account) {
     }
 }
 
-function updateRealtimeBalance({ account, system, virtualAccount, chartData }) {
+function sumUnrealizedFromPositions(positions = []) {
+    if (!Array.isArray(positions) || positions.length === 0) return 0;
+    return positions.reduce((sum, pos) => sum + (Number(pos?.pnl) || 0), 0);
+}
+
+function isTradeClosed(trade) {
+    if (!trade || typeof trade !== 'object') return false;
+    const status = String(trade.status || '').toUpperCase();
+    const action = String(trade.action || '').toUpperCase();
+    const exitPrice = Number(trade.exit_price ?? 0);
+    return status.includes('CLOSED')
+        || (Number.isFinite(exitPrice) && exitPrice !== 0)
+        || action.includes('CLOSE');
+}
+
+function sumRealizedFromTrades(trades = []) {
+    if (!Array.isArray(trades) || trades.length === 0) return 0;
+    let realized = 0;
+    for (const trade of trades) {
+        if (!isTradeClosed(trade)) continue;
+        const pnl = Number(trade.pnl);
+        if (Number.isFinite(pnl)) realized += pnl;
+    }
+    return realized;
+}
+
+function computeRealtimeBalance({ account, system, virtualAccount, chartData, positions = [], trades = [] }) {
+    const hasVirtual = system?.is_test_mode && virtualAccount;
+    const hasAccount = !!account;
+    if (!hasVirtual && !hasAccount) return null;
+
+    let initial = 1000;
+    let realized = 0;
+    let unrealized = 0;
+
+    if (hasVirtual) {
+        const rawInitial = Number(virtualAccount.initial_balance ?? 1000);
+        initial = Number.isFinite(rawInitial) && rawInitial > 0 ? rawInitial : 1000;
+        realized = Number(virtualAccount.cumulative_realized_pnl ?? 0) || 0;
+        unrealized = sumUnrealizedFromPositions(positions);
+        if (unrealized === 0) {
+            unrealized = Number(virtualAccount.total_unrealized_pnl ?? 0) || 0;
+        }
+    } else if (hasAccount) {
+        const rawInitial = Number(account.initial_balance ?? chartData?.initial_balance ?? 0);
+        initial = Number.isFinite(rawInitial) && rawInitial > 0 ? rawInitial : 1000;
+
+        const rawUnrealized = Number(account.unrealized_pnl ?? NaN);
+        if (Number.isFinite(rawUnrealized)) {
+            unrealized = rawUnrealized;
+        } else if (Array.isArray(positions) && positions.length > 0) {
+            unrealized = sumUnrealizedFromPositions(positions);
+        } else {
+            const totalEquity = Number(account.total_equity ?? NaN);
+            const walletBalance = Number(account.wallet_balance ?? NaN);
+            if (Number.isFinite(totalEquity) && Number.isFinite(walletBalance)) {
+                unrealized = totalEquity - walletBalance;
+            } else {
+                unrealized = 0;
+            }
+        }
+
+        let realizedFromAccount = Number(account.realized_pnl ?? NaN);
+        const totalEquity = Number(account.total_equity ?? NaN);
+        const totalPnl = Number(account.total_pnl ?? (Number.isFinite(totalEquity) ? totalEquity - initial : NaN));
+
+        if (!Number.isFinite(realizedFromAccount) && Number.isFinite(totalPnl)) {
+            realizedFromAccount = totalPnl - unrealized;
+        }
+
+        if (!Number.isFinite(realizedFromAccount) && Array.isArray(trades) && trades.length > 0) {
+            realizedFromAccount = sumRealizedFromTrades(trades);
+        }
+
+        if (!Number.isFinite(realizedFromAccount)) {
+            realizedFromAccount = 0;
+        }
+        realized = Number.isFinite(realizedFromAccount) ? realizedFromAccount : 0;
+    }
+
+    const totalPnl = realized + unrealized;
+    const realtimeBalance = initial + totalPnl;
+
+    return { initial, realized, unrealized, totalPnl, realtimeBalance };
+}
+
+function updateRealtimeBalance({ account, system, virtualAccount, chartData, positions = [], trades = [] }) {
     const fmt = num => `$${num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     const setTxt = (id, val) => {
         const el = document.getElementById(id);
@@ -849,37 +969,15 @@ function updateRealtimeBalance({ account, system, virtualAccount, chartData }) {
         }
     };
 
-    const hasVirtual = system?.is_test_mode && virtualAccount;
-    const hasAccount = !!account;
-    if (!hasVirtual && !hasAccount) {
+    const snapshot = computeRealtimeBalance({ account, system, virtualAccount, chartData, positions, trades });
+    if (!snapshot) {
         setTxt('account-realtime-balance', '--');
         setTxt('account-realtime-initial', '--');
         setTxt('account-realtime-realized', '--');
         setTxt('account-realtime-unrealized', '--');
-        return;
+        return null;
     }
-
-    let initial = 1000;
-    let realized = 0;
-    let unrealized = 0;
-
-    if (hasVirtual) {
-        const rawInitial = Number(virtualAccount.initial_balance ?? 1000);
-        initial = Number.isFinite(rawInitial) && rawInitial > 0 ? rawInitial : 1000;
-        realized = Number(virtualAccount.cumulative_realized_pnl ?? 0) || 0;
-        unrealized = Number(virtualAccount.total_unrealized_pnl ?? 0) || 0;
-    } else if (hasAccount) {
-        const wallet = Number(account.wallet_balance ?? 0) || 0;
-        const totalEquity = Number(account.total_equity ?? wallet) || wallet;
-        const rawInitial = Number(account.initial_balance ?? chartData?.initial_balance ?? 0);
-        initial = Number.isFinite(rawInitial) && rawInitial > 0 ? rawInitial : 1000;
-        const rawRealized = Number(account.realized_pnl ?? NaN);
-        const rawUnrealized = Number(account.unrealized_pnl ?? NaN);
-        unrealized = Number.isFinite(rawUnrealized) ? rawUnrealized : (totalEquity - wallet);
-        realized = Number.isFinite(rawRealized) ? rawRealized : (wallet - initial);
-    }
-
-    const realtimeBalance = initial + realized + unrealized;
+    const { initial, realized, unrealized, realtimeBalance } = snapshot;
 
     setTxt('account-realtime-balance', fmt(realtimeBalance));
     setTxt('account-realtime-initial', fmt(initial));
@@ -888,6 +986,36 @@ function updateRealtimeBalance({ account, system, virtualAccount, chartData }) {
     setPnlClass('account-realtime-realized', realized);
     setPnlClass('account-realtime-unrealized', unrealized);
     setPnlClass('account-realtime-balance', realtimeBalance - initial);
+
+    const pnlAmount = snapshot.totalPnl;
+    const pnlElement = document.getElementById('acc-pnl');
+    if (pnlElement) {
+        pnlElement.textContent = fmt(pnlAmount);
+        pnlElement.classList.remove('pos', 'neg', 'neutral');
+        if (pnlAmount > 0) {
+            pnlElement.classList.add('pos');
+        } else if (pnlAmount < 0) {
+            pnlElement.classList.add('neg');
+        } else {
+            pnlElement.classList.add('neutral');
+        }
+    }
+
+    const pnlPctElement = document.getElementById('account-total-pnl-pct');
+    if (pnlPctElement && initial > 0) {
+        const pnlPct = (pnlAmount / initial) * 100;
+        pnlPctElement.textContent = `${pnlPct.toFixed(2)}%`;
+        pnlPctElement.classList.remove('pos', 'neg', 'neutral');
+        if (pnlPct > 0) {
+            pnlPctElement.classList.add('pos');
+        } else if (pnlPct < 0) {
+            pnlPctElement.classList.add('neg');
+        } else {
+            pnlPctElement.classList.add('neutral');
+        }
+    }
+
+    return snapshot;
 }
 
 function updateAccountTradeStats(trades) {
@@ -901,14 +1029,7 @@ function updateAccountTradeStats(trades) {
     let wins = 0;
 
     for (const trade of list) {
-        if (!trade || typeof trade !== 'object') continue;
-        const status = String(trade.status || '').toUpperCase();
-        const action = String(trade.action || '').toUpperCase();
-        const exitPrice = Number(trade.exit_price ?? 0);
-        const isClosed = status.includes('CLOSED')
-            || (Number.isFinite(exitPrice) && exitPrice !== 0)
-            || action.includes('CLOSE');
-        if (!isClosed) continue;
+        if (!isTradeClosed(trade)) continue;
 
         const pnl = Number(trade.pnl);
         if (!Number.isFinite(pnl)) continue;
@@ -3576,7 +3697,7 @@ function renderTradeHistory(trades) {
     if (!tbody) return;
 
     if (!trades || trades.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--text-muted);">No trades yet</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:var(--text-muted);">No trades yet</td></tr>';
         return;
     }
 
@@ -3587,6 +3708,18 @@ function renderTradeHistory(trades) {
         const closeCycleRaw = trade.close_cycle;
         const closeCycle = formatCycle(closeCycleRaw === 0 || closeCycleRaw === '0' ? '-' : closeCycleRaw);
         const symbol = trade.symbol || '-';
+        const sideRaw = String(
+            trade.side
+            || trade.position_side
+            || trade.direction
+            || trade.position
+            || trade.action
+            || ''
+        ).toUpperCase();
+        let direction = '-';
+        if (sideRaw.includes('LONG') || sideRaw === 'BUY') direction = 'LONG';
+        else if (sideRaw.includes('SHORT') || sideRaw === 'SELL') direction = 'SHORT';
+        const directionClass = direction === 'LONG' ? 'pos' : (direction === 'SHORT' ? 'neg' : 'neutral');
         const entryPriceValue = trade.entry_price !== undefined ? trade.entry_price : trade.price;
         const entryPrice = entryPriceValue ? `$${Number(entryPriceValue).toLocaleString()}` : '-';
         const posValue = trade.quantity && entryPriceValue ? `$${(trade.quantity * entryPriceValue).toFixed(2)}` : '-';
@@ -3622,6 +3755,7 @@ function renderTradeHistory(trades) {
                 <td>${actionIcon} ${openCycle}</td>
                 <td>${closeCycle}</td>
                 <td>${symbol}</td>
+                <td><span class="val ${directionClass}">${direction}</span></td>
                 <td>${entryPrice}</td>
                 <td>${posValue}</td>
                 <td>${exitPrice}</td>

@@ -139,15 +139,15 @@
                     <h2 data-i18n="section.balance_curve">📈 Real-time Balance Curve</h2>
                     <div class="pnl-metrics">
                         <div class="pnl-metric">
-                            <span class="stat-label" data-i18n="account.wallet_balance">Wallet Balance</span>
-                            <span class="stat-value" id="account-wallet-balance">$0.00</span>
+                            <span class="stat-label" data-i18n="account.initial_balance">Initial Balance</span>
+                            <span class="stat-value" id="account-realtime-initial">$1,000.00</span>
                         </div>
                         <div class="pnl-metric">
-                            <span class="stat-label" data-i18n="account.total_equity">Total Equity</span>
-                            <span class="stat-value" id="acc-equity">$0.00</span>
+                            <span class="stat-label" data-i18n="account.current_balance">Current Balance</span>
+                            <span class="stat-value" id="account-realtime-balance">$0.00</span>
                         </div>
                         <div class="pnl-metric">
-                            <span class="stat-label" data-i18n="account.total_pnl">Total PnL</span>
+                            <span class="stat-label" data-i18n="account.pnl_amount">PnL Amount</span>
                             <span class="stat-value" id="acc-pnl">$0.00</span>
                         </div>
                         <div class="pnl-metric">
@@ -519,12 +519,13 @@
                     <h2 data-i18n="section.trades">📜 Trade History</h2>
                     <div class="table-container">
                         <table id="trade-table">
-                            <!-- 列宽定义 - 9列 -->
+                            <!-- 列宽定义 - 10列 -->
                             <colgroup>
                                 <col style="width: 80px;"> <!-- Time -->
                                 <col style="width: 90px;"> <!-- Open -->
                                 <col style="width: 90px;"> <!-- Close -->
                                 <col style="width: 100px;"> <!-- Symbol -->
+                                <col style="width: 90px;"> <!-- Direction -->
                                 <col style="width: 110px;"> <!-- Entry Price -->
                                 <col style="width: 110px;"> <!-- Pos Value -->
                                 <col style="width: 110px;"> <!-- Exit Price -->
@@ -537,6 +538,7 @@
                                     <th title="开仓周期" data-i18n="trade.open">Open</th>
                                     <th title="平仓周期" data-i18n="trade.close">Close</th>
                                     <th title="交易对" data-i18n="trade.symbol">Symbol</th>
+                                    <th title="开仓方向" data-i18n="trade.direction">Direction</th>
                                     <th title="开仓价格" data-i18n="trade.entry">Entry Price</th>
                                     <th title="持仓金额 (含杠杆)" data-i18n="trade.posvalue">Pos Value</th>
                                     <th title="平仓价格" data-i18n="trade.exit">Exit Price</th>

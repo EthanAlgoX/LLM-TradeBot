@@ -229,6 +229,13 @@ async def get_status(authenticated: bool = Depends(verify_auth)):
     if len(simplified_logs) > log_tail:
         simplified_logs = simplified_logs[-log_tail:]
 
+    account_payload = dict(global_state.account_overview or {})
+    realized_pnl = float(getattr(global_state, 'cumulative_realized_pnl', 0.0) or 0.0)
+    unrealized_pnl = float(account_payload.get('total_pnl', 0.0) or 0.0)
+    account_payload['realized_pnl'] = realized_pnl
+    account_payload['unrealized_pnl'] = unrealized_pnl
+    account_payload['total_pnl'] = realized_pnl + unrealized_pnl
+
     data = {
         "system": {
             "running": global_state.is_running,
@@ -257,7 +264,7 @@ async def get_status(authenticated: bool = Depends(verify_auth)):
             "guardian_status": global_state.guardian_status,
             "symbol_selector": getattr(global_state, 'symbol_selector', {})
         },
-        "account": global_state.account_overview,
+        "account": account_payload,
         "virtual_account": {
             "is_test_mode": global_state.is_test_mode,
             "initial_balance": global_state.virtual_initial_balance,
