@@ -562,9 +562,9 @@ class MarketDataProcessor:
 
         # 合成 is_feature_valid
         src_is_valid = df_checked.get('is_valid') if 'is_valid' in df_checked.columns else pd.Series(True, index=features.index)
-        # 显式转换为 bool，避免 FutureWarning (downcasting deprecated)
-        src_valid_bool = src_is_valid.fillna(False).astype(bool)
-        is_imputed = df_checked.get('is_imputed', pd.Series(False, index=features.index)).astype(bool)
+        # Fix: Use explicit boolean conversion to avoid FutureWarning about deprecated downcasting
+        src_valid_bool = pd.Series(src_is_valid, dtype=bool).fillna(False)
+        is_imputed = pd.Series(df_checked.get('is_imputed', pd.Series(False, index=features.index)), dtype=bool)
         is_feature_valid = src_valid_bool & has_critical & has_enough_history & (~is_imputed)
 
         features['is_feature_valid'] = is_feature_valid
