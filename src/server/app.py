@@ -358,7 +358,11 @@ async def control_bot(cmd: ControlCommand, authenticated: bool = Depends(verify_
             global_state.cycle_counter = 0
             global_state.current_cycle_id = ""
             global_state.cycle_positions_opened = 0
-            global_state.add_log("🔁 Cycle counter reset after stop")
+            # 🆕 清空交易记录，防止使用历史数据进行复盘
+            global_state.trade_history = []
+            global_state.decision_history = []
+            global_state.balance_history = []
+            global_state.add_log("🔁 Cycle counter reset after stop (history cleared)")
         global_state.add_log("▶️ System Resumed by User")
         
     elif action == "pause":
