@@ -117,7 +117,24 @@ When 1h shows CLEAR TREND (Uptrend or Downtrend):
 - 1h: Strong downtrend (EMA12 < EMA26, MACD negative)
 - 15m: Bearish or neutral
 - 5m: Shows short-term bullish (RSI bouncing, minor rally)
-- **ACTION**: This is "SELL THE RALLY" → Open Short with 50-70% size
+- **ACTION**: This is "SELL THE RALLY" → Open Short with 50-70% size **only if RSI is not oversold (1h RSI > 35)**
+
+### 🔻 Short-Side Safety Filters (NEW - Loss Reduction)
+
+Shorts carry squeeze risk. Apply stricter filters to avoid counter-trend traps:
+
+- **Primary Rule**: Open `short` only when **1h trend is DOWN** (EMA12 < EMA26 or trend score < 0).
+- **Exception (Mean Reversion)**: If 1h trend is flat, allow short only when **RSI > 75** AND **price position > 80%** AND **15m/5m both bearish**.
+- **Block Shorts** if any of the following:
+  - 1h RSI < 35 (oversold) or oscillator shows strong oversold momentum
+  - MACD histogram is rising (momentum reversal)
+  - 1h trend is uptrend (do NOT fade strong uptrends)
+  - OI rising while price rising (long build-up → squeeze risk)
+  
+- **Minimum Confirmation**: At least **2 of 3** must be true:
+  1) 15m trend score < 0  
+  2) 5m trend score < 0  
+  3) MACD negative and expanding  
 
 ### When to WAIT (True Conflict)
 

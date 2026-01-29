@@ -181,6 +181,7 @@ class RiskAuditAgent:
         t_1h = trend_scores.get('trend_1h_score')
         t_15m = trend_scores.get('trend_15m_score')
         t_5m = trend_scores.get('trend_5m_score')
+        sentiment_score = decision.get('sentiment_score')
         osc_scores = decision.get('oscillator_scores') or decision.get('oscillator') or {}
         osc_values = [
             osc_scores.get('osc_1h_score'),
@@ -212,6 +213,20 @@ class RiskAuditAgent:
             if confidence < 65:
                 return self._block_decision('total_blocks', "空头信号未达到强共振条件，拦截做空")
             warnings.append("⚠️ 空头共振偏弱，谨慎做空")
+        if is_short and regime_name == 'volatile_directionless' and not short_strong_setup:
+            if confidence < 70:
+                return self._block_decision('total_blocks', "震荡无方向区间，空头需更高信心")
+            if isinstance(t_1h, (int, float)) and t_1h > -45:
+                return self._block_decision('total_blocks', f"震荡无方向区间，空头趋势不足(1h={t_1h:+.0f})")
+            if osc_min is not None and osc_min > -20:
+                return self._block_decision('total_blocks', f"震荡无方向区间，空头超买不足(最弱:{osc_min:+.0f})")
+            warnings.append("⚠️ 震荡无方向区间空头风险偏高")
+        if is_short and isinstance(sentiment_score, (int, float)) and sentiment_score > 20:
+            if confidence < 80 and not short_strong_setup:
+                return self._block_decision('total_blocks', f"市场情绪偏多({sentiment_score:+.0f})，空头拦截")
+            warnings.append(f"⚠️ 市场情绪偏多({sentiment_score:+.0f})，谨慎做空")
+        if is_short and isinstance(atr_pct, (int, float)) and atr_pct > 3.0 and confidence < 75:
+            return self._block_decision('total_blocks', f"高波动空头风险过高(ATR {atr_pct:.2f}%)")
         # 🔧 OPTIMIZATION: Relax symbol-specific filters (was blocking all trades)
         # Changed from hard blocks to conditional warnings
         symbol = decision.get('symbol')
@@ -288,7 +303,7 @@ class RiskAuditAgent:
                 return self._block_decision('total_blocks', f"震荡指标强烈超买({osc_min:.0f})，避免追高做多")
             if is_short and osc_max >= 50:
                 return self._block_decision('total_blocks', f"震荡指标强烈超卖({osc_max:.0f})，避免追低做空")
-            if is_short and osc_min > -5:
+            if is_short and osc_min > -15:
                 if confidence < 70:
                     return self._block_decision('total_blocks', f"空头缺乏超买信号(最弱:{osc_min:+.0f})，避免弱势做空")
                 warnings.append(f"⚠️ 空头超买信号偏弱(最弱:{osc_min:+.0f})")
@@ -299,11 +314,11 @@ class RiskAuditAgent:
         t_15m = trend_scores.get('trend_15m_score')
         if is_short:
             # 若缺少趋势分数，则跳过此规则
-            if isinstance(t_1h, (int, float)) and t_1h > -40:
+            if isinstance(t_1h, (int, float)) and t_1h > -50:
                 if confidence < 70:
                     return self._block_decision('total_blocks', f"空头趋势不足(1h={t_1h:+.0f})，避免逆势做空")
                 warnings.append(f"⚠️ 空头趋势偏弱(1h={t_1h:+.0f})，谨慎做空")
-            if isinstance(t_15m, (int, float)) and t_15m > -10:
+            if isinstance(t_15m, (int, float)) and t_15m > -15:
                 if confidence < 70:
                     return self._block_decision('total_blocks', f"空头趋势不足(15m={t_15m:+.0f})，避免逆势做空")
                 warnings.append(f"⚠️ 空头趋势偏弱(15m={t_15m:+.0f})，谨慎做空")
