@@ -599,25 +599,28 @@ function updateDashboard() {
                 lastCycleCounter = cycleCounter;
             }
 
-            // Use backend's equity_history as the base to ensure x-axis starts from project startup time
-            const backendEquityHistory = data.chart_data && data.chart_data.equity ? data.chart_data.equity : [];
+            const tradeHistory = Array.isArray(data.trade_history) ? data.trade_history : [];
+            const baseline = curveBaselineBalance ?? balanceSnapshot?.initial ?? initialAmount ?? 0;
+            const tradeCurve = buildBalanceSeriesFromTrades(tradeHistory, baseline);
+            const backendBalanceHistory = data.chart_data && data.chart_data.balance_history ? data.chart_data.balance_history : [];
+            const fallbackCurve = backendBalanceHistory.map(h => ({
+                time: h.time,
+                value: Number(h.balance ?? h.value ?? h.total_equity ?? 0)
+            })).filter(h => Number.isFinite(h.value));
 
-            // Initialize realtimeBalanceHistory from backend history on first load
-            if (!realtimeBalanceHistory.length && backendEquityHistory.length) {
-                // Copy all backend history points to ensure we start from project startup time
-                realtimeBalanceHistory = backendEquityHistory.map(h => ({
-                    time: h.time,
-                    value: h.value
-                }));
-            } else if (!realtimeBalanceHistory.length && curveBaselineBalance !== null && curveBaselineTime) {
-                // Fallback: use baseline if no backend history
+            if (tradeCurve.length) {
+                realtimeBalanceHistory = tradeCurve;
+            } else if (fallbackCurve.length) {
+                realtimeBalanceHistory = fallbackCurve;
+            }
+
+            if (!realtimeBalanceHistory.length && curveBaselineBalance !== null && curveBaselineTime) {
                 realtimeBalanceHistory.push({
                     time: curveBaselineTime,
                     value: curveBaselineBalance
                 });
             }
 
-            // Add real-time balance point if available
             if (balanceSnapshot) {
                 const point = {
                     time: formatTimestamp(),
@@ -631,14 +634,8 @@ function updateDashboard() {
                 }
             }
 
-            // Ensure we always use backend history as base if local history is somehow empty
-            const curveData = realtimeBalanceHistory.length
-                ? realtimeBalanceHistory
-                : (backendEquityHistory.length ? backendEquityHistory : null);
-
-            if (curveData) {
-                const baseline = curveBaselineBalance ?? balanceSnapshot?.initial ?? initialAmount;
-                renderChart(curveData, baseline);
+            if (realtimeBalanceHistory.length) {
+                renderChart(realtimeBalanceHistory, baseline);
             }
 
             // Layout v2 Renderers with Filtering
@@ -1015,6 +1012,51 @@ function sumRealizedFromTrades(trades = []) {
     return realized;
 }
 
+function parseTradeTimestamp(trade) {
+    const raw = trade?.timestamp || trade?.record_time || trade?.recorded_at || trade?.time || '';
+    if (!raw) return { label: '', ts: null };
+    const iso = raw.includes('T') ? raw : raw.replace(' ', 'T');
+    const parsed = new Date(iso);
+    const ts = Number.isNaN(parsed.getTime()) ? null : parsed.getTime();
+    return { label: raw, ts };
+}
+
+function buildBalanceSeriesFromTrades(trades = [], initialBalance = 0) {
+    if (!Array.isArray(trades) || trades.length === 0) return [];
+    const closedTrades = trades.map((trade, index) => {
+        if (!isTradeClosed(trade)) return null;
+        const pnl = Number(trade.pnl);
+        if (!Number.isFinite(pnl)) return null;
+        const time = parseTradeTimestamp(trade);
+        return {
+            pnl,
+            label: time.label || `#${index + 1}`,
+            ts: time.ts,
+            index
+        };
+    }).filter(Boolean);
+
+    if (!closedTrades.length) return [];
+
+    closedTrades.sort((a, b) => {
+        if (a.ts === null && b.ts === null) return a.index - b.index;
+        if (a.ts === null) return -1;
+        if (b.ts === null) return 1;
+        return a.ts - b.ts;
+    });
+
+    let balance = Number.isFinite(initialBalance) ? initialBalance : 0;
+    const series = [];
+    for (const item of closedTrades) {
+        balance += item.pnl;
+        series.push({
+            time: item.label,
+            value: balance
+        });
+    }
+    return series;
+}
+
 function computeRealtimeBalance({ account, system, virtualAccount, chartData, positions = [], trades = [] }) {
     const hasVirtual = system?.is_test_mode && virtualAccount;
     const hasAccount = !!account;
@@ -1023,26 +1065,31 @@ function computeRealtimeBalance({ account, system, virtualAccount, chartData, po
     let initial = 1000;
     let realized = 0;
     let unrealized = 0;
+    let totalPnl = 0;
+    let realtimeBalance = 0;
+    const useTrades = Array.isArray(trades) && trades.some(isTradeClosed);
 
     if (hasVirtual) {
         const rawInitial = Number(virtualAccount.initial_balance ?? 1000);
         initial = Number.isFinite(rawInitial) && rawInitial > 0 ? rawInitial : 1000;
-        realized = Number(virtualAccount.cumulative_realized_pnl ?? 0) || 0;
+        realized = useTrades ? sumRealizedFromTrades(trades) : (Number(virtualAccount.cumulative_realized_pnl ?? 0) || 0);
         unrealized = sumUnrealizedFromPositions(positions);
         if (unrealized === 0) {
             unrealized = Number(virtualAccount.total_unrealized_pnl ?? 0) || 0;
         }
+        totalPnl = realized + unrealized;
+        realtimeBalance = initial + totalPnl;
     } else if (hasAccount) {
         const rawInitial = Number(account.initial_balance ?? chartData?.initial_balance ?? 0);
         initial = Number.isFinite(rawInitial) && rawInitial > 0 ? rawInitial : 1000;
 
+        const totalEquity = Number(account.total_equity ?? NaN);
         const rawUnrealized = Number(account.unrealized_pnl ?? NaN);
         if (Number.isFinite(rawUnrealized)) {
             unrealized = rawUnrealized;
         } else if (Array.isArray(positions) && positions.length > 0) {
             unrealized = sumUnrealizedFromPositions(positions);
         } else {
-            const totalEquity = Number(account.total_equity ?? NaN);
             const walletBalance = Number(account.wallet_balance ?? NaN);
             if (Number.isFinite(totalEquity) && Number.isFinite(walletBalance)) {
                 unrealized = totalEquity - walletBalance;
@@ -1052,27 +1099,33 @@ function computeRealtimeBalance({ account, system, virtualAccount, chartData, po
         }
 
         let realizedFromAccount = Number(account.realized_pnl ?? NaN);
-        const totalEquity = Number(account.total_equity ?? NaN);
-        const totalPnl = Number(account.total_pnl ?? (Number.isFinite(totalEquity) ? totalEquity - initial : NaN));
+        const totalPnlFromAccount = Number(account.total_pnl ?? (Number.isFinite(totalEquity) ? totalEquity - initial : NaN));
 
-        if (!Number.isFinite(realizedFromAccount) && Number.isFinite(totalPnl)) {
-            realizedFromAccount = totalPnl - unrealized;
-        }
-
-        if (!Number.isFinite(realizedFromAccount) && Array.isArray(trades) && trades.length > 0) {
+        if (useTrades) {
             realizedFromAccount = sumRealizedFromTrades(trades);
+        } else {
+            if (!Number.isFinite(realizedFromAccount) && Number.isFinite(totalPnlFromAccount)) {
+                realizedFromAccount = totalPnlFromAccount - unrealized;
+            }
+
+            if (!Number.isFinite(realizedFromAccount) && Array.isArray(trades) && trades.length > 0) {
+                realizedFromAccount = sumRealizedFromTrades(trades);
+            }
         }
 
         if (!Number.isFinite(realizedFromAccount)) {
             realizedFromAccount = 0;
         }
         realized = Number.isFinite(realizedFromAccount) ? realizedFromAccount : 0;
+        totalPnl = useTrades ? (realized + unrealized) : (Number.isFinite(totalPnlFromAccount) ? totalPnlFromAccount : (realized + unrealized));
+        if (!useTrades && Number.isFinite(totalEquity)) {
+            realtimeBalance = totalEquity;
+        } else {
+            realtimeBalance = initial + totalPnl;
+        }
     }
 
-    const totalPnl = realized + unrealized;
-    const realtimeBalance = initial + totalPnl;
-
-    return { initial, realized, unrealized, totalPnl, realtimeBalance };
+    return { initial, realized, unrealized, totalPnl, realtimeBalance, source: useTrades ? 'trades' : 'account' };
 }
 
 function updateRealtimeBalance({ account, system, virtualAccount, chartData, positions = [], trades = [] }) {
@@ -1125,6 +1178,11 @@ function updateRealtimeBalance({ account, system, virtualAccount, chartData, pos
         } else {
             pnlElement.classList.add('neutral');
         }
+    }
+
+    if (snapshot.source === 'trades') {
+        setTxt('acc-equity', fmt(currentBalanceDisplay));
+        setTxt('header-equity', fmt(currentBalanceDisplay));
     }
 
     const pnlPctElement = document.getElementById('account-total-pnl-pct');

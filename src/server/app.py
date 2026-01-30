@@ -308,7 +308,7 @@ async def get_status(authenticated: bool = Depends(verify_auth)):
         },
         "decision": global_state.latest_decision,
         "decision_history": global_state.decision_history[:10],
-        "trade_history": global_state.trade_history[:20],
+        "trade_history": global_state.trade_history[:200],
         "logs": logs_tail,
         "logs_simplified": simplified_logs
     }
