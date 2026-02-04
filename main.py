@@ -420,6 +420,11 @@ class MultiAgentTradingBot:
         # On local, load_dotenv refreshes from .env file.
         if self._env_exists:
             load_dotenv(override=True)
+        # Reload full config to pick up updated LLM provider/keys and agents
+        try:
+            self.config._load_config()
+        except Exception as e:
+            log.warning(f"⚠️ Failed to reload config: {e}")
         
         env_symbols = os.environ.get('TRADING_SYMBOLS', '').strip()
         

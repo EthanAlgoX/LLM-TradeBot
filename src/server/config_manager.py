@@ -102,6 +102,12 @@ class ConfigManager:
                     global_state.config_changed = True
                 except Exception as e:
                     print(f"[ConfigManager] Warning: Could not set config_changed flag: {e}")
+                # Reload runtime config (same process)
+                try:
+                    from src.config import config
+                    config._load_config()
+                except Exception as e:
+                    print(f"[ConfigManager] Warning: Could not reload config: {e}")
                 
                 print(f"[ConfigManager] Runtime config applied (Railway mode): {list(flat_updates.keys())}")
                 return True
@@ -149,6 +155,18 @@ class ConfigManager:
             if 'agents' in updates and isinstance(updates['agents'], dict):
                 self._update_agents_config(updates['agents'])
             
+            # Signal to main loop that config has changed (local mode)
+            try:
+                from src.server.state import global_state
+                global_state.config_changed = True
+            except Exception as e:
+                print(f"[ConfigManager] Warning: Could not set config_changed flag: {e}")
+            # Reload runtime config (same process)
+            try:
+                from src.config import config
+                config._load_config()
+            except Exception as e:
+                print(f"[ConfigManager] Warning: Could not reload config: {e}")
             return True
         except Exception as e:
             print(f"[ConfigManager] Error updating config: {e}")
