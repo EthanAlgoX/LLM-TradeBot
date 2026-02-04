@@ -3728,47 +3728,10 @@ async function loadSettings() {
             providerSel.dispatchEvent(new Event('change'));
         }
 
-        // Load Symbols (Multi-select)
-        const savedSymbols = (config.trading.symbol || '').split(',').map(s => s.trim());
-        const checkboxes = document.querySelectorAll('input[name="cfg-symbol"]');
-        let anyChecked = false;
-        checkboxes.forEach(cb => {
-            if (savedSymbols.includes(cb.value)) {
-                cb.checked = true;
-                anyChecked = true;
-            } else {
-                cb.checked = false;
-            }
-        });
-        // Default to BTCUSDT if none saved or matches legacy default
-        const isLegacyDefault = savedSymbols.length === 0 || (savedSymbols.length === 1 && (savedSymbols[0] === '' || savedSymbols[0] === 'BTCUSDT' || savedSymbols[0] === 'SOLUSDT'));
-
-        if (!anyChecked || isLegacyDefault) {
-            checkboxes.forEach(cb => {
-                if (cb.value === 'BTCUSDT') cb.checked = true;
-            });
-        }
-        document.getElementById('cfg-leverage').value = safeVal(config.trading.leverage);
-        document.getElementById('cfg-run-mode').value = safeVal(config.trading.run_mode || 'test');
-
-        // Load Prompt
-        const promptRes = await apiFetch('/api/config/prompt');
-        const promptData = await promptRes.json();
-
-        // Auto-load default prompt if empty
-        if (!promptData.content || promptData.content.trim().length === 0) {
-            console.log("Empty prompt detected, fetching default...");
-            try {
-                const defaultRes = await apiFetch('/api/config/default_prompt');
-                if (defaultRes.ok) {
-                    const defaultData = await defaultRes.json();
-                    document.getElementById('cfg-prompt').value = defaultData.content;
-                }
-            } catch (e) {
-                console.error("Failed to fetch default prompt fallback", e);
-            }
-        } else {
-            document.getElementById('cfg-prompt').value = promptData.content;
+        // Load Trading Mode if present
+        const runModeEl = document.getElementById('cfg-run-mode');
+        if (runModeEl) {
+            runModeEl.value = safeVal(config.trading.run_mode || 'test');
         }
 
     } catch (e) {
@@ -3807,16 +3770,16 @@ async function saveSettings() {
             qwen_api_key: elQwenKey ? elQwenKey.value : '',
             gemini_api_key: elGeminiKey ? elGeminiKey.value : ''
         },
-        trading: {
-            symbol: Array.from(document.querySelectorAll('input[name="cfg-symbol"]:checked'))
-                .map(cb => cb.value).join(','),
-            leverage: document.getElementById('cfg-leverage').value,
-            run_mode: document.getElementById('cfg-run-mode').value
-        },
         llm: {
             llm_provider: elLlmProvider ? elLlmProvider.value : 'deepseek'
         }
     };
+    const runModeEl = document.getElementById('cfg-run-mode');
+    if (runModeEl) {
+        data.trading = {
+            run_mode: runModeEl.value
+        };
+    }
 
     const res = await apiFetch('/api/config', {
         method: 'POST',
@@ -3830,7 +3793,9 @@ async function saveSettings() {
 }
 
 async function savePrompt() {
-    const content = document.getElementById('cfg-prompt').value;
+    const promptEl = document.getElementById('cfg-prompt');
+    if (!promptEl) return;
+    const content = promptEl.value;
     const res = await apiFetch('/api/config/prompt', {
         method: 'POST',
         body: JSON.stringify({ content })

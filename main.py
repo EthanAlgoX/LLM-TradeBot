@@ -425,6 +425,13 @@ class MultiAgentTradingBot:
             self.config._load_config()
         except Exception as e:
             log.warning(f"⚠️ Failed to reload config: {e}")
+        # Reload LLM engine to pick up new provider/keys
+        try:
+            if hasattr(self, "strategy_engine"):
+                self.strategy_engine.reload_config()
+                self._update_llm_metadata()
+        except Exception as e:
+            log.warning(f"⚠️ Failed to reload LLM engine: {e}")
         
         env_symbols = os.environ.get('TRADING_SYMBOLS', '').strip()
         
@@ -3845,6 +3852,13 @@ class MultiAgentTradingBot:
                 if global_state.config_changed:
                     log.info("⚙️ Runtime config change detected, reloading symbols...")
                     self._reload_symbols()
+                    # Reload LLM engine after config updates
+                    try:
+                        if hasattr(self, "strategy_engine"):
+                            self.strategy_engine.reload_config()
+                            self._update_llm_metadata()
+                    except Exception as e:
+                        log.warning(f"⚠️ Failed to reload LLM engine: {e}")
                     # Re-evaluate agent config from env/config on runtime updates
                     from src.agents.agent_config import AgentConfig
                     refreshed = AgentConfig.from_dict({'agents': self.config.get('agents', {})})

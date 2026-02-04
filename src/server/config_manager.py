@@ -114,8 +114,21 @@ class ConfigManager:
             
             # === Local Mode: Update .env file ===
             if not os.path.exists(self.env_path):
-                print(f"[ConfigManager] .env file not found at: {self.env_path}")
-                return False
+                print(f"[ConfigManager] .env file not found at: {self.env_path} (applying runtime config only)")
+                for key, val in flat_updates.items():
+                    ConfigManager._runtime_config[key] = val
+                    os.environ[key] = val
+                try:
+                    from src.server.state import global_state
+                    global_state.config_changed = True
+                except Exception as e:
+                    print(f"[ConfigManager] Warning: Could not set config_changed flag: {e}")
+                try:
+                    from src.config import config
+                    config._load_config()
+                except Exception as e:
+                    print(f"[ConfigManager] Warning: Could not reload config: {e}")
+                return True
                 
             # Read all lines
             with open(self.env_path, 'r', encoding='utf-8') as f:
