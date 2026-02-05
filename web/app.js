@@ -4576,7 +4576,7 @@ function renderTradeHistory(trades) {
         const llmModelText = document.getElementById('llm-model-text');
 
         const AGENT_DEFS = [
-            { id: 'symbol_selector', label: '🎯 Symbol Selector', hasPrompt: true },
+            { id: 'symbol_selector', label: '🎯 Symbol Selector', hasPrompt: false },
             { id: 'trend_agent', label: '📊 Trend Agent (1h)', hasPrompt: true },
             { id: 'setup_agent', label: '📉 Setup Agent (15m)', hasPrompt: true },
             { id: 'trigger_agent', label: '⚡ Trigger Agent (5m)', hasPrompt: true },
@@ -4767,13 +4767,31 @@ function renderTradeHistory(trades) {
                 agents: JSON.parse(JSON.stringify(agentSettings.agents || {}))
             };
             const enabledPayload = {};
+            const applyEnableChange = (localKey, llmKey, enabled) => {
+                if (enabled === true) {
+                    enabledPayload[localKey] = true;
+                } else if (enabled === false) {
+                    enabledPayload[localKey] = false;
+                    if (llmKey) enabledPayload[llmKey] = false;
+                }
+            };
             AGENT_DEFS.forEach(def => {
                 const draft = draftInputs[def.id];
                 const base = agentSettings.agents[def.id] || { params: {}, system_prompt: '' };
                 const paramsRaw = draft?.paramsText ?? JSON.stringify(base.params || {}, null, 2);
                 const promptRaw = (draft?.promptText ?? base.system_prompt) || '';
                 if (draft?.enabled !== undefined && !def.required) {
-                    enabledPayload[def.id] = draft.enabled;
+                    if (def.id === 'symbol_selector') {
+                        applyEnableChange('symbol_selector_agent', null, draft.enabled);
+                    } else if (def.id === 'trend_agent') {
+                        applyEnableChange('trend_agent_local', 'trend_agent_llm', draft.enabled);
+                    } else if (def.id === 'setup_agent') {
+                        applyEnableChange('setup_agent_local', 'setup_agent_llm', draft.enabled);
+                    } else if (def.id === 'trigger_agent') {
+                        applyEnableChange('trigger_agent_local', 'trigger_agent_llm', draft.enabled);
+                    } else if (def.id === 'reflection_agent') {
+                        applyEnableChange('reflection_agent_local', 'reflection_agent_llm', draft.enabled);
+                    }
                 }
                 let parsedParams = {};
                 if (paramsRaw && paramsRaw.trim()) {
