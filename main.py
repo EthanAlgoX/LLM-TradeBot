@@ -1532,7 +1532,11 @@ class MultiAgentTradingBot:
                         global_state.last_reflection = res.raw_response
                         global_state.last_reflection_text = reflection_text
                         global_state.reflection_count = self.reflection_agent.reflection_count
-                        global_state.add_agent_message("reflection_agent", f"Reflected on {len(trades_to_analyze)} trades. Insight: {res.insight[:100]}...", level="info")
+                        global_state.add_agent_message(
+                            "reflection_agent",
+                            f"Reflected on {len(trades_to_analyze)} trades. Insight: {res.insight}",
+                            level="info"
+                        )
                     return res
                 return None
 
@@ -2128,7 +2132,7 @@ class MultiAgentTradingBot:
                     conf_val = 0.0
                 global_state.add_agent_message(
                     "decision_core",
-                    f"Action: {decision_payload.get('action', '').upper()} | Conf: {conf_val:.1f}% | Reason: {decision_payload.get('reasoning', '')[:100]}... | Source: FORCED",
+                    f"Action: {decision_payload.get('action', '').upper()} | Conf: {conf_val:.1f}% | Reason: {decision_payload.get('reasoning', '')} | Source: FORCED",
                     level="warning"
                 )
             else:
@@ -2218,10 +2222,10 @@ class MultiAgentTradingBot:
                     bull_p, bear_p = await asyncio.gather(bull_task, bear_task)
 
                     # Post to Chatroom
-                    bull_summary = bull_p.get('bullish_reasons', 'No reasons provided')[:150] + "..."
-                    bear_summary = bear_p.get('bearish_reasons', 'No reasons provided')[:150] + "..."
-                    global_state.add_agent_message("bull_agent", f"Stance: {bull_p.get('stance')} | Reason: {bull_summary}", level="success")
-                    global_state.add_agent_message("bear_agent", f"Stance: {bear_p.get('stance')} | Reason: {bear_summary}", level="warning")
+                bull_summary = bull_p.get('bullish_reasons', 'No reasons provided')
+                bear_summary = bear_p.get('bearish_reasons', 'No reasons provided')
+                global_state.add_agent_message("bull_agent", f"Stance: {bull_p.get('stance')} | Reason: {bull_summary}", level="success")
+                global_state.add_agent_message("bear_agent", f"Stance: {bear_p.get('stance')} | Reason: {bear_summary}", level="warning")
 
                     # Call DeepSeek with pre-computed perspectives
                     decision_payload = self.strategy_engine.make_decision(
@@ -2239,7 +2243,7 @@ class MultiAgentTradingBot:
                         conf_val = 0.0
                     global_state.add_agent_message(
                         "decision_core",
-                        f"Action: {decision_payload.get('action').upper()} | Conf: {conf_val:.1f}% | Reason: {decision_payload.get('reasoning')[:100]}...",
+                        f"Action: {decision_payload.get('action').upper()} | Conf: {conf_val:.1f}% | Reason: {decision_payload.get('reasoning')}",
                         level="info"
                     )
                 else:
@@ -2281,7 +2285,7 @@ class MultiAgentTradingBot:
                         conf_val = 0.0
                     global_state.add_agent_message(
                         "decision_core",
-                        f"Action: {decision_payload.get('action').upper()} | Conf: {conf_val:.1f}% | Reason: {decision_payload.get('reasoning')[:100]}... | Source: RULE",
+                        f"Action: {decision_payload.get('action').upper()} | Conf: {conf_val:.1f}% | Reason: {decision_payload.get('reasoning')} | Source: RULE",
                         level="info"
                     )
 
