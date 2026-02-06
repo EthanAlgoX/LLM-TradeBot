@@ -4222,7 +4222,9 @@ def start_server():
     """Start FastAPI server in a separate thread"""
     import os
     port = int(os.getenv("PORT", 8000))
-    host = os.getenv("HOST", "127.0.0.1")
+    is_railway = bool(os.getenv("RAILWAY_ENVIRONMENT") or os.getenv("RAILWAY_PROJECT_ID"))
+    is_production = is_railway or os.getenv("DEPLOYMENT_MODE", "local") != "local"
+    host = "0.0.0.0" if is_production else os.getenv("HOST", "127.0.0.1")
     print(f"\n🌍 Starting Web Dashboard at http://{host}:{port}")
     uvicorn.run(app, host=host, port=port, log_level="error")
 
