@@ -29,7 +29,7 @@
 ## ✨ 核心特性
 
 - 🕵️ **感知优先**: 不同于常规指标派，系统优先判断“当前能不能打”，再判断“怎么打”。
-- 🤖 **17-Agent 协作**: 17 个高度专业化的 Agent (3 核心 + 14 可选)，支持 LLM 和 Local 双模式部署。
+- 🤖 **多 Agent 协作**: 核心 + 可选 Agent 组合，支持 LLM 与 Local 双模式部署。
 - 🎛️ **Agent 配置**: 通过仪表盘、环境变量或配置文件启用/禁用可选 Agent，定制化策略。
 - 💬 **Agent Chatroom**: 聊天式多 Agent 输出，每周期汇总并由 Decision Core 做最终决策。
 - 🧩 **Agent 配置面板**: 在仪表盘中为每个 Agent 配置参数与系统提示词。
@@ -78,10 +78,6 @@
 ---
 
 ## 🚀 快速开始
-
-### 启动流程
-
-![快速开始流程](./docs/quick_start_flow_1766232535088.png)
 
 ### 详细步骤
 
@@ -234,10 +230,6 @@ TRADING_SYMBOLS=AUTO3
 
 ## 📁 项目结构
 
-### 目录树形图
-
-![项目结构](./docs/project_structure_tree_1766232597202.png)
-
 ### 目录说明
 
 ```text
@@ -255,7 +247,8 @@ LLM-TradeBot/
 │
 ├── docs/                  # 项目文档
 │   ├── data_flow_analysis.md          # 数据流转分析文档
-│   └── *.png                          # 架构图和流程图
+│   ├── ScreenShot_2026-01-21_003126_160.png # 仪表盘截图
+│   └── Backtesting.png                # 回测界面
 │
 ├── data/                  # 结构化数据存储 (按日期归档)
 │   ├── market_data/       # 原始 K 线数据
@@ -278,135 +271,35 @@ LLM-TradeBot/
 
 ## 🎯 核心架构
 
-### 17-Agent 协作框架 + 四层策略过滤
-
-本系统采用 **四层策略过滤 (Four-Layer Strategy)** 架构，结合 17 个专业化 Agent 协作完成交易决策：
-
-![Multi-Agent Decision Framework](./docs/Multi-Agent%20Decision%20Framework.png)
-
-#### 币种选择层 Agents
-
-| Agent | 角色 | 职责 |
-|-------|------|------|
-| **🔝 SymbolSelectorAgent** | AUTO3 Selector | 基于回测的动态币种选择，从 AI500 Top 5 自动筛选 Top 2 最佳交易币种 |
-
-#### 数据层 Agents
-
-| Agent | 角色 | 职责 |
-|-------|------|------|
-| **🕵️ DataSyncAgent** | The Oracle | 异步并发采集 5m/15m/1h K线数据，确保市场快照一致性 |
-| **👨‍🔬 QuantAnalystAgent** | The Strategist | 生成趋势评分、震荡指标、情绪分析及 OI Fuel |
-
-#### 预测层 Agents
-
-| Agent | 角色 | 职责 |
-|-------|------|------|
-| **🔮 PredictAgent** | The Prophet | 基于技术特征预测价格上涨概率 (Rule-based/ML) |
-| **🎯 RegimeDetector** | Regime Analyzer | 检测市场状态 (趋势/震荡) 及 ADX 强度 |
-| **🤖 AIFilter** | AI Validator | AI 预测与趋势方向一致性验证，拥有否决权 |
-
-#### 语义分析层 Agents (LLM 上下文生成)
-
-| Agent | 角色 | 职责 |
-|-------|------|------|
-| **📈 TrendAgent** | Trend Summarizer | 生成趋势方向语义分析 (UPTREND/DOWNTREND) |
-| **📊 SetupAgent** | Setup Analyzer | 生成入场位置语义分析 (PULLBACK_ZONE/OVERBOUGHT) |
-| **⚡ TriggerAgent** | Trigger Reporter | 生成触发信号语义分析 (CONFIRMED/WAITING) |
-
-#### 决策与执行层 Agents
-
-| Agent | 角色 | 职责 |
-|-------|------|------|
-| **🧠 StrategyEngine** | LLM Decision | DeepSeek LLM 多空辩论决策引擎 |
-| **👮 RiskAuditAgent** | The Guardian | 风控审计，拥有一票否决权 |
-| **🧠 ReflectionAgent** | The Philosopher | 交易反思，为 LLM 提供历史教训 |
-| **🚀 ExecutionEngine** | The Executor | 精准执行订单及状态管理 |
-
-### 四层策略过滤 (Four-Layer Strategy)
-
-```text
-Layer 1: Trend + Fuel (1h EMA + Volume Proxy)
-    ↓ PASS/FAIL
-Layer 2: AI Filter (PredictAgent 方向一致性验证)
-    ↓ PASS/VETO
-Layer 3: Setup (15m KDJ + Bollinger Bands 入场位置)
-    ↓ READY/WAIT
-Layer 4: Trigger (5m 形态 + RVOL 放量确认)
-    ↓ CONFIRMED/WAITING
-    ↓
-🧠 LLM Decision (DeepSeek 多空辩论)
-    ↓
-👮 Risk Audit (一票否决)
-    ↓
-🚀 Execution
-```
-
-### 数据流转架构
-
-![数据流转架构](./docs/data_flow_diagram_1766231460411.png)
-
-**架构说明**:
-
-1. **数据采集层** (蓝色): DataSyncAgent 异步并发采集多周期数据
-2. **量化分析层** (绿色): QuantAnalystAgent 内部 3 个子 Agent 并行分析
-3. **决策对抗层** (橙色): DecisionCoreAgent 集成市场感知模块进行加权投票
-4. **风控审计层** (红色): RiskAuditAgent 执行最终审核和自动修正
-5. **执行层** (紫色): ExecutionEngine 执行订单
-6. **可视化层**: Recent Decisions 表格完整展示所有 Agent 数据 (16列)
-
-#### 详细流程图
+### 多 Agent 协作 + 四层策略过滤
 
 ```mermaid
-graph TB
-    subgraph "1️⃣ 数据采集层"
-        A[🕵️ DataSyncAgent] --> MS[MarketSnapshot<br/>5m/15m/1h + 外部数据]
-    end
-    
-    subgraph "2️⃣ 量化分析层"
-        MS --> QA[👨‍🔬 QuantAnalystAgent]
-        QA --> TS[TrendSubAgent<br/>1h-T, 15m-T, 5m-T]
-        QA --> OS[OscillatorSubAgent<br/>1h-O, 15m-O, 5m-O]
-        QA --> SS[SentimentSubAgent<br/>Sentiment]
-        TS & OS & SS --> QR[quant_analysis]
-    end
-    
-    subgraph "3️⃣ 决策对抗层"
-        QR --> DC[⚖️ DecisionCoreAgent<br/>加权投票]
-        DC --> RD[RegimeDetector<br/>市场状态]
-        DC --> PA[PositionAnalyzer<br/>价格位置%]
-        RD & PA --> VR[VoteResult<br/>Action, Conf, Reason, Aligned]
-    end
-    
-    subgraph "4️⃣ 风控审计层"
-        VR --> RA[🛡️ RiskAuditAgent<br/>一票否决]
-        RA --> AR[AuditResult<br/>Risk, Guard, Corrections]
-    end
-    
-    subgraph "5️⃣ 执行层"
-        AR --> EE[🚀 ExecutionEngine]
-    end
-    
-    subgraph "6️⃣ 可视化层"
-        VR & AR --> DT[📊 Recent Decisions<br/>16 Columns]
-    end
-    
-    style A fill:#4A90E2,color:#fff
-    style QA fill:#7ED321,color:#fff
-    style DC fill:#F5A623,color:#fff
-    style RA fill:#D0021B,color:#fff
-    style EE fill:#BD10E0,color:#fff
-    style DT fill:#50E3C2,color:#000
+flowchart TD
+  A["🎯 选币"] --> B["🕵️ DataSync (5m/15m/1h)"]
+  B --> C["👨‍🔬 Quant Analyst"]
+  C --> D["🧭 多周期解析器"]
+  C --> E["🔮 趋势 / 📊 形态 / ⚡ 触发 (LLM 或 Local)"]
+  C --> F["🪞 复盘 (可选)"]
+  D --> G["⚖️ 决策核心"]
+  E --> G
+  F --> G
+  G --> H["🛡️ 风控审计"]
+  H --> I["🚀 执行引擎"]
 ```
 
-> 📖 **详细文档**: 查看 [数据流转分析文档](./docs/data_flow_analysis.md) 了解完整的数据流转机制，或查看 [多Agent技术详解](./README_MULTI_AGENT.md) 了解底层实现细节。
+**设计要点**
+1. **选币** 在分析前确定当前交易对象。
+2. **DataSync** 对齐 5m/15m/1h 多周期数据快照。
+3. **Quant Analyst** 输出趋势/震荡/情绪/陷阱等数值信号。
+4. **语义代理**（趋势/形态/触发）提供可读结论（LLM 或 Local）。
+5. **多周期解析器** 将对齐信息压缩成决策输入。
+6. **决策核心** 融合所有启用代理输出并给出动作/置信度。
+7. **风控审计** 可否决或修正。
+8. **复盘** 汇总交易表现，作为后续决策参考。
 
----
+> 📖 **详细文档**: 查看 [数据流转分析文档](./docs/data_flow_analysis.md) 了解完整的数据流转机制。
 
 ## 📄 数据全链路审计
-
-### 数据存储结构
-
-![数据存储层级](./docs/data_storage_hierarchy_1766232628608.png)
 
 ### 存储组织
 
@@ -485,18 +378,13 @@ data/
 
 ## 🎉 最新更新
 
-**2026-01-19**:
+**2026-02-07**:
 
-- ✅ **仪表盘 UI 增强**: 现代化仪表盘，金色主题 NoFX 设计。
-  - **K 线图**: TradingView 轻量图表集成，实时 K 线显示
-  - **账户摘要面板**: 实时余额、权益、盈亏及持仓跟踪
-  - **测试/实盘模式切换**: 快速切换，可视化确认和安全警告
-  - **Agent 选择面板**: 通过设置 → Agents 选项卡配置可选 Agent
-  - **当前币种显示**: 在 Agent 框架头部显示 AUTO1 选中的币种
-- ✅ **17-Agent 框架**: 扩展至 17 个专业化 Agent (3 核心 + 14 可选)，支持 LLM 和 Local 双模式。
-  - 3 个核心 Agent (DataSync, QuantAnalyst, RiskAudit) 始终启用
-  - 14 个可选 Agent: LLM 版本用于 AI 语义分析, Local 版本用于快速规则判断
-  - 新增 SetupAgent 用于 15m 入场区域分析 (KDJ, 布林带)
+- ✅ **多 Agent Chatroom**：每周期输出各 Agent 结果与最终决策。
+- ✅ **Agent 配置页**：按 Agent 配置参数与（可选）系统提示词。
+- ✅ **LLM 开关（默认关闭）**：仅在输入 API Key 后启用调用。
+- ✅ **多周期解析器**：1h/15m/5m 对齐信息摘要输入决策核心。
+- ✅ **余额/盈亏修正**：初始资金固定，当前余额由 PnL 驱动。
 
 **2026-01-07**:
 

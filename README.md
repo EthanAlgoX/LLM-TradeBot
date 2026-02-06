@@ -30,7 +30,7 @@ Intelligent Multi-Agent Quantitative Trading Bot based on the **Adversarial Deci
 ## ✨ Key Features
 
 - 🕵️ **Perception First**: Unlike strict indicator-based systems, this framework prioritizes judging "IF we should trade" before deciding "HOW to trade".
-- 🤖 **17-Agent Collaboration**: 17 highly specialized Agents (3 core + 14 optional) with LLM and Local variants for flexible deployment.
+- 🤖 **Multi-Agent Collaboration**: Core + optional agents with LLM and Local variants for flexible deployment.
 - 🎛️ **Agent Configuration**: Enable/disable optional agents via Dashboard, environment variables, or config file for customized strategy.
 - 💬 **Agent Chatroom**: Chat-style multi-agent outputs per cycle, with Decision Core final decisioning.
 - 🧩 **Agent Config Tabs**: Configure per-agent parameters and optional system prompts directly in the Dashboard.
@@ -47,25 +47,31 @@ Intelligent Multi-Agent Quantitative Trading Bot based on the **Adversarial Deci
 
 ## 🏗️ System Architecture Overview
 
-### Data Flow Architecture
+### Multi-Agent Architecture (Current)
 
-![Data Flow Architecture](./docs/data_flow_architecture.png)
+```mermaid
+flowchart TD
+  A["🎯 Symbol Selector"] --> B["🕵️ DataSync (5m/15m/1h)"]
+  B --> C["👨‍🔬 Quant Analyst"]
+  C --> D["🧭 Multi-Period Parser"]
+  C --> E["🔮 Trend / 📊 Setup / ⚡ Trigger (LLM or Local)"]
+  C --> F["🪞 Reflection (optional)"]
+  D --> G["⚖️ Decision Core"]
+  E --> G
+  F --> G
+  G --> H["🛡️ Risk Audit"]
+  H --> I["🚀 Execution Engine"]
+```
 
-The system uses a **Multi-Layer Agent Architecture** where data flows through specialized agents:
-
-1. **📡 Data & Selection**: SymbolSelectorAgent → DataSyncAgent (5m/15m/1h market data)
-2. **📊 Quant Analysis**: QuantAnalystAgent + RegimeDetectorAgent + TriggerDetectorAgent + PositionAnalyzerAgent
-3. **🔮 ML Prediction**: PredictAgent with LightGBM model + AIPredictionFilterAgent
-4. **🧠 Semantic Agents**: TrendAgent (1h), SetupAgent (15m), TriggerAgent (5m) with LLM/Local variants
-5. **🧭 Multi-Period Parser**: Summarizes 1h/15m/5m alignment + four-layer status for Decision Core
-6. **⚖️ Decision Core**: DecisionCoreAgent aggregates multi-agent signals and outputs action/confidence
-7. **🛡️ Risk Audit**: RiskAuditAgent with veto power and auto-corrections
-8. **🚀 Execution**: ExecutionEngine manages orders
-9. **🪞 Reflection**: ReflectionAgent summarizes trade history for continuous improvement
-
-### Detailed Flowchart
-
-![Detailed Flowchart](./docs/detailed_flowchart.png)
+**Design highlights**
+1. **Symbol Selection** chooses the active symbol(s) before analysis.
+2. **DataSync** aligns multi-timeframe data at the same snapshot moment.
+3. **Quant Analyst** produces numeric signals (trend/osc/sentiment/traps).
+4. **Semantic Agents** (Trend/Setup/Trigger) provide human-readable reasoning (LLM or local).
+5. **Multi-Period Parser** compresses 1h/15m/5m alignment into a Decision Core input.
+6. **Decision Core** fuses all enabled agent outputs into final action/confidence.
+7. **Risk Audit** can veto or adjust before execution.
+8. **Reflection** summarizes performance and feeds back into decisions.
 
 > 📖 **Detailed Docs**: See [Data Flow Analysis](./docs/data_flow_analysis.md) for complete mechanisms.
 
@@ -482,10 +488,6 @@ tail -f logs/trading_$(date +%Y%m%d).log
 
 ## 📁 Project Structure
 
-### Directory Tree
-
-![Project Structure](./docs/project_structure_tree_9agents.png)
-
 ### Directory Description
 
 ```text
@@ -516,7 +518,8 @@ LLM-TradeBot/
 │
 ├── docs/                  # Documentation
 │   ├── data_flow_analysis.md          # Data Flow Analysis
-│   └── *.png                          # Architecture & Flow Diagrams
+│   ├── ScreenShot_2026-01-21_003126_160.png # Dashboard
+│   └── Backtesting.png                # Backtesting UI
 │
 ├── data/                  # Structured Data Storage (Archived by Date)
 │   ├── market_data/       # Raw K-Line Data
@@ -541,11 +544,9 @@ LLM-TradeBot/
 
 ## 🎯 Core Architecture
 
-### 17-Agent Collaborative Framework + Four-Layer Strategy
+### Multi-Agent Collaborative Framework + Four-Layer Strategy
 
-The system uses a **Four-Layer Strategy Filter** architecture with **17 specialized Agents** collaborating to make trading decisions. Core agents are always enabled, while optional agents can be configured via Dashboard or `config.yaml`.
-
-![Multi-Agent Decision Framework](./docs/Multi-Agent%20Decision%20Framework.png)
+The system uses a **Four-Layer Strategy Filter** with a **multi-agent pipeline**. Core agents are always enabled, while optional agents can be configured via Dashboard or `config.yaml`.
 
 **Key Feature**: Agents have **LLM** and **Local** variants - LLM versions use AI for semantic analysis, while Local versions use fast rule-based heuristics.
 
@@ -752,10 +753,6 @@ graph TB
 
 ## 📄 Full-Link Data Auditing
 
-### Data Storage Structure
-
-![Data Storage Hierarchy](./docs/data_storage_hierarchy_9agents.png)
-
 ### Storage Organization
 
 The system automatically records intermediate processes for each cycle in the `data/` directory, organized by date for easy review and debugging:
@@ -833,18 +830,13 @@ data/
 
 ## 🎉 Latest Updates
 
-**2026-01-19**:
+**2026-02-07**:
 
-- ✅ **Dashboard UI Enhancement**: Modernized dashboard with gold-themed NoFX design.
-  - **K-Line Chart**: TradingView Lightweight Charts integration for real-time candlestick display
-  - **Account Summary Panel**: Real-time balance, equity, PnL, and position tracking
-  - **Test/Live Mode Toggle**: Quick switch with visual confirmation and safety warnings
-  - **Agent Selection Panel**: Configure optional agents via Settings → Agents tab
-  - **Current Symbol Display**: Shows AUTO1 selected symbol in agent framework header
-- ✅ **17-Agent Framework**: Expanded to 17 specialized agents (3 core + 14 optional) with LLM and Local variants.
-  - 3 Core agents (DataSync, QuantAnalyst, RiskAudit) always enabled
-  - 14 Optional agents: LLM variants for AI analysis, Local variants for fast rule-based heuristics
-  - Added SetupAgent for 15m setup zone analysis (KDJ, Bollinger Bands, entry zones)
+- ✅ **Multi-Agent Chatroom**: Per-cycle agent outputs with Decision Core final action.
+- ✅ **Agent Config Tabs**: Per-agent parameters + optional system prompts in the UI.
+- ✅ **LLM Toggle (default off)**: Enables LLM only when key is provided.
+- ✅ **Multi-Period Parser**: 1h/15m/5m alignment summarized for Decision Core.
+- ✅ **Balance & PnL Fixes**: Initial balance fixed, PnL-driven current balance.
 
 **2026-01-07**:
 
