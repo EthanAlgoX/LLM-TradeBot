@@ -15,6 +15,9 @@ websockets==12.0
 # DeepSeek API
 openai==1.6.1
 
+# BlockRun.AI (x402 micropayments)
+blockrun-llm>=0.1.0
+
 # 数据存储
 redis==5.0.1
 sqlalchemy==2.0.23
