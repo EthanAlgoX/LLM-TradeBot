@@ -280,6 +280,14 @@ textarea:focus {
 
 /* 14. 模态框动画 */
 .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.72);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    backdrop-filter: blur(5px);
     animation: fadeIn 0.3s ease-out;
 }
 
@@ -294,7 +302,116 @@ textarea:focus {
 }
 
 .settings-modal {
+    width: min(640px, 92vw);
+    background: #1a202c;
+    border: 1px solid rgba(255, 255, 255, 0.1);
     animation: slideUp 0.3s ease-out;
+}
+
+.modal-content .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.modal-content .btn-close {
+    background: none;
+    border: none;
+    color: #a0aec0;
+    font-size: 24px;
+    cursor: pointer;
+}
+
+#settings-modal {
+    z-index: 10000;
+}
+
+#settings-modal .modal-header h3 {
+    margin: 0;
+    color: #fff;
+}
+
+#settings-modal .settings-tabs {
+    display: flex;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(0, 0, 0, 0.2);
+}
+
+#settings-modal .tab-btn {
+    flex: 1;
+    padding: 12px;
+    background: none;
+    border: none;
+    color: #a0aec0;
+    cursor: pointer;
+    transition: all 0.2s;
+    border-bottom: 2px solid transparent;
+}
+
+#settings-modal .tab-btn:hover {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.05);
+}
+
+#settings-modal .tab-btn.active {
+    color: #00ff9d;
+    border-bottom-color: #00ff9d;
+    background: rgba(0, 255, 157, 0.05);
+}
+
+#settings-modal .settings-body {
+    padding: 20px;
+    min-height: 300px;
+    max-height: min(64vh, 620px);
+    overflow-y: auto;
+}
+
+#settings-modal .tab-pane {
+    display: none;
+}
+
+#settings-modal .tab-pane.active {
+    display: block;
+}
+
+#settings-modal .form-group {
+    margin-bottom: 15px;
+}
+
+#settings-modal .form-group label {
+    display: block;
+    margin-bottom: 5px;
+    color: #a0aec0;
+    font-size: 0.9em;
+}
+
+#settings-modal .form-control {
+    width: 100%;
+    padding: 8px 12px;
+    background: #2d3748;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    color: #fff;
+}
+
+#settings-modal .form-control:focus {
+    outline: none;
+    border-color: #00ff9d;
+}
+
+#settings-modal .modal-footer {
+    padding: 15px 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    text-align: right;
+    background: rgba(0, 0, 0, 0.2);
+}
+
+#btn-save-settings {
+    position: relative;
+    z-index: 2;
+    cursor: pointer;
 }
 
 @keyframes slideUp {
@@ -340,14 +457,7 @@ textarea:focus {
     animation: shimmer 2s infinite;
 }
 
-/* 17. 性能优化提示 */
-.glass-panel,
-.btn-control,
-.status-item {
-    will-change: transform;
-}
-
-/* 18. 响应式优化 */
+/* 17. 响应式优化 */
 @media (max-width: 768px) {
     .glass-panel:hover {
         transform: none;
@@ -360,7 +470,21 @@ textarea:focus {
     }
 }
 
-/* 19. 打印样式优化 */
+@media (prefers-reduced-motion: reduce) {
+    * {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+
+    body::after,
+    .crt-overlay {
+        display: none !important;
+    }
+}
+
+/* 18. 打印样式优化 */
 @media print {
     .glass-panel {
         background: white !important;
@@ -369,19 +493,60 @@ textarea:focus {
     }
 }
 
-/* 20. [NEW] Multi-Agent Mission Control Layout */
+/* 19. [NEW] Multi-Agent Mission Control Layout */
 .hero-layout {
     display: grid;
     grid-template-columns: 280px 1fr 320px;
     gap: 20px;
     height: calc(100vh - 160px);
-    min-height: 700px;
+    min-height: 0;
     align-items: stretch;
+}
+
+@media (max-width: 1200px) {
+    .header {
+        height: auto;
+        padding: 10px 14px;
+    }
+
+    .status-indicators {
+        width: 100%;
+        flex-wrap: wrap;
+        gap: 10px;
+        justify-content: space-between;
+    }
+
+    .controls {
+        width: 100%;
+        margin-right: 0;
+        padding-right: 0;
+        border-right: 0;
+        flex-wrap: wrap;
+    }
+
+    .hero-layout {
+        grid-template-columns: minmax(0, 1fr);
+        height: auto;
+        min-height: 0;
+    }
+
+    .hero-center {
+        order: 1;
+    }
+
+    .sidebar-left {
+        order: 2;
+    }
+
+    .sidebar-right {
+        order: 3;
+    }
 }
 
 .hero-center {
     display: flex;
     flex-direction: column;
+    min-height: 0;
 }
 
 .hero-chatroom-card {
@@ -402,6 +567,7 @@ textarea:focus {
     display: flex;
     flex-direction: column;
     gap: 20px;
+    min-height: 0;
 }
 
 /* Compact Metrics & Ranking */
@@ -419,6 +585,7 @@ textarea:focus {
 .ranking-compact-container {
     overflow-y: auto;
     flex: 1;
+    min-height: 0;
 }
 
 .compact-table {
@@ -457,6 +624,7 @@ textarea:focus {
     display: flex;
     flex-direction: column;
     height: 100%;
+    min-height: 0;
 }
 
 .card-header-compact {
@@ -768,7 +936,8 @@ textarea:focus {
     width: 900px;
     max-width: 96vw;
     background: #0d1117;
-    max-height: 90vh;
+    height: min(92vh, 980px);
+    max-height: 92vh;
     display: flex;
     flex-direction: column;
 }
@@ -817,7 +986,9 @@ textarea:focus {
     border-radius: 10px;
     padding: 16px;
     min-height: 0;
-    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
 }
 
 .agent-config-section {
@@ -825,6 +996,7 @@ textarea:focus {
     flex-direction: column;
     gap: 14px;
     min-height: 0;
+    height: 100%;
 }
 
 .agent-config-section h4 {
@@ -861,7 +1033,7 @@ textarea:focus {
     display: flex;
     flex-direction: column;
     gap: 10px;
-    max-height: 38vh;
+    max-height: min(34vh, 360px);
     overflow-y: auto;
     padding-right: 6px;
 }
@@ -932,12 +1104,21 @@ textarea:focus {
 }
 
 .agent-config-row-params {
+    flex: 0 0 auto;
     min-height: 0;
 }
 
-.agent-config-row-prompt textarea {
+.agent-config-row-prompt {
+    flex: 1 1 auto;
     min-height: 160px;
-    max-height: 28vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.agent-config-row-prompt textarea {
+    flex: 1 1 auto;
+    min-height: 160px;
+    max-height: none;
 }
 
 .agent-config-toggle-row {
@@ -959,7 +1140,7 @@ textarea:focus {
     font-size: 0.85rem;
 }
 
-.modal-footer {
+#prompts-modal .modal-footer {
     display: flex;
     justify-content: flex-end;
     gap: 10px;

@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LLM-TradeBot Dashboard</title>
     <link rel="stylesheet" href="/static/style.css?v=20260119_0300">
-    <link rel="stylesheet" href="/static/style-enhancements.css?v=20260215_0240">
+    <link rel="stylesheet" href="/static/style-enhancements.css?v=20260215_0310">
     <link
         href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Inter:wght@400;600&display=swap"
         rel="stylesheet">
@@ -444,137 +444,11 @@
         </div>
 
         <div class="modal-footer">
-            <button id="btn-save-settings" class="btn btn-primary"
-                style="position:relative; z-index:9999; cursor:pointer;">Save Changes</button>
+            <button id="btn-save-settings" class="btn btn-primary">Save Changes</button>
         </div>
     </div>
     </div>
 
-    <style>
-        /* Settings Modal Styles */
-        .modal-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.7);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 1000;
-            backdrop-filter: blur(5px);
-        }
-
-        .settings-modal {
-            width: 600px;
-            max-width: 90vw;
-            background: #1a202c;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-        }
-
-        .modal-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 15px 20px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-        }
-
-        .modal-header h3 {
-            margin: 0;
-            color: #fff;
-        }
-
-        .btn-close {
-            background: none;
-            border: none;
-            color: #a0aec0;
-            font-size: 24px;
-            cursor: pointer;
-        }
-
-        .settings-tabs {
-            display: flex;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-            background: rgba(0, 0, 0, 0.2);
-        }
-
-        .tab-btn {
-            flex: 1;
-            padding: 12px;
-            background: none;
-            border: none;
-            color: #a0aec0;
-            cursor: pointer;
-            transition: all 0.2s;
-            border-bottom: 2px solid transparent;
-        }
-
-        .tab-btn:hover {
-            color: #fff;
-            background: rgba(255, 255, 255, 0.05);
-        }
-
-        .tab-btn.active {
-            color: #00ff9d;
-            border-bottom-color: #00ff9d;
-            background: rgba(0, 255, 157, 0.05);
-        }
-
-        .settings-body {
-            padding: 20px;
-            min-height: 300px;
-            max-height: 60vh;
-            overflow-y: auto;
-        }
-
-        .tab-pane {
-            display: none;
-        }
-
-        .tab-pane.active {
-            display: block;
-        }
-
-        .form-group {
-            margin-bottom: 15px;
-        }
-
-        .form-group label {
-            display: block;
-            margin-bottom: 5px;
-            color: #a0aec0;
-            font-size: 0.9em;
-        }
-
-        .form-control {
-            width: 100%;
-            padding: 8px 12px;
-            background: #2d3748;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 4px;
-            color: #fff;
-        }
-
-        .form-control:focus {
-            outline: none;
-            border-color: #00ff9d;
-        }
-
-        /* Fix for Z-Index issues */
-        #settings-modal {
-            z-index: 10000 !important;
-        }
-
-        .modal-footer {
-            padding: 15px 20px;
-            border-top: 1px solid rgba(255, 255, 255, 0.1);
-            text-align: right;
-            background: rgba(0, 0, 0, 0.2);
-        }
-    </style>
-    </style>
     <script src="/static/app.js?v=20260215_0250"></script>
     <script>
         // Inline script removed (logic handled in app.js).
