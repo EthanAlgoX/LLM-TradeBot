@@ -2446,7 +2446,7 @@ class MultiAgentTradingBot:
             self.saver.save_decision(asdict(vote_result), self.current_symbol, snapshot_id, cycle_id=cycle_id)
 
             # 如果是观望，也需要更新状态
-            if vote_result.action in ('hold', 'wait'):
+            if is_passive_action(vote_result.action):
                 # Check if there's an active position to distinguish hold vs wait.
                 # ✅ 先检查持仓，再显示正确的 action
                 has_position = False
