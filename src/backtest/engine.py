@@ -20,6 +20,12 @@ from src.backtest.metrics import PerformanceMetrics, MetricsResult
 from src.backtest.report import BacktestReport
 from src.agents.risk_audit_agent import RiskAuditAgent, PositionInfo
 from src.utils.logger import log
+from src.utils.action_protocol import (
+    normalize_action,
+    is_open_action,
+    is_close_action,
+    is_passive_action,
+)
 
 
 @dataclass
@@ -133,8 +139,8 @@ class BacktestResult:
             """获取过滤和去重后的决策列表"""
             # 获取最后50个决策
             recent = self.decisions[-50:] if len(self.decisions) > 50 else self.decisions
-            # 获取所有非hold决策
-            non_hold = [d for d in self.decisions if d.get('action') != 'hold']
+            # 获取所有非被动决策
+            non_hold = [d for d in self.decisions if not is_passive_action(d.get('action'))]
             
             # 合并并去重（基于timestamp）
             seen = set()
@@ -299,7 +305,7 @@ class BacktestEngine:
                 )
                 
                 # 记录净值 (OPTIMIZATION: Sample every 12 steps or on key events)
-                should_record_equity = (i % 12 == 0) or (i == total - 1) or (decision['action'] != 'hold')
+                should_record_equity = (i % 12 == 0) or (i == total - 1) or (not is_passive_action(decision.get('action')))
                 if should_record_equity:
                     self.portfolio.record_equity(timestamp, prices)
                 
@@ -468,20 +474,23 @@ class BacktestEngine:
         timestamp: datetime
     ):
         """执行交易决策"""
-        action = decision.get('action', 'hold')
-        action_lower = action.lower() if isinstance(action, str) else 'hold'
+        action_raw = str(decision.get('action', 'hold'))
+        position_side = None
+        if self.config.symbol in self.portfolio.positions:
+            position_side = self.portfolio.positions[self.config.symbol].side.value
+        action = normalize_action(action_raw, position_side=position_side)
         confidence = decision.get('confidence', 0.0)
         if isinstance(confidence, (int, float)) and 0 < confidence <= 1:
             confidence *= 100
 
-        if action_lower == 'wait':
+        if is_passive_action(action):
             decision['action'] = 'hold'
-            decision.setdefault('reason', 'wait')
+            decision.setdefault('reason', str(action_raw).lower() or 'wait')
             action = 'hold'
         
         # 0. Global Safety Check: Minimum Confidence 50%
         # Filters out weak mechanical signals when LLM yields (0% confidence)
-        if action in ['long', 'short', 'open_long', 'open_short', 'add_position'] and confidence < 50:
+        if (is_open_action(action) or action_raw == 'add_position') and confidence < 50:
             log.warning(f"🚫 Confidence {confidence}% < 50% for {action}. Forcing WAIT.")
             decision['action'] = 'hold'
             decision['reason'] = 'low_confidence_filtering'
@@ -491,8 +500,10 @@ class BacktestEngine:
         # The LLM already provides this context in the reason field
         
         # Normalize actions
-        if action == 'open_long': action = 'long'
-        if action == 'open_short': action = 'short'
+        if action == 'open_long':
+            action = 'long'
+        if action == 'open_short':
+            action = 'short'
         
         symbol = self.config.symbol
         has_position = symbol in self.portfolio.positions
@@ -530,7 +541,7 @@ class BacktestEngine:
             return
 
         # Basic Action Filtering
-        if action in ['close', 'close_short', 'close_long'] and has_position:
+        if (action in ['close_short', 'close_long'] or is_close_action(action)) and has_position:
             # 平仓 (Close Position)
             # Validate direction matches if specified (close_short for SHORT, close_long for LONG)
             current_side = self.portfolio.positions[symbol].side
