@@ -337,7 +337,7 @@ class LLMOutputParser:
         支持多种变体：
         - long/buy -> open_long
         - short/sell -> open_short
-        - close/exit -> close_position
+        - close/exit -> close_long/close_short (if side known) else close_position
         
         Args:
             action: 原始 action

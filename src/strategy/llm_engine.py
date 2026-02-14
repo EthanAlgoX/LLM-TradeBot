@@ -486,8 +486,9 @@ Analyze the above data following the strategy rules in system prompt. Output you
         
         # 检查action合法性
         valid_actions = [
-            'open_long', 'open_short', 'close_position',
-            'add_position', 'reduce_position', 'hold'
+            'open_long', 'open_short',
+            'close_long', 'close_short', 'close_position',
+            'add_position', 'reduce_position', 'hold', 'wait'
         ]
         if decision['action'] not in valid_actions:
             log.error(f"无效的action: {decision['action']}")

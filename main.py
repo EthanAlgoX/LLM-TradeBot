@@ -3810,7 +3810,9 @@ class MultiAgentTradingBot:
 **EXIT JUDGMENT INSTRUCTION**:
 1. **Trend Reversal**: If current trend contradicts position side (e.g. Long but Trend turned Bearish), consider CLOSE.
 2. **Profit/Risk**: Check if PnL is satisfactory or risk is increasing.
-3. **If Closing**: Return `close_position` action.
+3. **If Closing**:
+   - current side is LONG -> return `close_long`
+   - current side is SHORT -> return `close_short`
 """
         
         context = f"""
