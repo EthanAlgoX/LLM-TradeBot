@@ -58,7 +58,7 @@ import json
 import time
 import threading
 import signal
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 
 from src.api.binance_client import BinanceClient
 from src.execution.engine import ExecutionEngine
@@ -131,6 +131,13 @@ class CycleContext:
     snapshot_id: str
     cycle_num: int
     symbol: str
+
+
+@dataclass
+class StageResult:
+    """Standard stage return envelope for early-return or payload."""
+    early_result: Optional[Dict[str, Any]] = None
+    payload: Dict[str, Any] = field(default_factory=dict)
 
 class MultiAgentTradingBot:
     """
@@ -1027,7 +1034,7 @@ class MultiAgentTradingBot:
         self,
         *,
         run_id: str,
-        cycle_id: str,
+        cycle_id: Optional[str],
         agent_name: str,
         timeout_seconds: float,
         task_factory,
@@ -1091,7 +1098,7 @@ class MultiAgentTradingBot:
         self,
         *,
         run_id: str,
-        cycle_id: str,
+        cycle_id: Optional[str],
         snapshot_id: str,
         market_snapshot,
         processed_dfs: Dict[str, "pd.DataFrame"]
@@ -1189,7 +1196,7 @@ class MultiAgentTradingBot:
         self,
         *,
         run_id: str,
-        cycle_id: str,
+        cycle_id: Optional[str],
         current_price: float,
         trend_1h: str,
         four_layer_result: Dict[str, Any],
@@ -1393,7 +1400,7 @@ class MultiAgentTradingBot:
         self,
         *,
         run_id: str,
-        cycle_id: str,
+        cycle_id: Optional[str],
         processed_dfs: Dict[str, "pd.DataFrame"],
         quant_analysis: Dict[str, Any],
         predict_result: Any,
@@ -1813,7 +1820,7 @@ class MultiAgentTradingBot:
         self,
         *,
         run_id: str,
-        cycle_id: str,
+        cycle_id: Optional[str],
         vote_result: Any,
         quant_analysis: Dict[str, Any],
         processed_dfs: Dict[str, "pd.DataFrame"],
@@ -2090,7 +2097,7 @@ class MultiAgentTradingBot:
         *,
         market_snapshot: Any,
         snapshot_id: str,
-        cycle_id: str
+        cycle_id: Optional[str]
     ) -> Dict[str, "pd.DataFrame"]:
         """Save raw/indicators/features and return processed dataframes."""
         processed_dfs: Dict[str, "pd.DataFrame"] = {}
@@ -2116,7 +2123,7 @@ class MultiAgentTradingBot:
         *,
         data_readiness: Dict[str, Any],
         snapshot_id: str,
-        cycle_id: str
+        cycle_id: Optional[str]
     ) -> Dict[str, Any]:
         """Create wait result when indicators are still warming up."""
         reason = data_readiness.get('blocking_reason') or "data_warmup"
@@ -2169,9 +2176,9 @@ class MultiAgentTradingBot:
         self,
         *,
         run_id: str,
-        cycle_id: str,
+        cycle_id: Optional[str],
         snapshot_id: str
-    ) -> Dict[str, Any]:
+    ) -> StageResult:
         """Run Step 1: fetch market data, validate, build position context, and process indicators."""
         if not (hasattr(self, '_headless_mode') and self._headless_mode):
             print("\n[Step 1/4] 🕵️ The Oracle (Data Agent) - Fetching data...")
@@ -2207,16 +2214,14 @@ class MultiAgentTradingBot:
                 cycle_id=cycle_id,
                 data={"error_type": "api_timeout", "timeout_seconds": data_sync_timeout}
             )
-            return {
-                'early_result': {
-                    'status': 'error',
-                    'action': 'blocked',
-                    'details': {
-                        'reason': error_msg,
-                        'error_type': 'api_timeout'
-                    }
+            return StageResult(early_result={
+                'status': 'error',
+                'action': 'blocked',
+                'details': {
+                    'reason': error_msg,
+                    'error_type': 'api_timeout'
                 }
-            }
+            })
         except Exception as e:
             error_msg = f"❌ DATA FETCH FAILED: {str(e)}"
             log.error(error_msg)
@@ -2230,16 +2235,14 @@ class MultiAgentTradingBot:
                 cycle_id=cycle_id,
                 data={"error_type": "api_failure", "error": str(e)}
             )
-            return {
-                'early_result': {
-                    'status': 'error',
-                    'action': 'blocked',
-                    'details': {
-                        'reason': f'Data API call failed: {str(e)}',
-                        'error_type': 'api_failure'
-                    }
+            return StageResult(early_result={
+                'status': 'error',
+                'action': 'blocked',
+                'details': {
+                    'reason': f'Data API call failed: {str(e)}',
+                    'error_type': 'api_failure'
                 }
-            }
+            })
 
         data_errors = self._validate_market_snapshot(market_snapshot)
         if data_errors:
@@ -2261,17 +2264,15 @@ class MultiAgentTradingBot:
                 cycle_id=cycle_id,
                 data={"error_type": "data_incomplete", "errors": data_errors}
             )
-            return {
-                'early_result': {
-                    'status': 'error',
-                    'action': 'blocked',
-                    'details': {
-                        'reason': error_msg,
-                        'error_type': 'data_incomplete',
-                        'errors': data_errors
-                    }
+            return StageResult(early_result={
+                'status': 'error',
+                'action': 'blocked',
+                'details': {
+                    'reason': error_msg,
+                    'error_type': 'data_incomplete',
+                    'errors': data_errors
                 }
-            }
+            })
 
         global_state.oracle_status = "Data Ready"
         current_position_info = self._extract_position_info(market_snapshot)
@@ -2300,13 +2301,11 @@ class MultiAgentTradingBot:
                 cycle_id=cycle_id,
                 data={"status": "warmup"}
             )
-            return {
-                'early_result': self._build_warmup_wait_result(
-                    data_readiness=data_readiness,
-                    snapshot_id=snapshot_id,
-                    cycle_id=cycle_id
-                )
-            }
+            return StageResult(early_result=self._build_warmup_wait_result(
+                data_readiness=data_readiness,
+                snapshot_id=snapshot_id,
+                cycle_id=cycle_id
+            ))
 
         indicator_snapshot = self._capture_indicator_snapshot(processed_dfs, timeframe='15m')
         if indicator_snapshot:
@@ -2324,19 +2323,18 @@ class MultiAgentTradingBot:
             cycle_id=cycle_id,
             data={"status": "ok", "price": current_price}
         )
-        return {
-            'early_result': None,
+        return StageResult(payload={
             'market_snapshot': market_snapshot,
             'processed_dfs': processed_dfs,
             'current_price': current_price,
             'current_position_info': current_position_info
-        }
+        })
 
     async def _run_agent_analysis_stage(
         self,
         *,
         run_id: str,
-        cycle_id: str,
+        cycle_id: Optional[str],
         snapshot_id: str,
         market_snapshot: Any,
         processed_dfs: Dict[str, "pd.DataFrame"]
@@ -2404,7 +2402,7 @@ class MultiAgentTradingBot:
         self,
         *,
         run_id: str,
-        cycle_id: str,
+        cycle_id: Optional[str],
         quant_analysis: Dict[str, Any],
         predict_result: Any,
         processed_dfs: Dict[str, "pd.DataFrame"],
@@ -2733,7 +2731,7 @@ class MultiAgentTradingBot:
         self,
         *,
         run_id: str,
-        cycle_id: str,
+        cycle_id: Optional[str],
         current_price: float,
         trend_1h: str,
         four_layer_result: Dict[str, Any],
@@ -2797,7 +2795,7 @@ class MultiAgentTradingBot:
         decision_source: str,
         vote_result: Any,
         snapshot_id: str,
-        cycle_id: str
+        cycle_id: Optional[str]
     ) -> None:
         """Persist LLM logs and emit decision observability logs."""
         if decision_source == 'llm' and os.environ.get('ENABLE_DETAILED_LLM_LOGS', 'false').lower() == 'true':
@@ -2904,7 +2902,7 @@ class MultiAgentTradingBot:
         audit_result: Any,
         order_params: Dict[str, Any],
         snapshot_id: str,
-        cycle_id: str,
+        cycle_id: Optional[str],
         current_price: float
     ) -> Optional[Dict[str, Any]]:
         """Persist audit outcome, apply corrections, update state, and return blocked result if needed."""
@@ -2989,7 +2987,7 @@ class MultiAgentTradingBot:
         self,
         *,
         run_id: str,
-        cycle_id: str,
+        cycle_id: Optional[str],
         snapshot_id: str,
         processed_dfs: Dict[str, "pd.DataFrame"],
         quant_analysis: Dict[str, Any],
@@ -2998,7 +2996,7 @@ class MultiAgentTradingBot:
         current_price: float,
         current_position_info: Optional[Dict[str, Any]],
         regime_result: Optional[Dict[str, Any]]
-    ) -> Dict[str, Any]:
+    ) -> StageResult:
         """Run decision stage + observability + passive handling."""
         decision_payload, decision_source, fast_signal, vote_result, selected_agent_outputs = await self._run_decision_stage(
             run_id=run_id,
@@ -3027,22 +3025,21 @@ class MultiAgentTradingBot:
             current_position_info=current_position_info
         )
         if passive_result is not None:
-            return {'early_result': passive_result}
+            return StageResult(early_result=passive_result)
 
-        return {
-            'early_result': None,
+        return StageResult(payload={
             'decision_payload': decision_payload,
             'decision_source': decision_source,
             'fast_signal': fast_signal,
             'vote_result': vote_result,
             'selected_agent_outputs': selected_agent_outputs
-        }
+        })
 
     async def _run_action_pipeline_stage(
         self,
         *,
         run_id: str,
-        cycle_id: str,
+        cycle_id: Optional[str],
         snapshot_id: str,
         analyze_only: bool,
         vote_result: Any,
@@ -3106,7 +3103,7 @@ class MultiAgentTradingBot:
         self,
         *,
         run_id: str,
-        cycle_id: str,
+        cycle_id: Optional[str],
         vote_result: Any,
         order_params: Dict[str, Any],
         current_price: float,
@@ -3150,7 +3147,7 @@ class MultiAgentTradingBot:
         self,
         *,
         run_id: str,
-        cycle_id: str,
+        cycle_id: Optional[str],
         vote_result: Any,
         order_params: Dict[str, Any],
         current_price: float,
@@ -3249,7 +3246,7 @@ class MultiAgentTradingBot:
         self,
         *,
         run_id: str,
-        cycle_id: str,
+        cycle_id: Optional[str],
         vote_result: Any,
         order_params: Dict[str, Any],
         current_price: float,
@@ -3372,7 +3369,7 @@ class MultiAgentTradingBot:
         self,
         *,
         order_params: Dict[str, Any],
-        cycle_id: str,
+        cycle_id: Optional[str],
         entry_price: float,
         exit_price: float,
         pnl: float,
@@ -3720,6 +3717,17 @@ class MultiAgentTradingBot:
             symbol=self.current_symbol
         )
 
+    def _emit_cycle_pipeline_end(self, *, context: CycleContext, result: Dict[str, Any]) -> None:
+        """Emit cycle_pipeline end event using normalized result payload."""
+        self._emit_runtime_event(
+            run_id=context.run_id,
+            stream="lifecycle",
+            agent="cycle_pipeline",
+            phase="end",
+            cycle_id=context.cycle_id,
+            data={"status": result.get('status'), "action": result.get('action')}
+        )
+
     async def _run_cycle_pipeline(self, *, context: CycleContext, analyze_only: bool) -> Dict[str, Any]:
         """Run the full trading pipeline using a prepared cycle context."""
         self._emit_runtime_event(
@@ -3736,22 +3744,15 @@ class MultiAgentTradingBot:
                 cycle_id=context.cycle_id,
                 snapshot_id=context.snapshot_id
             )
-            if oracle_result.get('early_result') is not None:
-                early = oracle_result['early_result']
-                self._emit_runtime_event(
-                    run_id=context.run_id,
-                    stream="lifecycle",
-                    agent="cycle_pipeline",
-                    phase="end",
-                    cycle_id=context.cycle_id,
-                    data={"status": early.get('status'), "action": early.get('action')}
-                )
+            if oracle_result.early_result is not None:
+                early = oracle_result.early_result
+                self._emit_cycle_pipeline_end(context=context, result=early)
                 return early
 
-            market_snapshot = oracle_result['market_snapshot']
-            processed_dfs = oracle_result['processed_dfs']
-            current_price = oracle_result['current_price']
-            current_position_info = oracle_result['current_position_info']
+            market_snapshot = oracle_result.payload['market_snapshot']
+            processed_dfs = oracle_result.payload['processed_dfs']
+            current_price = oracle_result.payload['current_price']
+            current_position_info = oracle_result.payload['current_position_info']
 
             quant_analysis, predict_result, _reflection_result, reflection_text = await self._run_agent_analysis_stage(
                 run_id=context.run_id,
@@ -3792,18 +3793,11 @@ class MultiAgentTradingBot:
                 current_position_info=current_position_info,
                 regime_result=regime_result
             )
-            if decision_result.get('early_result') is not None:
-                early = decision_result['early_result']
-                self._emit_runtime_event(
-                    run_id=context.run_id,
-                    stream="lifecycle",
-                    agent="cycle_pipeline",
-                    phase="end",
-                    cycle_id=context.cycle_id,
-                    data={"status": early.get('status'), "action": early.get('action')}
-                )
+            if decision_result.early_result is not None:
+                early = decision_result.early_result
+                self._emit_cycle_pipeline_end(context=context, result=early)
                 return early
-            vote_result = decision_result['vote_result']
+            vote_result = decision_result.payload['vote_result']
 
             result = await self._run_action_pipeline_stage(
                 run_id=context.run_id,
@@ -3819,14 +3813,7 @@ class MultiAgentTradingBot:
                 regime_result=regime_result,
                 market_snapshot=market_snapshot
             )
-            self._emit_runtime_event(
-                run_id=context.run_id,
-                stream="lifecycle",
-                agent="cycle_pipeline",
-                phase="end",
-                cycle_id=context.cycle_id,
-                data={"status": result.get('status'), "action": result.get('action')}
-            )
+            self._emit_cycle_pipeline_end(context=context, result=result)
             return result
         except Exception as e:
             self._emit_runtime_event(
@@ -4151,7 +4138,7 @@ class MultiAgentTradingBot:
     def _record_cycle_summary(
         self,
         cycle_number: int,
-        cycle_id: str,
+        cycle_id: Optional[str],
         timestamp_start: str,
         timestamp_end: str,
         symbols: List[str],
@@ -4239,7 +4226,7 @@ class MultiAgentTradingBot:
             log.error(f"Failed to get positions: {e}")
             return None
 
-    def _execute_suggested_open_trade(self, symbol: str, suggested: Any, cycle_id: str) -> Dict:
+    def _execute_suggested_open_trade(self, symbol: str, suggested: Any, cycle_id: Optional[str]) -> Dict:
         """Execute an already-audited open suggestion without re-running full analysis."""
         if isinstance(suggested, SuggestedTrade):
             suggestion_symbol = suggested.symbol
