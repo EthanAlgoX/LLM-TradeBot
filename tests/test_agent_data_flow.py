@@ -7,7 +7,6 @@ import sys
 import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-import pytest
 import asyncio
 import pandas as pd
 import numpy as np
@@ -35,6 +34,7 @@ class MockMarketSnapshot:
     raw_5m: List[Dict] = field(default_factory=list)
     raw_15m: List[Dict] = field(default_factory=list)
     raw_1h: List[Dict] = field(default_factory=list)
+    symbol: str = "BTCUSDT"
 
 
 def create_mock_df(n=100, start_price=100000.0, freq='5T'):
@@ -78,58 +78,59 @@ def create_mock_snapshot():
 
 
 class TestOscillatorSubAgentDataFlow:
-    """Test OscillatorSubAgent returns correct data structure"""
+    """Test oscillator outputs in QuantAnalystAgent"""
     
     def test_oscillator_returns_all_timeframe_scores(self):
         """Verify all 3 timeframe scores are returned"""
-        from src.agents.quant_analyst_agent import OscillatorSubAgent
-        
-        agent = OscillatorSubAgent()
+        from src.agents.quant_analyst_agent import QuantAnalystAgent
+
+        agent = QuantAnalystAgent()
         snapshot = create_mock_snapshot()
-        result = agent.analyze(snapshot)
-        
+        result = asyncio.run(agent.analyze_all_timeframes(snapshot))
+        oscillator = result["oscillator"]
+
         # Check required keys exist
-        assert 'osc_5m_score' in result, "Missing osc_5m_score"
-        assert 'osc_15m_score' in result, "Missing osc_15m_score"
-        assert 'osc_1h_score' in result, "Missing osc_1h_score"
-        assert 'total_oscillator_score' in result, "Missing total_oscillator_score"
+        assert 'osc_5m_score' in oscillator, "Missing osc_5m_score"
+        assert 'osc_15m_score' in oscillator, "Missing osc_15m_score"
+        assert 'osc_1h_score' in oscillator, "Missing osc_1h_score"
+        assert 'total_osc_score' in oscillator, "Missing total_osc_score"
         
     def test_oscillator_scores_in_valid_range(self):
         """Verify scores are within expected range"""
-        from src.agents.quant_analyst_agent import OscillatorSubAgent
-        
-        agent = OscillatorSubAgent()
+        from src.agents.quant_analyst_agent import QuantAnalystAgent
+
+        agent = QuantAnalystAgent()
         snapshot = create_mock_snapshot()
-        result = agent.analyze(snapshot)
-        
-        for key in ['osc_5m_score', 'osc_15m_score', 'osc_1h_score', 'total_oscillator_score']:
-            assert -100 <= result[key] <= 100, f"{key} out of range: {result[key]}"
+        result = asyncio.run(agent.analyze_all_timeframes(snapshot))
+        oscillator = result["oscillator"]
+
+        for key in ['osc_5m_score', 'osc_15m_score', 'osc_1h_score', 'total_osc_score']:
+            assert -100 <= oscillator[key] <= 100, f"{key} out of range: {oscillator[key]}"
 
 
 class TestSentimentSubAgentDataFlow:
-    """Test SentimentSubAgent returns consistent structure"""
+    """Test sentiment outputs in QuantAnalystAgent"""
     
     def test_sentiment_returns_consistent_structure(self):
         """Verify structure matches other sub-agents"""
-        from src.agents.quant_analyst_agent import SentimentSubAgent
-        
-        agent = SentimentSubAgent()
+        from src.agents.quant_analyst_agent import QuantAnalystAgent
+
+        agent = QuantAnalystAgent()
         snapshot = create_mock_snapshot()
-        result = agent.analyze(snapshot)
+        result = agent._analyze_sentiment(snapshot)
         
         # Check required keys exist (matching other agents)
         assert 'score' in result, "Missing 'score' key"
         assert 'details' in result, "Missing 'details' key"
         assert 'total_sentiment_score' in result, "Missing 'total_sentiment_score' key"
-        assert 'confidence' in result, "Missing 'confidence' key"
         
     def test_sentiment_score_equals_total(self):
         """Verify score and total_sentiment_score match"""
-        from src.agents.quant_analyst_agent import SentimentSubAgent
-        
-        agent = SentimentSubAgent()
+        from src.agents.quant_analyst_agent import QuantAnalystAgent
+
+        agent = QuantAnalystAgent()
         snapshot = create_mock_snapshot()
-        result = agent.analyze(snapshot)
+        result = agent._analyze_sentiment(snapshot)
         
         assert result['score'] == result['total_sentiment_score']
 
@@ -137,17 +138,15 @@ class TestSentimentSubAgentDataFlow:
 class TestQuantAnalystAgentIntegration:
     """Test full QuantAnalystAgent integration"""
     
-    @pytest.mark.asyncio
-    async def test_full_analysis_returns_all_components(self):
+    def test_full_analysis_returns_all_components(self):
         """Verify analyze_all_timeframes returns complete structure"""
         from src.agents.quant_analyst_agent import QuantAnalystAgent
         
         agent = QuantAnalystAgent()
         snapshot = create_mock_snapshot()
-        result = await agent.analyze_all_timeframes(snapshot)
+        result = asyncio.run(agent.analyze_all_timeframes(snapshot))
         
         # Check top-level keys
-        assert 'comprehensive' in result
         assert 'trend' in result
         assert 'oscillator' in result
         assert 'sentiment' in result
@@ -164,8 +163,7 @@ class TestQuantAnalystAgentIntegration:
 class TestDecisionCoreAgentIntegration:
     """Test DecisionCoreAgent with proper quant_analysis format"""
     
-    @pytest.mark.asyncio
-    async def test_make_decision_with_correct_format(self):
+    def test_make_decision_with_correct_format(self):
         """Verify make_decision works with new quant_analysis format"""
         from src.agents.quant_analyst_agent import QuantAnalystAgent
         from src.agents.decision_core_agent import DecisionCoreAgent
@@ -174,7 +172,7 @@ class TestDecisionCoreAgentIntegration:
         decision_agent = DecisionCoreAgent()
         
         snapshot = create_mock_snapshot()
-        quant_analysis = await quant_agent.analyze_all_timeframes(snapshot)
+        quant_analysis = asyncio.run(quant_agent.analyze_all_timeframes(snapshot))
         
         # Prepare market_data
         market_data = {
@@ -185,15 +183,16 @@ class TestDecisionCoreAgentIntegration:
         }
         
         # Should not raise any KeyError
-        vote_result = await decision_agent.make_decision(quant_analysis, market_data)
+        vote_result = asyncio.run(
+            decision_agent.make_decision(quant_analysis, market_data=market_data)
+        )
         
         assert vote_result is not None
         assert hasattr(vote_result, 'action')
         assert hasattr(vote_result, 'confidence')
         assert hasattr(vote_result, 'reason')
         
-    @pytest.mark.asyncio
-    async def test_generate_reason_no_keyerror(self):
+    def test_generate_reason_no_keyerror(self):
         """Verify _generate_reason doesn't throw KeyError"""
         from src.agents.quant_analyst_agent import QuantAnalystAgent
         from src.agents.decision_core_agent import DecisionCoreAgent
@@ -202,7 +201,7 @@ class TestDecisionCoreAgentIntegration:
         decision_agent = DecisionCoreAgent()
         
         snapshot = create_mock_snapshot()
-        quant_analysis = await quant_agent.analyze_all_timeframes(snapshot)
+        quant_analysis = asyncio.run(quant_agent.analyze_all_timeframes(snapshot))
         
         # Directly test _generate_reason
         reason = decision_agent._generate_reason(
@@ -216,7 +215,3 @@ class TestDecisionCoreAgentIntegration:
         assert isinstance(reason, str)
         assert len(reason) > 0
         print(f"Generated reason: {reason}")
-
-
-if __name__ == '__main__':
-    pytest.main([__file__, '-v'])

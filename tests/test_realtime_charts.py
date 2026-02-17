@@ -7,9 +7,19 @@ This script runs a short backtest and monitors the streaming output.
 import requests
 import json
 from datetime import datetime, timedelta
+import socket
+import pytest
+
+
+def _is_port_open(host: str, port: int, timeout: float = 0.5) -> bool:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.settimeout(timeout)
+        return sock.connect_ex((host, port)) == 0
 
 def test_realtime_visualization():
     """Run a short backtest and verify streaming data."""
+    if not _is_port_open("localhost", 8000):
+        pytest.skip("Dashboard server is not running on localhost:8000")
     
     # Configure a short backtest (1 day)
     end_date = datetime.now()

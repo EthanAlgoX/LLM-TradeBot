@@ -2,7 +2,6 @@
 import asyncio
 import pandas as pd
 import numpy as np
-from datetime import datetime
 from src.backtest.agent_wrapper import BacktestAgentRunner
 from src.agents.data_sync_agent import MarketSnapshot
 
@@ -45,7 +44,7 @@ def create_mock_snapshot():
     )
     return snapshot
 
-async def test_agent_runner():
+def test_agent_runner():
     print("🧪 Testing BacktestAgentRunner...")
     
     # 1. Initialize
@@ -58,7 +57,7 @@ async def test_agent_runner():
     
     # 3. Run Step
     print("🏃 Running step()...")
-    decision = await runner.step(snapshot)
+    decision = asyncio.run(runner.step(snapshot))
     
     # 4. Verify Output
     print("\n📋 Decision Result:")
@@ -79,4 +78,4 @@ async def test_agent_runner():
     print("\n✅ Test Passed!")
 
 if __name__ == "__main__":
-    asyncio.run(test_agent_runner())
+    test_agent_runner()
