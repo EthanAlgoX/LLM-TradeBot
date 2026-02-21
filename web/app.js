@@ -4367,8 +4367,12 @@ function syncTradingModeButtons(isTestMode) {
                 throw new Error(payload.detail || `Mode switch failed (HTTP ${response.status})`);
             }
 
-            syncTradingModeButtons(mode === 'test');
-            console.log(`Mode unchanged on backend: ${mode.toUpperCase()}`);
+            const backendIsTest = payload.is_test_mode !== undefined
+                ? Boolean(payload.is_test_mode)
+                : mode === 'test';
+            window.backendIsTestMode = backendIsTest;
+            syncTradingModeButtons(backendIsTest);
+            console.log(`✅ Switched to ${backendIsTest ? 'TEST' : 'LIVE'} mode`);
         } catch (err) {
             console.error('Mode switch failed:', err);
             syncTradingModeButtons(Boolean(window.backendIsTestMode));

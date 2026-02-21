@@ -18,7 +18,7 @@ from pydantic import BaseModel
 class ControlCommand(BaseModel):
     action: str  # start, pause, stop, restart, set_interval
     interval: float = None  # Optional: interval in minutes for set_interval action
-    mode: Optional[str] = None  # Optional: test/live (runtime switch currently unsupported)
+    mode: Optional[str] = None  # Optional: test/live
 
 class LoginRequest(BaseModel):
     password: str
@@ -411,20 +411,46 @@ async def control_bot(cmd: ControlCommand, authenticated: bool = Depends(verify_
         if target_mode not in {"test", "live"}:
             raise HTTPException(status_code=400, detail="Invalid mode. Must be 'test' or 'live'.")
 
+        if global_state.execution_mode == "Running":
+            raise HTTPException(status_code=409, detail="Please Pause/Stop first, then switch mode.")
+
         current_mode = "test" if global_state.is_test_mode else "live"
         if target_mode == current_mode:
-            return {"status": "success", "mode": current_mode}
+            return {
+                "status": "success",
+                "mode": global_state.execution_mode,
+                "trading_mode": current_mode,
+                "is_test_mode": global_state.is_test_mode
+            }
 
-        raise HTTPException(
-            status_code=409,
-            detail="Runtime mode switching is not supported. Restart with --live (or RUN_MODE=live) to use real wallet balance and live trading."
-        )
+        switch_handler = getattr(global_state, "mode_switch_handler", None)
+        if not callable(switch_handler):
+            raise HTTPException(status_code=503, detail="Mode switch handler is not ready yet. Please retry.")
+
+        try:
+            switched = switch_handler(target_mode) or {}
+        except RuntimeError as e:
+            raise HTTPException(status_code=409, detail=str(e))
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Mode switch failed: {e}")
+
+        return {
+            "status": "success",
+            "mode": global_state.execution_mode,
+            "trading_mode": "test" if global_state.is_test_mode else "live",
+            "is_test_mode": global_state.is_test_mode,
+            **(switched if isinstance(switched, dict) else {})
+        }
     else:
         raise HTTPException(status_code=400, detail="Invalid action")
     
     return {
         "status": "success", 
         "mode": global_state.execution_mode,
+        "trading_mode": "test" if global_state.is_test_mode else "live",
+        "is_test_mode": global_state.is_test_mode,
         "demo_mode_active": global_state.demo_mode_active,
         "demo_expired": global_state.demo_expired
     }

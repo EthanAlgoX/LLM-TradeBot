@@ -26,6 +26,7 @@ class SharedState:
     
     # Config Reload Flag (for Railway runtime config changes)
     config_changed: bool = False  # Set to True when config is updated via API
+    mode_switch_handler: Any = field(default=None, repr=False)  # Callable injected by runtime bot
     
     # Market Data
     current_price: Dict[str, float] = field(default_factory=dict)

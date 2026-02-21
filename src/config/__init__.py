@@ -45,8 +45,10 @@ class Config:
         # Binance
         if os.getenv('BINANCE_API_KEY'):
             self._config['binance']['api_key'] = os.getenv('BINANCE_API_KEY')
-        if os.getenv('BINANCE_API_SECRET'):
-            self._config['binance']['api_secret'] = os.getenv('BINANCE_API_SECRET')
+        # Support both BINANCE_API_SECRET (legacy) and BINANCE_SECRET_KEY (current docs/UI)
+        binance_secret = os.getenv('BINANCE_API_SECRET') or os.getenv('BINANCE_SECRET_KEY')
+        if binance_secret:
+            self._config['binance']['api_secret'] = binance_secret
         
         # DeepSeek (向后兼容)
         if os.getenv('DEEPSEEK_API_KEY'):

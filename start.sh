@@ -90,17 +90,17 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Determine test/live mode
-TEST_MODE=""
+MODE_FLAG=""
 if [ "$MODE_OVERRIDE" = "test" ]; then
-    TEST_MODE="--test"
+    MODE_FLAG="--test"
 elif [ "$MODE_OVERRIDE" = "live" ]; then
-    TEST_MODE=""
+    MODE_FLAG="--live"
 else
     ENV_RUN_MODE=$(echo "${RUN_MODE:-test}" | tr '[:upper:]' '[:lower:]')
     if [ "$ENV_RUN_MODE" = "live" ]; then
-        TEST_MODE=""
+        MODE_FLAG="--live"
     else
-        TEST_MODE="--test"
+        MODE_FLAG="--test"
     fi
 fi
 
@@ -111,7 +111,7 @@ fi
 # Start the application
 echo ""
 print_info "Starting LLM-TradeBot..."
-if [ -n "$TEST_MODE" ]; then
+if [ "$MODE_FLAG" = "--test" ]; then
     print_info "Environment: TEST"
 else
     print_info "Environment: LIVE"
@@ -122,4 +122,4 @@ print_success "Dashboard will be available at: http://localhost:8000"
 echo ""
 
 # Run main.py
-python main.py $TEST_MODE $RUN_MODE_ARG $EXTRA_ARGS
+python main.py $MODE_FLAG $RUN_MODE_ARG $EXTRA_ARGS
