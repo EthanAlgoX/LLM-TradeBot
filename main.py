@@ -4788,16 +4788,27 @@ class MultiAgentTradingBot:
         # mode == "live"
         self.test_mode = False
         global_state.is_test_mode = False
-        try:
-            # Reload .env file to pick up latest API keys from settings
-            from dotenv import load_dotenv
-            load_dotenv(self._env_path, override=True)
-            self.config._load_config()
-            self.config._override_from_env()
-        except Exception:
-            pass
-        # Recreate client on mode switch to pick up latest env/config credentials.
-        self.client = BinanceClient()
+        
+        # Force reload .env file to pick up latest API keys from settings
+        from dotenv import load_dotenv
+        import os
+        load_dotenv(self._env_path, override=True)
+        
+        # Read fresh API keys from environment
+        fresh_api_key = os.getenv('BINANCE_API_KEY')
+        fresh_api_secret = os.getenv('BINANCE_SECRET_KEY') or os.getenv('BINANCE_API_SECRET')
+        
+        if not fresh_api_key or not fresh_api_secret:
+            self.test_mode = True
+            global_state.is_test_mode = True
+            raise RuntimeError("请在设置中配置 Binance API Key 和 Secret Key")
+        
+        # Update config with fresh values
+        self.config._config['binance']['api_key'] = fresh_api_key
+        self.config._config['binance']['api_secret'] = fresh_api_secret
+        
+        # Recreate client on mode switch to pick up latest credentials.
+        self.client = BinanceClient(api_key=fresh_api_key, api_secret=fresh_api_secret)
         self.execution_engine = ExecutionEngine(self.client, self.risk_manager)
         self.data_sync_agent = DataSyncAgent(self.client)
         try:

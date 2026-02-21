@@ -14,10 +14,10 @@ from src.utils.logger import log
 class BinanceClient:
     """Binance API 客户端封装"""
     
-    def __init__(self):
-        self.api_key = config.binance.get('api_key')
-        self.api_secret = config.binance.get('api_secret')
-        self.testnet = config.binance.get('testnet', True)
+    def __init__(self, api_key: str = None, api_secret: str = None, testnet: bool = None):
+        self.api_key = api_key or config.binance.get('api_key')
+        self.api_secret = api_secret or config.binance.get('api_secret')
+        self.testnet = testnet if testnet is not None else config.binance.get('testnet', True)
         self.offline = False
         
         # 初始化客户端
