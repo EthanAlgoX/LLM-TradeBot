@@ -231,6 +231,21 @@ class ExecutionEngine:
             'take_profit': take_profit_price,
             'message': '开空仓成功'
         }
+
+    def set_stop_loss_take_profit(
+        self,
+        symbol: str,
+        position_side: str,
+        stop_loss: Optional[float] = None,
+        take_profit: Optional[float] = None
+    ) -> List[Dict]:
+        """兼容主流程调用，转发到 BinanceClient。"""
+        return self.client.set_stop_loss_take_profit(
+            symbol=symbol,
+            stop_loss_price=stop_loss,
+            take_profit_price=take_profit,
+            position_side=position_side
+        )
     
     def _close_position(
         self,
