@@ -9,6 +9,8 @@ import asyncio
 from datetime import datetime
 from src.config import config
 from src.utils.logger import log
+from decimal import Decimal, ROUND_DOWN
+import time
 
 
 class BinanceClient:
@@ -30,6 +32,13 @@ class BinanceClient:
                 )
             else:
                 self.client = Client(self.api_key, self.api_secret)
+            
+            self._futures_rules = {}
+            self._futures_rules_ts = 0.0
+            self._futures_rules_ttl = 3600  # 1h
+            if self.client is not None:
+                self._refresh_futures_rules()
+
         except Exception as e:
             # Allow dashboard to start even if Binance is unreachable
             self.client = None
@@ -43,6 +52,53 @@ class BinanceClient:
         self._cache_duration = 3600 # 1小时缓存
         
         log.info(f"Binance client initialized (testnet: {self.testnet})")
+    
+    def _refresh_futures_rules(self) -> None:
+        info = self.client.futures_exchange_info()
+        rules = {}
+        for s in info.get("symbols", []):
+            fs = {f["filterType"]: f for f in s.get("filters", [])}
+            lot = fs.get("LOT_SIZE", {})
+            mlot = fs.get("MARKET_LOT_SIZE", {})
+            pf = fs.get("PRICE_FILTER", {})
+            rules[s["symbol"]] = {
+                "lot_step": Decimal(str(lot.get("stepSize", "0"))),
+                "lot_min": Decimal(str(lot.get("minQty", "0"))),
+                "mkt_step": Decimal(str(mlot.get("stepSize", "0"))),
+                "mkt_min": Decimal(str(mlot.get("minQty", "0"))),
+                "tick": Decimal(str(pf.get("tickSize", "0"))),
+            }
+        self._futures_rules = rules
+        self._futures_rules_ts = time.time()
+        # print(rules)
+
+    def _get_rules(self, symbol: str):
+        if time.time() - self._futures_rules_ts > self._futures_rules_ttl:
+            self._refresh_futures_rules()
+        if symbol not in self._futures_rules:
+            self._refresh_futures_rules()
+        return self._futures_rules[symbol]
+
+    @staticmethod
+    def _floor_to_step(v: Decimal, step: Decimal) -> Decimal:
+        if step <= 0:
+            return v
+        return (v / step).to_integral_value(rounding=ROUND_DOWN) * step
+
+    def normalize_futures_qty(self, symbol: str, qty: float, is_market: bool = True) -> str:
+        r = self._get_rules(symbol)
+        q = Decimal(str(qty))
+        step = r["mkt_step"] if (is_market and r["mkt_step"] > 0) else r["lot_step"]
+        min_q = r["mkt_min"] if (is_market and r["mkt_step"] > 0) else r["lot_min"]
+        q = self._floor_to_step(q, step)
+        if q <= 0 or q < min_q:
+            raise ValueError(f"{symbol} qty invalid: {q} < minQty {min_q}")
+        return format(q.normalize(), "f")
+
+    def normalize_futures_price(self, symbol: str, price: float) -> str:
+        r = self._get_rules(symbol)
+        p = self._floor_to_step(Decimal(str(price)), r["tick"])
+        return format(p.normalize(), "f")
     
     def get_klines(self, symbol: str, interval: str, limit: int = 500, start_time: int = None) -> List[Dict]:
         """
@@ -348,13 +404,14 @@ class BinanceClient:
             position_side: 持仓方向 (BOTH/LONG/SHORT), 双向持仓用LONG/SHORT
         """
         try:
-            # 构建订单参数
+            norm_qty = self.normalize_futures_qty(symbol, quantity, is_market=True)
+            # Build order parameters
             order_params = {
                 'symbol': symbol,
                 'side': side,
                 'type': 'MARKET',
-                'quantity': quantity,
-                'positionSide': position_side
+                'quantity': norm_qty
+                # 'positionSide': position_side
             }
             
             # 只在需要时添加 reduceOnly 参数
@@ -363,7 +420,7 @@ class BinanceClient:
             
             order = self.client.futures_create_order(**order_params)
             
-            log.info(f"Market order placed: {side} {quantity} {symbol} (positionSide={position_side})")
+            log.info(f"Market order placed: {side} {norm_qty} {symbol} (positionSide={position_side})")
             return order
             
         except BinanceAPIException as e:
@@ -380,16 +437,18 @@ class BinanceClient:
     ) -> Dict:
         """下限价单"""
         try:
+            norm_qty = self.normalize_futures_qty(symbol, quantity, is_market=False)
+            norm_price = self.normalize_futures_price(symbol, price)
             order = self.client.futures_create_order(
                 symbol=symbol,
                 side=side,
                 type='LIMIT',
-                quantity=quantity,
-                price=price,
+                quantity=norm_qty,
+                price=norm_price,
                 timeInForce=time_in_force
             )
             
-            log.info(f"Limit order placed: {side} {quantity} {symbol} @ {price}")
+            log.info(f"Limit order placed: {side} {norm_qty} {symbol} @ {norm_price}")
             return order
             
         except BinanceAPIException as e:
@@ -426,29 +485,33 @@ class BinanceClient:
             
             # 止损单
             if stop_loss_price:
+                norm_sl = self.normalize_futures_price(symbol, stop_loss_price)
                 sl_order = self.client.futures_create_order(
                     symbol=symbol,
                     side=side,
                     type='STOP_MARKET',
-                    stopPrice=stop_loss_price,
+                    stopPrice=norm_sl,
                     closePosition=True,
-                    positionSide=position_side  # 添加持仓方向
+                    positionSide='BOTH'
+                    # positionSide=position_side  # specify position side
                 )
                 orders.append(sl_order)
-                log.info(f"Stop loss set: {stop_loss_price} (positionSide={position_side})")
+                log.info(f"Stop loss set: {norm_sl} (positionSide={position_side})")
             
             # 止盈单
             if take_profit_price:
+                norm_tp = self.normalize_futures_price(symbol, take_profit_price)
                 tp_order = self.client.futures_create_order(
                     symbol=symbol,
                     side=side,
                     type='TAKE_PROFIT_MARKET',
-                    stopPrice=take_profit_price,
+                    stopPrice=norm_tp,
                     closePosition=True,
-                    positionSide=position_side  # 添加持仓方向
+                    positionSide='BOTH'
+                    # positionSide=position_side  # specify position side
                 )
                 orders.append(tp_order)
-                log.info(f"Take profit set: {take_profit_price} (positionSide={position_side})")
+                log.info(f"Take profit set: {norm_tp} (positionSide={position_side})")
             
             return orders
             
