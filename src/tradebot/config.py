@@ -43,6 +43,8 @@ class RuntimeConfig:
     live_confirm_token: str = "NO"
     persistence_enabled: bool = False
     persistence_path: str = "data/tradebot.db"
+    backtest_fee_bps: float = 3.0
+    backtest_slippage_bps: float = 1.0
 
     # AI500 candidate universe (reference from LLM-TradeBot)
     ai500_candidates: list[str] = field(
@@ -71,4 +73,6 @@ class RuntimeConfig:
         cfg.live_confirm_token = os.getenv("TRADEBOT_LIVE_CONFIRM", cfg.live_confirm_token)
         cfg.persistence_enabled = os.getenv("TRADEBOT_PERSISTENCE_ENABLED", "0") in {"1", "true", "True"}
         cfg.persistence_path = os.getenv("TRADEBOT_PERSISTENCE_PATH", cfg.persistence_path)
+        cfg.backtest_fee_bps = float(os.getenv("TRADEBOT_BACKTEST_FEE_BPS", str(cfg.backtest_fee_bps)))
+        cfg.backtest_slippage_bps = float(os.getenv("TRADEBOT_BACKTEST_SLIPPAGE_BPS", str(cfg.backtest_slippage_bps)))
         return cfg

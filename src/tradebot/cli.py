@@ -4,8 +4,10 @@ import argparse
 import asyncio
 import json
 from datetime import datetime
+from pathlib import Path
 from typing import Any
 
+from tradebot.backtest import BacktestRunner
 from tradebot.config import RuntimeConfig
 from tradebot.orchestrator import MultiAgentTradeBot
 from tradebot.storage import SQLiteStateStore
@@ -14,6 +16,15 @@ from tradebot.storage import SQLiteStateStore
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description="TradeBot multi-agent runner")
     p.add_argument("--cycles", type=int, default=1, help="Number of cycles to run")
+    p.add_argument("--backtest-csv", help="Run historical backtest from csv file")
+    p.add_argument("--backtest-start", help="Backtest start datetime (ISO8601)")
+    p.add_argument("--backtest-end", help="Backtest end datetime (ISO8601)")
+    p.add_argument("--backtest-symbols", help="Comma separated symbols filter for backtest")
+    p.add_argument("--backtest-max-steps", type=int, help="Maximum aligned steps for backtest")
+    p.add_argument("--backtest-fee-bps", type=float, help="Per-side fee in bps for backtest execution")
+    p.add_argument("--backtest-slippage-bps", type=float, help="Per-fill slippage in bps for backtest execution")
+    p.add_argument("--backtest-output", help="Write backtest JSON result to this file path")
+    p.add_argument("--backtest-include-trades", action="store_true", help="Include full trade list in backtest output")
     p.add_argument("--data-provider", choices=["sim", "binance"], help="Market data provider")
     p.add_argument("--market-rank-provider", choices=["mock", "binance"], help="Market-rank provider")
     p.add_argument("--execution-provider", choices=["sim", "paper", "binance_live"], help="Execution provider")
@@ -142,12 +153,52 @@ def main() -> None:
         cfg.persistence_enabled = False
     if args.replay_trace and args.replay_latest:
         raise SystemExit("configuration error: use only one of --replay-trace or --replay-latest")
+    if args.backtest_max_steps is not None and args.backtest_max_steps <= 0:
+        raise SystemExit("configuration error: --backtest-max-steps must be > 0")
+    if args.backtest_fee_bps is not None and args.backtest_fee_bps < 0:
+        raise SystemExit("configuration error: --backtest-fee-bps must be >= 0")
+    if args.backtest_slippage_bps is not None and args.backtest_slippage_bps < 0:
+        raise SystemExit("configuration error: --backtest-slippage-bps must be >= 0")
+    if (
+        args.backtest_start
+        or args.backtest_end
+        or args.backtest_symbols
+        or args.backtest_max_steps is not None
+        or args.backtest_fee_bps is not None
+        or args.backtest_slippage_bps is not None
+        or args.backtest_output
+        or args.backtest_include_trades
+    ) and not args.backtest_csv:
+        raise SystemExit("configuration error: --backtest-* filters require --backtest-csv")
+    if args.backtest_csv and (args.replay_trace or args.replay_latest):
+        raise SystemExit("configuration error: backtest mode cannot be combined with replay mode")
+    if args.backtest_csv and args.reset_state:
+        raise SystemExit("configuration error: backtest mode cannot be combined with --reset-state")
     if args.replay_max_events is not None and args.replay_max_events <= 0:
         raise SystemExit("configuration error: --replay-max-events must be > 0")
     if (args.replay_stage or args.replay_max_events is not None or args.replay_summary_only) and not (args.replay_trace or args.replay_latest):
         raise SystemExit("configuration error: replay filters require --replay-trace or --replay-latest")
     if args.replay_trace or args.replay_latest:
         _replay(args, cfg)
+        return
+    if args.backtest_csv:
+        symbol_filter = [x.strip() for x in (args.backtest_symbols or "").split(",") if x.strip()]
+        runner = BacktestRunner(
+            cfg=cfg,
+            csv_path=args.backtest_csv,
+            start=args.backtest_start,
+            end=args.backtest_end,
+            symbols=symbol_filter or None,
+            max_steps=args.backtest_max_steps,
+            fee_bps=args.backtest_fee_bps,
+            slippage_bps=args.backtest_slippage_bps,
+        )
+        payload = runner.run(include_trades=args.backtest_include_trades)
+        if args.backtest_output:
+            out_path = Path(args.backtest_output)
+            out_path.parent.mkdir(parents=True, exist_ok=True)
+            out_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        _dump(payload, pretty=args.pretty)
         return
     try:
         bot = MultiAgentTradeBot(cfg=cfg, reset_state=args.reset_state)

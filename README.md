@@ -12,6 +12,24 @@ tradebot --cycles 3
 pytest
 ```
 
+## Backtest (CSV)
+
+Run historical replay backtest from CSV:
+
+```bash
+tradebot --backtest-csv data/bars.csv --backtest-symbols BTCUSDT,ETHUSDT,SOLUSDT --backtest-max-steps 500 --pretty
+```
+
+Required CSV columns:
+
+- `ts` (ISO8601 datetime)
+- `symbol`
+- `close`
+
+Optional CSV columns:
+
+- `quote_volume` (defaults to `0` if omitted)
+
 ## Runtime modes
 
 - `sim` (default): fully deterministic local simulation

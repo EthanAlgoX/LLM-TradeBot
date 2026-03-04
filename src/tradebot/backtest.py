@@ -1,0 +1,382 @@
+from __future__ import annotations
+
+import asyncio
+import csv
+from dataclasses import dataclass
+from datetime import datetime
+from pathlib import Path
+from statistics import mean
+from typing import Any
+
+from tradebot.config import RuntimeConfig
+from tradebot.contracts import ExecutionResult, ProposedAction, SCHEMA_V2
+from tradebot.orchestrator import MultiAgentTradeBot
+from tradebot.providers.data import MarketDataProvider, ProviderSnapshot
+from tradebot.providers.execution import ExecutionProvider
+from tradebot.providers.ranking import MarketRankProvider, MarketRankRow
+from tradebot.state import Position, RuntimeState, TradeRecord
+
+
+@dataclass
+class BacktestBar:
+    ts: datetime
+    symbol: str
+    close: float
+    quote_volume: float
+
+
+@dataclass
+class BacktestReport:
+    dataset_path: str
+    symbols: list[str]
+    steps: int
+    start_ts: str
+    end_ts: str
+    initial_cash: float
+    final_cash: float
+    total_return_pct: float
+    realized_pnl: float
+    fee_bps: float
+    slippage_bps: float
+    total_fees: float
+    closed_trades: int
+    wins: int
+    losses: int
+    win_rate: float
+    avg_pnl_per_trade: float
+    max_drawdown_pct: float
+    cycle_status_counts: dict[str, int]
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "dataset_path": self.dataset_path,
+            "symbols": self.symbols,
+            "steps": self.steps,
+            "start_ts": self.start_ts,
+            "end_ts": self.end_ts,
+            "initial_cash": round(self.initial_cash, 6),
+            "final_cash": round(self.final_cash, 6),
+            "total_return_pct": round(self.total_return_pct, 6),
+            "realized_pnl": round(self.realized_pnl, 6),
+            "fee_bps": round(self.fee_bps, 6),
+            "slippage_bps": round(self.slippage_bps, 6),
+            "total_fees": round(self.total_fees, 6),
+            "closed_trades": self.closed_trades,
+            "wins": self.wins,
+            "losses": self.losses,
+            "win_rate": round(self.win_rate, 6),
+            "avg_pnl_per_trade": round(self.avg_pnl_per_trade, 6),
+            "max_drawdown_pct": round(self.max_drawdown_pct, 6),
+            "cycle_status_counts": self.cycle_status_counts,
+        }
+
+
+class CSVBacktestDataset:
+    def __init__(self, *, bars_by_symbol: dict[str, list[BacktestBar]], steps: int, source_path: str) -> None:
+        self.bars_by_symbol = bars_by_symbol
+        self.steps = steps
+        self.source_path = source_path
+        self.symbols = sorted(list(bars_by_symbol.keys()))
+
+    @classmethod
+    def from_csv(
+        cls,
+        path: str,
+        *,
+        start: str | None = None,
+        end: str | None = None,
+        symbols: list[str] | None = None,
+        max_steps: int | None = None,
+    ) -> "CSVBacktestDataset":
+        p = Path(path)
+        if not p.exists():
+            raise ValueError(f"backtest csv not found: {path}")
+
+        start_dt = datetime.fromisoformat(start) if start else None
+        end_dt = datetime.fromisoformat(end) if end else None
+        filter_symbols = set(symbols or [])
+
+        parsed: dict[str, list[BacktestBar]] = {}
+        with p.open("r", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            required = {"ts", "symbol", "close"}
+            missing = required - set(reader.fieldnames or [])
+            if missing:
+                raise ValueError(f"missing csv columns: {sorted(missing)}")
+
+            for row in reader:
+                sym = str(row.get("symbol", "")).strip()
+                if not sym:
+                    continue
+                if filter_symbols and sym not in filter_symbols:
+                    continue
+
+                ts_raw = str(row.get("ts", "")).strip()
+                ts = datetime.fromisoformat(ts_raw)
+                if start_dt and ts < start_dt:
+                    continue
+                if end_dt and ts > end_dt:
+                    continue
+
+                close = float(row.get("close", 0.0) or 0.0)
+                qv = float(row.get("quote_volume", 0.0) or 0.0)
+                parsed.setdefault(sym, []).append(BacktestBar(ts=ts, symbol=sym, close=close, quote_volume=qv))
+
+        parsed = {sym: sorted(rows, key=lambda x: x.ts) for sym, rows in parsed.items() if rows}
+        if not parsed:
+            raise ValueError("no bars loaded from csv after filters")
+
+        min_steps = min(len(rows) for rows in parsed.values())
+        if max_steps is not None and max_steps > 0:
+            min_steps = min(min_steps, max_steps)
+        if min_steps < 2:
+            raise ValueError("backtest requires at least 2 aligned bars per symbol")
+
+        trimmed = {sym: rows[:min_steps] for sym, rows in parsed.items()}
+        return cls(bars_by_symbol=trimmed, steps=min_steps, source_path=str(p))
+
+    def start_ts(self) -> datetime:
+        return min(rows[0].ts for rows in self.bars_by_symbol.values())
+
+    def end_ts(self) -> datetime:
+        return max(rows[self.steps - 1].ts for rows in self.bars_by_symbol.values())
+
+
+class BacktestMarketDataProvider(MarketDataProvider):
+    def __init__(self, dataset: CSVBacktestDataset) -> None:
+        self.dataset = dataset
+
+    def fetch(self, *, symbol: str, state: RuntimeState) -> ProviderSnapshot:
+        rows = self.dataset.bars_by_symbol.get(symbol)
+        if not rows:
+            raise ValueError(f"symbol not found in backtest dataset: {symbol}")
+        idx = max(0, min(state.cycle - 1, self.dataset.steps - 1))
+
+        row = rows[idx]
+        lookback = rows[max(0, idx - 29) : idx + 1]
+        first = lookback[0].close
+        price = row.close
+        momentum = (price / first - 1.0) * 100.0 if first > 0 else 0.0
+
+        highs = [x.close for x in lookback]
+        low = min(highs)
+        high = max(highs)
+        volatility = (high - low) / price * 100.0 if price > 0 else 0.0
+
+        recent_vol = [x.quote_volume for x in rows[max(0, idx - 20) : idx]]
+        baseline = mean(recent_vol) if recent_vol else max(1.0, row.quote_volume)
+        volume_ratio = row.quote_volume / max(1e-9, baseline)
+
+        return ProviderSnapshot(
+            price=round(price, 5),
+            momentum_30m_pct=round(momentum, 4),
+            volatility_pct=round(max(0.01, volatility), 4),
+            volume_ratio=round(max(0.01, volume_ratio), 4),
+        )
+
+
+class BacktestMarketRankProvider(MarketRankProvider):
+    def __init__(self, dataset: CSVBacktestDataset) -> None:
+        self.dataset = dataset
+
+    def snapshot(self, symbols: list[str], cycle: int) -> dict[str, MarketRankRow]:
+        out: dict[str, MarketRankRow] = {}
+        idx = max(0, min(cycle, self.dataset.steps - 1))
+
+        max_qv = 1.0
+        for sym in symbols:
+            rows = self.dataset.bars_by_symbol.get(sym)
+            if rows:
+                max_qv = max(max_qv, rows[idx].quote_volume)
+
+        for sym in symbols:
+            rows = self.dataset.bars_by_symbol.get(sym)
+            if not rows:
+                out[sym] = MarketRankRow(symbol=sym, score=40.0, reason="missing in backtest dataset")
+                continue
+
+            row = rows[idx]
+            prev_idx = max(0, idx - 1)
+            prev = rows[prev_idx].close
+            trend = (row.close / prev - 1.0) * 100.0 if prev > 0 else 0.0
+            trend_score = max(0.0, min(100.0, (trend + 5.0) * 10.0))
+            vol_score = max(0.0, min(100.0, row.quote_volume / max_qv * 100.0))
+            score = 0.55 * trend_score + 0.45 * vol_score
+            out[sym] = MarketRankRow(symbol=sym, score=score, reason=f"backtest trend={trend:.2f}% qv={row.quote_volume:.0f}")
+
+        return out
+
+
+class BacktestExecutionProvider(ExecutionProvider):
+    def __init__(self, *, fee_bps: float = 3.0, slippage_bps: float = 1.0) -> None:
+        self.fee_bps = max(0.0, fee_bps)
+        self.slippage_bps = max(0.0, slippage_bps)
+        self.total_fees_paid = 0.0
+
+    def _fill_price(self, mark_price: float, action: str) -> float:
+        slip = self.slippage_bps / 10_000.0
+        if action in {"open_long", "close_short"}:  # buy side
+            return mark_price * (1.0 + slip)
+        if action in {"open_short", "close_long"}:  # sell side
+            return mark_price * (1.0 - slip)
+        return mark_price
+
+    def _fee(self, fill_price: float, qty: float) -> float:
+        return abs(fill_price * qty) * self.fee_bps / 10_000.0
+
+    def execute(self, *, trace_id: str, planned: ProposedAction, state: RuntimeState) -> ExecutionResult:
+        symbol = planned.symbol
+        action = planned.action
+        mark_price = float(planned.order_params.get("entry_price", 0) or 0)
+        qty = float(planned.order_params.get("quantity", 0) or 0)
+        lev = float(planned.order_params.get("leverage", 1.0) or 1.0)
+
+        if action in {"wait", "hold"}:
+            return ExecutionResult(SCHEMA_V2, trace_id, symbol, action, "skipped", "passive action")
+        if qty <= 0:
+            return ExecutionResult(SCHEMA_V2, trace_id, symbol, action, "failed", "invalid quantity")
+
+        fill = self._fill_price(mark_price, action)
+        fee = self._fee(fill, qty)
+        self.total_fees_paid += fee
+
+        if action == "open_long":
+            state.positions[symbol] = Position(symbol=symbol, side="long", qty=qty, entry_price=fill, leverage=lev, opened_cycle=state.cycle)
+            state.cash -= fee
+            state.trades.append(TradeRecord(state.cycle, symbol, action, qty, fill, -fee))
+            return ExecutionResult(SCHEMA_V2, trace_id, symbol, action, "success", f"backtest long opened fee={fee:.6f}", fill)
+
+        if action == "open_short":
+            state.positions[symbol] = Position(symbol=symbol, side="short", qty=qty, entry_price=fill, leverage=lev, opened_cycle=state.cycle)
+            state.cash -= fee
+            state.trades.append(TradeRecord(state.cycle, symbol, action, qty, fill, -fee))
+            return ExecutionResult(SCHEMA_V2, trace_id, symbol, action, "success", f"backtest short opened fee={fee:.6f}", fill)
+
+        if action in {"close_long", "close_short"}:
+            pos = state.positions.get(symbol)
+            if not pos:
+                return ExecutionResult(SCHEMA_V2, trace_id, symbol, action, "failed", "no position", fill)
+            sign = 1.0 if pos.side == "long" else -1.0
+            gross_pnl = (fill - pos.entry_price) * pos.qty * sign
+            net_pnl = gross_pnl - fee
+            state.cash += net_pnl
+            state.trades.append(TradeRecord(state.cycle, symbol, action, pos.qty, fill, net_pnl))
+            del state.positions[symbol]
+            return ExecutionResult(SCHEMA_V2, trace_id, symbol, action, "success", f"backtest close net_pnl={net_pnl:.6f}", fill)
+
+        return ExecutionResult(SCHEMA_V2, trace_id, symbol, action, "failed", "unknown action", fill)
+
+
+class BacktestRunner:
+    def __init__(
+        self,
+        *,
+        cfg: RuntimeConfig,
+        csv_path: str,
+        start: str | None = None,
+        end: str | None = None,
+        symbols: list[str] | None = None,
+        max_steps: int | None = None,
+        fee_bps: float | None = None,
+        slippage_bps: float | None = None,
+    ) -> None:
+        self.cfg = cfg
+        self.fee_bps = cfg.backtest_fee_bps if fee_bps is None else max(0.0, fee_bps)
+        self.slippage_bps = cfg.backtest_slippage_bps if slippage_bps is None else max(0.0, slippage_bps)
+        self.dataset = CSVBacktestDataset.from_csv(
+            csv_path,
+            start=start,
+            end=end,
+            symbols=symbols,
+            max_steps=max_steps,
+        )
+
+    def run(self, *, include_trades: bool = False) -> dict[str, object]:
+        # Backtest scope uses only symbols existing in the dataset.
+        self.cfg.ai500_candidates = list(self.dataset.symbols)
+        self.cfg.selector.top_n = min(self.cfg.selector.top_n, len(self.dataset.symbols))
+        self.cfg.persistence_enabled = False
+        exec_provider = BacktestExecutionProvider(fee_bps=self.fee_bps, slippage_bps=self.slippage_bps)
+
+        bot = MultiAgentTradeBot(
+            cfg=self.cfg,
+            market_data_provider=BacktestMarketDataProvider(self.dataset),
+            market_rank_provider=BacktestMarketRankProvider(self.dataset),
+            execution_provider=exec_provider,
+        )
+
+        cycle_results: list[Any] = []
+        cash_curve = [{"cycle": 0, "cash": bot.state.cash}]
+        status_counts: dict[str, int] = {}
+
+        for _ in range(self.dataset.steps):
+            result = asyncio.run(bot.run_cycle())
+            cycle_results.append(result)
+            cash = float(result.details.get("cash", bot.state.cash))
+            cash_curve.append({"cycle": result.cycle, "cash": cash})
+            status_counts[result.status] = status_counts.get(result.status, 0) + 1
+
+        closed = [t for t in bot.state.trades if t.action in {"close_long", "close_short"}]
+        wins = len([t for t in closed if t.pnl > 0])
+        losses = len([t for t in closed if t.pnl < 0])
+        final_cash = bot.state.cash
+        initial_cash = self.cfg.initial_cash
+        realized = final_cash - initial_cash
+        win_rate = wins / len(closed) if closed else 0.0
+        avg_pnl = mean([t.pnl for t in closed]) if closed else 0.0
+
+        peak = float(cash_curve[0]["cash"])
+        max_dd = 0.0
+        for point in cash_curve:
+            x = float(point["cash"])
+            peak = max(peak, x)
+            if peak > 0:
+                dd = (peak - x) / peak
+                max_dd = max(max_dd, dd)
+
+        report = BacktestReport(
+            dataset_path=self.dataset.source_path,
+            symbols=self.dataset.symbols,
+            steps=self.dataset.steps,
+            start_ts=self.dataset.start_ts().isoformat(),
+            end_ts=self.dataset.end_ts().isoformat(),
+            initial_cash=initial_cash,
+            final_cash=final_cash,
+            total_return_pct=((final_cash / initial_cash) - 1.0) * 100.0 if initial_cash else 0.0,
+            realized_pnl=realized,
+            fee_bps=self.fee_bps,
+            slippage_bps=self.slippage_bps,
+            total_fees=exec_provider.total_fees_paid,
+            closed_trades=len(closed),
+            wins=wins,
+            losses=losses,
+            win_rate=win_rate * 100.0,
+            avg_pnl_per_trade=avg_pnl,
+            max_drawdown_pct=max_dd * 100.0,
+            cycle_status_counts=status_counts,
+        )
+
+        payload: dict[str, object] = {
+            "mode": "backtest_csv",
+            "report": report.to_dict(),
+            "equity_curve": cash_curve,
+            "last_cycle": {
+                "cycle": cycle_results[-1].cycle if cycle_results else 0,
+                "trace_id": cycle_results[-1].trace_id if cycle_results else "",
+                "status": cycle_results[-1].status if cycle_results else "",
+                "action": cycle_results[-1].action if cycle_results else "",
+            },
+        }
+        if include_trades:
+            payload["trades"] = [
+                {
+                    "cycle": t.cycle,
+                    "symbol": t.symbol,
+                    "action": t.action,
+                    "qty": t.qty,
+                    "price": t.price,
+                    "pnl": t.pnl,
+                }
+                for t in bot.state.trades
+            ]
+        return payload

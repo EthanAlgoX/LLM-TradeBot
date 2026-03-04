@@ -23,6 +23,9 @@ from tradebot.config import RuntimeConfig
 from tradebot.contracts import CycleResult, ProposedAction, SCHEMA_V2
 from tradebot.events import EventBus
 from tradebot.providers import build_execution_provider, build_market_data_provider, build_market_rank_provider
+from tradebot.providers.data import MarketDataProvider
+from tradebot.providers.execution import ExecutionProvider
+from tradebot.providers.ranking import MarketRankProvider
 from tradebot.storage import SQLiteStateStore
 from tradebot.state import RuntimeState
 
@@ -35,6 +38,9 @@ class MultiAgentTradeBot:
         cfg: RuntimeConfig | None = None,
         state: RuntimeState | None = None,
         state_store: SQLiteStateStore | None = None,
+        market_data_provider: MarketDataProvider | None = None,
+        market_rank_provider: MarketRankProvider | None = None,
+        execution_provider: ExecutionProvider | None = None,
         reset_state: bool = False,
     ) -> None:
         self.cfg = cfg or RuntimeConfig()
@@ -52,9 +58,9 @@ class MultiAgentTradeBot:
             self.state = RuntimeState(cash=self.cfg.initial_cash)
         self.bus = EventBus()
 
-        rank_provider = build_market_rank_provider(self.cfg)
-        data_provider = build_market_data_provider(self.cfg)
-        execution_provider = build_execution_provider(self.cfg)
+        rank_provider = market_rank_provider or build_market_rank_provider(self.cfg)
+        data_provider = market_data_provider or build_market_data_provider(self.cfg)
+        exec_provider = execution_provider or build_execution_provider(self.cfg)
 
         self.selector = UnifiedSelectorAgent(self.cfg, provider=rank_provider)
         self.data_agent = DataAgent(provider=data_provider)
@@ -67,7 +73,7 @@ class MultiAgentTradeBot:
         self.portfolio_agent = OpportunityRankerAgent()
         self.risk_agent = RiskAuditAgent(self.cfg)
         self.exec_planner = ExecutionPlannerAgent()
-        self.exec_agent = ExecutionAgent(provider=execution_provider)
+        self.exec_agent = ExecutionAgent(provider=exec_provider)
         self.post_trade_agent = PostTradeAgent()
 
     async def _analyze_symbol(self, *, trace_id: str, symbol: str, rank: int) -> ProposedAction:
