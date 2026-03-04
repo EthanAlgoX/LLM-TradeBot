@@ -1,0 +1,940 @@
+{
+  "mode": "backtest_csv",
+  "report": {
+    "dataset_path": "data/real_3d_1h_binance.csv",
+    "symbols": [
+      "BTCUSDT",
+      "ETHUSDT",
+      "SOLUSDT"
+    ],
+    "steps": 72,
+    "start_ts": "2026-03-01T20:00:00+00:00",
+    "end_ts": "2026-03-04T19:00:00+00:00",
+    "initial_cash": 100000.0,
+    "final_cash": 99894.436882,
+    "total_return_pct": -0.105563,
+    "realized_pnl": -105.563118,
+    "fee_bps": 3.0,
+    "slippage_bps": 1.0,
+    "total_fees": 21.684346,
+    "closed_trades": 18,
+    "wins": 6,
+    "losses": 12,
+    "win_rate": 33.333333,
+    "avg_pnl_per_trade": -5.264571,
+    "expectancy": -5.264571,
+    "profit_factor": 0.800055,
+    "sharpe": -0.354539,
+    "max_drawdown_pct": 0.372895,
+    "sharpe_equity": -0.307992,
+    "max_drawdown_equity_pct": 0.4746,
+    "unrealized_pnl": 0.0,
+    "final_equity": 99894.436882,
+    "open_positions_end": 0,
+    "forced_close_count": 2,
+    "cycle_status_counts": {
+      "wait": 43,
+      "success": 29
+    }
+  },
+  "equity_curve": [
+    {
+      "cycle": 0,
+      "cash": 100000.0
+    },
+    {
+      "cycle": 1,
+      "cash": 100000.0
+    },
+    {
+      "cycle": 2,
+      "cash": 100000.0
+    },
+    {
+      "cycle": 3,
+      "cash": 100000.0
+    },
+    {
+      "cycle": 4,
+      "cash": 100000.0
+    },
+    {
+      "cycle": 5,
+      "cash": 99999.39994
+    },
+    {
+      "cycle": 6,
+      "cash": 99998.79988
+    },
+    {
+      "cycle": 7,
+      "cash": 99998.79988
+    },
+    {
+      "cycle": 8,
+      "cash": 99998.19982000001
+    },
+    {
+      "cycle": 9,
+      "cash": 99998.19982000001
+    },
+    {
+      "cycle": 10,
+      "cash": 99998.19982000001
+    },
+    {
+      "cycle": 11,
+      "cash": 99998.19982000001
+    },
+    {
+      "cycle": 12,
+      "cash": 99998.19982000001
+    },
+    {
+      "cycle": 13,
+      "cash": 99998.19982000001
+    },
+    {
+      "cycle": 14,
+      "cash": 99998.19982000001
+    },
+    {
+      "cycle": 15,
+      "cash": 99971.31265144203
+    },
+    {
+      "cycle": 16,
+      "cash": 99953.14117812229
+    },
+    {
+      "cycle": 17,
+      "cash": 99953.14117812229
+    },
+    {
+      "cycle": 18,
+      "cash": 99910.98221413868
+    },
+    {
+      "cycle": 19,
+      "cash": 99910.38215413869
+    },
+    {
+      "cycle": 20,
+      "cash": 99909.78209413869
+    },
+    {
+      "cycle": 21,
+      "cash": 99909.78209413869
+    },
+    {
+      "cycle": 22,
+      "cash": 99909.78209413869
+    },
+    {
+      "cycle": 23,
+      "cash": 99909.78209413869
+    },
+    {
+      "cycle": 24,
+      "cash": 99909.78209413869
+    },
+    {
+      "cycle": 25,
+      "cash": 99909.78209413869
+    },
+    {
+      "cycle": 26,
+      "cash": 99995.56913348753
+    },
+    {
+      "cycle": 27,
+      "cash": 99994.96907348753
+    },
+    {
+      "cycle": 28,
+      "cash": 99994.96907348753
+    },
+    {
+      "cycle": 29,
+      "cash": 100050.54407112274
+    },
+    {
+      "cycle": 30,
+      "cash": 100038.39669936844
+    },
+    {
+      "cycle": 31,
+      "cash": 100037.79663936845
+    },
+    {
+      "cycle": 32,
+      "cash": 100037.79663936845
+    },
+    {
+      "cycle": 33,
+      "cash": 100037.79663936845
+    },
+    {
+      "cycle": 34,
+      "cash": 100037.79663936845
+    },
+    {
+      "cycle": 35,
+      "cash": 100037.79663936845
+    },
+    {
+      "cycle": 36,
+      "cash": 100037.79663936845
+    },
+    {
+      "cycle": 37,
+      "cash": 99950.90244809771
+    },
+    {
+      "cycle": 38,
+      "cash": 99950.90244809771
+    },
+    {
+      "cycle": 39,
+      "cash": 99950.90244809771
+    },
+    {
+      "cycle": 40,
+      "cash": 99891.69520424615
+    },
+    {
+      "cycle": 41,
+      "cash": 99858.0555492558
+    },
+    {
+      "cycle": 42,
+      "cash": 99858.0555492558
+    },
+    {
+      "cycle": 43,
+      "cash": 99858.0555492558
+    },
+    {
+      "cycle": 44,
+      "cash": 99857.45548925581
+    },
+    {
+      "cycle": 45,
+      "cash": 99857.45548925581
+    },
+    {
+      "cycle": 46,
+      "cash": 99856.85542925581
+    },
+    {
+      "cycle": 47,
+      "cash": 99856.25536925581
+    },
+    {
+      "cycle": 48,
+      "cash": 99856.25536925581
+    },
+    {
+      "cycle": 49,
+      "cash": 99856.25536925581
+    },
+    {
+      "cycle": 50,
+      "cash": 99842.95452413557
+    },
+    {
+      "cycle": 51,
+      "cash": 99842.35458413557
+    },
+    {
+      "cycle": 52,
+      "cash": 99842.35458413557
+    },
+    {
+      "cycle": 53,
+      "cash": 99842.35458413557
+    },
+    {
+      "cycle": 54,
+      "cash": 99861.59694160019
+    },
+    {
+      "cycle": 55,
+      "cash": 99861.59694160019
+    },
+    {
+      "cycle": 56,
+      "cash": 99860.99700160019
+    },
+    {
+      "cycle": 57,
+      "cash": 99860.2312971081
+    },
+    {
+      "cycle": 58,
+      "cash": 99860.2312971081
+    },
+    {
+      "cycle": 59,
+      "cash": 99860.2312971081
+    },
+    {
+      "cycle": 60,
+      "cash": 99860.2312971081
+    },
+    {
+      "cycle": 61,
+      "cash": 99678.6609575483
+    },
+    {
+      "cycle": 62,
+      "cash": 99678.0608975483
+    },
+    {
+      "cycle": 63,
+      "cash": 99677.46083754831
+    },
+    {
+      "cycle": 64,
+      "cash": 99677.46083754831
+    },
+    {
+      "cycle": 65,
+      "cash": 99677.46083754831
+    },
+    {
+      "cycle": 66,
+      "cash": 99677.46083754831
+    },
+    {
+      "cycle": 67,
+      "cash": 99677.46083754831
+    },
+    {
+      "cycle": 68,
+      "cash": 99677.46083754831
+    },
+    {
+      "cycle": 69,
+      "cash": 99677.46083754831
+    },
+    {
+      "cycle": 70,
+      "cash": 99677.46083754831
+    },
+    {
+      "cycle": 71,
+      "cash": 99734.85447789614
+    },
+    {
+      "cycle": 72,
+      "cash": 99894.43688166235
+    }
+  ],
+  "equity_curve_mtm": [
+    {
+      "cycle": 0,
+      "equity": 100000.0
+    },
+    {
+      "cycle": 1,
+      "equity": 100000.0
+    },
+    {
+      "cycle": 2,
+      "equity": 100000.0
+    },
+    {
+      "cycle": 3,
+      "equity": 100000.0
+    },
+    {
+      "cycle": 4,
+      "equity": 100000.0
+    },
+    {
+      "cycle": 5,
+      "equity": 99999.19994
+    },
+    {
+      "cycle": 6,
+      "equity": 99989.6888735256
+    },
+    {
+      "cycle": 7,
+      "equity": 99970.10522813284
+    },
+    {
+      "cycle": 8,
+      "equity": 100001.34726736881
+    },
+    {
+      "cycle": 9,
+      "equity": 99991.73779215437
+    },
+    {
+      "cycle": 10,
+      "equity": 99983.95333063033
+    },
+    {
+      "cycle": 11,
+      "equity": 99916.81206371471
+    },
+    {
+      "cycle": 12,
+      "equity": 99902.19221398546
+    },
+    {
+      "cycle": 13,
+      "equity": 99929.81359131637
+    },
+    {
+      "cycle": 14,
+      "equity": 99929.71551071109
+    },
+    {
+      "cycle": 15,
+      "equity": 99943.79708906604
+    },
+    {
+      "cycle": 16,
+      "equity": 99939.04396323263
+    },
+    {
+      "cycle": 17,
+      "equity": 99921.99380726088
+    },
+    {
+      "cycle": 18,
+      "equity": 99891.22347830088
+    },
+    {
+      "cycle": 19,
+      "equity": 99951.96187983935
+    },
+    {
+      "cycle": 20,
+      "equity": 100094.41532782179
+    },
+    {
+      "cycle": 21,
+      "equity": 100122.34013919809
+    },
+    {
+      "cycle": 22,
+      "equity": 100062.52090009465
+    },
+    {
+      "cycle": 23,
+      "equity": 100034.52376511767
+    },
+    {
+      "cycle": 24,
+      "equity": 100059.05612961961
+    },
+    {
+      "cycle": 25,
+      "equity": 100051.47580806779
+    },
+    {
+      "cycle": 26,
+      "equity": 100067.4909692998
+    },
+    {
+      "cycle": 27,
+      "equity": 100079.04811138325
+    },
+    {
+      "cycle": 28,
+      "equity": 100003.13679409098
+    },
+    {
+      "cycle": 29,
+      "equity": 100023.37954453497
+    },
+    {
+      "cycle": 30,
+      "equity": 99995.25971368988
+    },
+    {
+      "cycle": 31,
+      "equity": 99989.46413242079
+    },
+    {
+      "cycle": 32,
+      "equity": 99982.57758153703
+    },
+    {
+      "cycle": 33,
+      "equity": 99956.45068177296
+    },
+    {
+      "cycle": 34,
+      "equity": 99943.34006482188
+    },
+    {
+      "cycle": 35,
+      "equity": 99954.85867838134
+    },
+    {
+      "cycle": 36,
+      "equity": 99948.19840735912
+    },
+    {
+      "cycle": 37,
+      "equity": 99840.39909993805
+    },
+    {
+      "cycle": 38,
+      "equity": 99828.05512001991
+    },
+    {
+      "cycle": 39,
+      "equity": 99840.73972422171
+    },
+    {
+      "cycle": 40,
+      "equity": 99848.325198069
+    },
+    {
+      "cycle": 41,
+      "equity": 99858.0555492558
+    },
+    {
+      "cycle": 42,
+      "equity": 99858.0555492558
+    },
+    {
+      "cycle": 43,
+      "equity": 99858.0555492558
+    },
+    {
+      "cycle": 44,
+      "equity": 99857.25548925581
+    },
+    {
+      "cycle": 45,
+      "equity": 99870.40022464008
+    },
+    {
+      "cycle": 46,
+      "equity": 99873.82810717434
+    },
+    {
+      "cycle": 47,
+      "equity": 99890.09037698568
+    },
+    {
+      "cycle": 48,
+      "equity": 99874.82112495859
+    },
+    {
+      "cycle": 49,
+      "equity": 99856.71487166798
+    },
+    {
+      "cycle": 50,
+      "equity": 99844.61852010929
+    },
+    {
+      "cycle": 51,
+      "equity": 99879.82301875169
+    },
+    {
+      "cycle": 52,
+      "equity": 99896.88893385507
+    },
+    {
+      "cycle": 53,
+      "equity": 99888.50716260338
+    },
+    {
+      "cycle": 54,
+      "equity": 99906.65090714679
+    },
+    {
+      "cycle": 55,
+      "equity": 99904.65805427231
+    },
+    {
+      "cycle": 56,
+      "equity": 99891.82541846596
+    },
+    {
+      "cycle": 57,
+      "equity": 99881.63236893939
+    },
+    {
+      "cycle": 58,
+      "equity": 99858.26427759412
+    },
+    {
+      "cycle": 59,
+      "equity": 99840.1796977265
+    },
+    {
+      "cycle": 60,
+      "equity": 99784.15984422978
+    },
+    {
+      "cycle": 61,
+      "equity": 99678.4609575483
+    },
+    {
+      "cycle": 62,
+      "equity": 99695.49813277685
+    },
+    {
+      "cycle": 63,
+      "equity": 99681.29582532535
+    },
+    {
+      "cycle": 64,
+      "equity": 99649.27462123503
+    },
+    {
+      "cycle": 65,
+      "equity": 99647.15994726228
+    },
+    {
+      "cycle": 66,
+      "equity": 99673.1509100208
+    },
+    {
+      "cycle": 67,
+      "equity": 99696.14730998216
+    },
+    {
+      "cycle": 68,
+      "equity": 99874.48846854344
+    },
+    {
+      "cycle": 69,
+      "equity": 99832.51362524515
+    },
+    {
+      "cycle": 70,
+      "equity": 99834.55081136742
+    },
+    {
+      "cycle": 71,
+      "equity": 99882.15024356516
+    },
+    {
+      "cycle": 72,
+      "equity": 99894.43688166235
+    }
+  ],
+  "last_cycle": {
+    "cycle": 72,
+    "trace_id": "cycle:72:20260304T191230Z",
+    "status": "success",
+    "action": "close_long"
+  },
+  "forced_closes": [
+    {
+      "symbol": "ETHUSDT",
+      "action": "close_long",
+      "status": "success",
+      "message": "backtest close net_pnl=98.954273",
+      "price": 2175.3
+    },
+    {
+      "symbol": "SOLUSDT",
+      "action": "close_long",
+      "status": "success",
+      "message": "backtest close net_pnl=-0.999940",
+      "price": 92.5
+    }
+  ],
+  "trades": [
+    {
+      "cycle": 5,
+      "symbol": "SOLUSDT",
+      "action": "open_long",
+      "qty": 23.543260741612713,
+      "price": 84.958495,
+      "pnl": -0.6000599999999999
+    },
+    {
+      "cycle": 6,
+      "symbol": "ETHUSDT",
+      "action": "open_long",
+      "qty": 1.018936943087277,
+      "price": 1963.026283,
+      "pnl": -0.6000599999999999
+    },
+    {
+      "cycle": 8,
+      "symbol": "BTCUSDT",
+      "action": "open_long",
+      "qty": 0.0299458130512837,
+      "price": 66793.97873,
+      "pnl": -0.60006
+    },
+    {
+      "cycle": 15,
+      "symbol": "SOLUSDT",
+      "action": "close_long",
+      "qty": 23.543260741612713,
+      "price": 83.84161499999999,
+      "pnl": -26.887168557975492
+    },
+    {
+      "cycle": 16,
+      "symbol": "ETHUSDT",
+      "action": "close_long",
+      "qty": 1.018936943087277,
+      "price": 1946.365344,
+      "pnl": -17.571413319747375
+    },
+    {
+      "cycle": 16,
+      "symbol": "SOLUSDT",
+      "action": "open_long",
+      "qty": 23.85211687537269,
+      "price": 83.858385,
+      "pnl": -0.60006
+    },
+    {
+      "cycle": 18,
+      "symbol": "BTCUSDT",
+      "action": "close_long",
+      "qty": 0.0299458130512837,
+      "price": 65405.75877,
+      "pnl": -42.15896398360174
+    },
+    {
+      "cycle": 19,
+      "symbol": "ETHUSDT",
+      "action": "open_long",
+      "qty": 1.010851490753236,
+      "price": 1978.7278529999999,
+      "pnl": -0.6000599999999999
+    },
+    {
+      "cycle": 20,
+      "symbol": "BTCUSDT",
+      "action": "open_long",
+      "qty": 0.028948126404888756,
+      "price": 69096.00891,
+      "pnl": -0.6000599999999999
+    },
+    {
+      "cycle": 26,
+      "symbol": "SOLUSDT",
+      "action": "close_long",
+      "qty": 23.85211687537269,
+      "price": 87.481251,
+      "pnl": 85.78703934883725
+    },
+    {
+      "cycle": 27,
+      "symbol": "SOLUSDT",
+      "action": "open_long",
+      "qty": 22.732439190725163,
+      "price": 87.988798,
+      "pnl": -0.6000599999999999
+    },
+    {
+      "cycle": 29,
+      "symbol": "ETHUSDT",
+      "action": "close_long",
+      "qty": 1.010851490753236,
+      "price": 2034.316548,
+      "pnl": 55.57499763521417
+    },
+    {
+      "cycle": 30,
+      "symbol": "BTCUSDT",
+      "action": "close_long",
+      "qty": 0.028948126404888756,
+      "price": 68717.72754,
+      "pnl": -11.547311754299793
+    },
+    {
+      "cycle": 30,
+      "symbol": "ETHUSDT",
+      "action": "open_long",
+      "qty": 0.9906531871789666,
+      "price": 2019.0718869999998,
+      "pnl": -0.60006
+    },
+    {
+      "cycle": 31,
+      "symbol": "BTCUSDT",
+      "action": "open_long",
+      "qty": 0.02920641781825138,
+      "price": 68484.94781,
+      "pnl": -0.6000599999999999
+    },
+    {
+      "cycle": 37,
+      "symbol": "SOLUSDT",
+      "action": "close_long",
+      "qty": 22.732439190725163,
+      "price": 84.19158,
+      "pnl": -86.89419127074336
+    },
+    {
+      "cycle": 40,
+      "symbol": "ETHUSDT",
+      "action": "close_long",
+      "qty": 0.9906531871789666,
+      "price": 1959.893991,
+      "pnl": -59.207243851560456
+    },
+    {
+      "cycle": 41,
+      "symbol": "BTCUSDT",
+      "action": "close_long",
+      "qty": 0.02920641781825138,
+      "price": 67353.36399000001,
+      "pnl": -33.639654990339544
+    },
+    {
+      "cycle": 44,
+      "symbol": "BTCUSDT",
+      "action": "open_long",
+      "qty": 0.029545370609742588,
+      "price": 67699.26925,
+      "pnl": -0.60006
+    },
+    {
+      "cycle": 46,
+      "symbol": "ETHUSDT",
+      "action": "open_long",
+      "qty": 1.0103306306988962,
+      "price": 1979.7479549999998,
+      "pnl": -0.6000599999999999
+    },
+    {
+      "cycle": 47,
+      "symbol": "SOLUSDT",
+      "action": "open_long",
+      "qty": 23.432923257176334,
+      "price": 85.35853499999999,
+      "pnl": -0.6000599999999999
+    },
+    {
+      "cycle": 50,
+      "symbol": "ETHUSDT",
+      "action": "close_long",
+      "qty": 1.0103306306988962,
+      "price": 1967.173263,
+      "pnl": -13.300845120254515
+    },
+    {
+      "cycle": 51,
+      "symbol": "ETHUSDT",
+      "action": "open_short",
+      "qty": 1.0088883059756453,
+      "price": 1982.1817620000002,
+      "pnl": -0.5999399999999999
+    },
+    {
+      "cycle": 54,
+      "symbol": "BTCUSDT",
+      "action": "close_long",
+      "qty": 0.029545370609742588,
+      "price": 68371.06220999999,
+      "pnl": 19.242357464622867
+    },
+    {
+      "cycle": 56,
+      "symbol": "BTCUSDT",
+      "action": "open_short",
+      "qty": 0.029542053852209964,
+      "price": 67693.32999000001,
+      "pnl": -0.59994
+    },
+    {
+      "cycle": 57,
+      "symbol": "SOLUSDT",
+      "action": "close_long",
+      "qty": 23.432923257176334,
+      "price": 85.351464,
+      "pnl": -0.7657044920909681
+    },
+    {
+      "cycle": 61,
+      "symbol": "ETHUSDT",
+      "action": "close_short",
+      "qty": 1.0088883059756453,
+      "price": 2063.466326,
+      "pnl": -82.63158818975175
+    },
+    {
+      "cycle": 61,
+      "symbol": "BTCUSDT",
+      "action": "close_short",
+      "qty": 0.029542053852209964,
+      "price": 71000.79937,
+      "pnl": -98.33869137005647
+    },
+    {
+      "cycle": 61,
+      "symbol": "SOLUSDT",
+      "action": "open_long",
+      "qty": 22.29654403567447,
+      "price": 89.70897000000001,
+      "pnl": -0.60006
+    },
+    {
+      "cycle": 62,
+      "symbol": "BTCUSDT",
+      "action": "open_long",
+      "qty": 0.02797707558426625,
+      "price": 71494.24871,
+      "pnl": -0.6000599999999999
+    },
+    {
+      "cycle": 63,
+      "symbol": "ETHUSDT",
+      "action": "open_long",
+      "qty": 0.9653814221999113,
+      "price": 2071.9271719999997,
+      "pnl": -0.60006
+    },
+    {
+      "cycle": 71,
+      "symbol": "SOLUSDT",
+      "action": "close_long",
+      "qty": 22.29654403567447,
+      "price": 92.310768,
+      "pnl": 57.393640347825816
+    },
+    {
+      "cycle": 72,
+      "symbol": "BTCUSDT",
+      "action": "close_long",
+      "qty": 0.02797707558426625,
+      "price": 73740.6252,
+      "pnl": 62.22813073799315
+    },
+    {
+      "cycle": 72,
+      "symbol": "SOLUSDT",
+      "action": "open_long",
+      "qty": 21.62162162162162,
+      "price": 92.50925,
+      "pnl": -0.6000599999999999
+    },
+    {
+      "cycle": 72,
+      "symbol": "ETHUSDT",
+      "action": "close_long",
+      "qty": 0.9653814221999113,
+      "price": 2175.0824700000003,
+      "pnl": 98.95427302820902
+    },
+    {
+      "cycle": 72,
+      "symbol": "SOLUSDT",
+      "action": "close_long",
+      "qty": 21.62162162162162,
+      "price": 92.49075,
+      "pnl": -0.999939999999759
+    }
+  ]
+}

@@ -1,0 +1,384 @@
+{
+  "mode": "backtest_grid",
+  "dataset_path": "data/real_3d_1h_binance.csv",
+  "symbols": [
+    "BTCUSDT",
+    "ETHUSDT",
+    "SOLUSDT"
+  ],
+  "steps": 72,
+  "rank_by": "max_drawdown_pct",
+  "rank_order": "asc",
+  "runs": 12,
+  "results": [
+    {
+      "fee_bps": 0.0,
+      "slippage_bps": 0.0,
+      "final_cash": 99923.349343,
+      "total_return_pct": -0.076651,
+      "realized_pnl": -76.650657,
+      "total_fees": 0.0,
+      "closed_trades": 18,
+      "profit_factor": 0.834168,
+      "sharpe": -0.256826,
+      "max_drawdown_pct": 0.357869,
+      "win_rate": 38.888889
+    },
+    {
+      "fee_bps": 0.0,
+      "slippage_bps": 1.0,
+      "final_cash": 99916.121228,
+      "total_return_pct": -0.083879,
+      "realized_pnl": -83.878772,
+      "total_fees": 0.0,
+      "closed_trades": 18,
+      "profit_factor": 0.820301,
+      "sharpe": -0.281304,
+      "max_drawdown_pct": 0.361474,
+      "win_rate": 33.333333
+    },
+    {
+      "fee_bps": 1.0,
+      "slippage_bps": 0.0,
+      "final_cash": 99916.121228,
+      "total_return_pct": -0.083879,
+      "realized_pnl": -83.878772,
+      "total_fees": 7.228115,
+      "closed_trades": 18,
+      "profit_factor": 0.827138,
+      "sharpe": -0.281231,
+      "max_drawdown_pct": 0.361676,
+      "win_rate": 38.888889
+    },
+    {
+      "fee_bps": 0.0,
+      "slippage_bps": 2.0,
+      "final_cash": 99908.893113,
+      "total_return_pct": -0.091107,
+      "realized_pnl": -91.106887,
+      "total_fees": 0.0,
+      "closed_trades": 18,
+      "profit_factor": 0.806798,
+      "sharpe": -0.305789,
+      "max_drawdown_pct": 0.36508,
+      "win_rate": 33.333333
+    },
+    {
+      "fee_bps": 1.0,
+      "slippage_bps": 1.0,
+      "final_cash": 99908.893113,
+      "total_return_pct": -0.091107,
+      "realized_pnl": -91.106887,
+      "total_fees": 7.228115,
+      "closed_trades": 18,
+      "profit_factor": 0.813484,
+      "sharpe": -0.305715,
+      "max_drawdown_pct": 0.365281,
+      "win_rate": 33.333333
+    },
+    {
+      "fee_bps": 1.0,
+      "slippage_bps": 2.0,
+      "final_cash": 99901.664997,
+      "total_return_pct": -0.098335,
+      "realized_pnl": -98.335003,
+      "total_fees": 7.228116,
+      "closed_trades": 18,
+      "profit_factor": 0.800119,
+      "sharpe": -0.330206,
+      "max_drawdown_pct": 0.368886,
+      "win_rate": 33.333333
+    },
+    {
+      "fee_bps": 3.0,
+      "slippage_bps": 0.0,
+      "final_cash": 99901.664999,
+      "total_return_pct": -0.098335,
+      "realized_pnl": -98.335001,
+      "total_fees": 21.684344,
+      "closed_trades": 18,
+      "profit_factor": 0.813419,
+      "sharpe": -0.330045,
+      "max_drawdown_pct": 0.369289,
+      "win_rate": 33.333333
+    },
+    {
+      "fee_bps": 3.0,
+      "slippage_bps": 1.0,
+      "final_cash": 99894.436882,
+      "total_return_pct": -0.105563,
+      "realized_pnl": -105.563118,
+      "total_fees": 21.684346,
+      "closed_trades": 18,
+      "profit_factor": 0.800055,
+      "sharpe": -0.354539,
+      "max_drawdown_pct": 0.372895,
+      "win_rate": 33.333333
+    },
+    {
+      "fee_bps": 3.0,
+      "slippage_bps": 2.0,
+      "final_cash": 99887.208765,
+      "total_return_pct": -0.112791,
+      "realized_pnl": -112.791235,
+      "total_fees": 21.684349,
+      "closed_trades": 18,
+      "profit_factor": 0.786959,
+      "sharpe": -0.379036,
+      "max_drawdown_pct": 0.376501,
+      "win_rate": 33.333333
+    },
+    {
+      "fee_bps": 5.0,
+      "slippage_bps": 0.0,
+      "final_cash": 99887.208769,
+      "total_return_pct": -0.112791,
+      "realized_pnl": -112.791231,
+      "total_fees": 36.140573,
+      "closed_trades": 18,
+      "profit_factor": 0.79999,
+      "sharpe": -0.378857,
+      "max_drawdown_pct": 0.376903,
+      "win_rate": 33.333333
+    },
+    {
+      "fee_bps": 5.0,
+      "slippage_bps": 1.0,
+      "final_cash": 99879.980651,
+      "total_return_pct": -0.120019,
+      "realized_pnl": -120.019349,
+      "total_fees": 36.140577,
+      "closed_trades": 18,
+      "profit_factor": 0.786895,
+      "sharpe": -0.403355,
+      "max_drawdown_pct": 0.380509,
+      "win_rate": 33.333333
+    },
+    {
+      "fee_bps": 5.0,
+      "slippage_bps": 2.0,
+      "final_cash": 99872.752532,
+      "total_return_pct": -0.127247,
+      "realized_pnl": -127.247468,
+      "total_fees": 36.140581,
+      "closed_trades": 18,
+      "profit_factor": 0.774059,
+      "sharpe": -0.427851,
+      "max_drawdown_pct": 0.384115,
+      "win_rate": 33.333333
+    }
+  ],
+  "best": {
+    "fee_bps": 0.0,
+    "slippage_bps": 0.0,
+    "final_cash": 99923.349343,
+    "total_return_pct": -0.076651,
+    "realized_pnl": -76.650657,
+    "total_fees": 0.0,
+    "closed_trades": 18,
+    "profit_factor": 0.834168,
+    "sharpe": -0.256826,
+    "max_drawdown_pct": 0.357869,
+    "win_rate": 38.888889
+  },
+  "analysis": {
+    "top_results": [
+      {
+        "fee_bps": 0.0,
+        "slippage_bps": 0.0,
+        "final_cash": 99923.349343,
+        "total_return_pct": -0.076651,
+        "realized_pnl": -76.650657,
+        "total_fees": 0.0,
+        "closed_trades": 18,
+        "profit_factor": 0.834168,
+        "sharpe": -0.256826,
+        "max_drawdown_pct": 0.357869,
+        "win_rate": 38.888889
+      },
+      {
+        "fee_bps": 0.0,
+        "slippage_bps": 1.0,
+        "final_cash": 99916.121228,
+        "total_return_pct": -0.083879,
+        "realized_pnl": -83.878772,
+        "total_fees": 0.0,
+        "closed_trades": 18,
+        "profit_factor": 0.820301,
+        "sharpe": -0.281304,
+        "max_drawdown_pct": 0.361474,
+        "win_rate": 33.333333
+      },
+      {
+        "fee_bps": 1.0,
+        "slippage_bps": 0.0,
+        "final_cash": 99916.121228,
+        "total_return_pct": -0.083879,
+        "realized_pnl": -83.878772,
+        "total_fees": 7.228115,
+        "closed_trades": 18,
+        "profit_factor": 0.827138,
+        "sharpe": -0.281231,
+        "max_drawdown_pct": 0.361676,
+        "win_rate": 38.888889
+      },
+      {
+        "fee_bps": 0.0,
+        "slippage_bps": 2.0,
+        "final_cash": 99908.893113,
+        "total_return_pct": -0.091107,
+        "realized_pnl": -91.106887,
+        "total_fees": 0.0,
+        "closed_trades": 18,
+        "profit_factor": 0.806798,
+        "sharpe": -0.305789,
+        "max_drawdown_pct": 0.36508,
+        "win_rate": 33.333333
+      },
+      {
+        "fee_bps": 1.0,
+        "slippage_bps": 1.0,
+        "final_cash": 99908.893113,
+        "total_return_pct": -0.091107,
+        "realized_pnl": -91.106887,
+        "total_fees": 7.228115,
+        "closed_trades": 18,
+        "profit_factor": 0.813484,
+        "sharpe": -0.305715,
+        "max_drawdown_pct": 0.365281,
+        "win_rate": 33.333333
+      }
+    ],
+    "best_result": {
+      "fee_bps": 0.0,
+      "slippage_bps": 0.0,
+      "final_cash": 99923.349343,
+      "total_return_pct": -0.076651,
+      "realized_pnl": -76.650657,
+      "total_fees": 0.0,
+      "closed_trades": 18,
+      "profit_factor": 0.834168,
+      "sharpe": -0.256826,
+      "max_drawdown_pct": 0.357869,
+      "win_rate": 38.888889
+    },
+    "worst_result": {
+      "fee_bps": 5.0,
+      "slippage_bps": 2.0,
+      "final_cash": 99872.752532,
+      "total_return_pct": -0.127247,
+      "realized_pnl": -127.247468,
+      "total_fees": 36.140581,
+      "closed_trades": 18,
+      "profit_factor": 0.774059,
+      "sharpe": -0.427851,
+      "max_drawdown_pct": 0.384115,
+      "win_rate": 33.333333
+    },
+    "constraint": {
+      "max_drawdown_pct": null,
+      "min_closed_trades": null
+    },
+    "ranking": {
+      "rank_by": "max_drawdown_pct"
+    },
+    "constrained_count": 12,
+    "constrained_best_result": {
+      "fee_bps": 0.0,
+      "slippage_bps": 0.0,
+      "final_cash": 99923.349343,
+      "total_return_pct": -0.076651,
+      "realized_pnl": -76.650657,
+      "total_fees": 0.0,
+      "closed_trades": 18,
+      "profit_factor": 0.834168,
+      "sharpe": -0.256826,
+      "max_drawdown_pct": 0.357869,
+      "win_rate": 38.888889
+    },
+    "spread_final_cash": 50.596811,
+    "fee_sensitivity": [
+      {
+        "fee_bps": 0.0,
+        "runs": 3,
+        "avg_final_cash": 99916.121228,
+        "avg_return_pct": -0.083879,
+        "avg_max_drawdown_pct": 0.361474
+      },
+      {
+        "fee_bps": 1.0,
+        "runs": 3,
+        "avg_final_cash": 99908.893113,
+        "avg_return_pct": -0.091107,
+        "avg_max_drawdown_pct": 0.365281
+      },
+      {
+        "fee_bps": 3.0,
+        "runs": 3,
+        "avg_final_cash": 99894.436882,
+        "avg_return_pct": -0.105563,
+        "avg_max_drawdown_pct": 0.372895
+      },
+      {
+        "fee_bps": 5.0,
+        "runs": 3,
+        "avg_final_cash": 99879.980651,
+        "avg_return_pct": -0.120019,
+        "avg_max_drawdown_pct": 0.380509
+      }
+    ],
+    "slippage_sensitivity": [
+      {
+        "slippage_bps": 0.0,
+        "runs": 4,
+        "avg_final_cash": 99907.086085,
+        "avg_return_pct": -0.092914,
+        "avg_max_drawdown_pct": 0.366434
+      },
+      {
+        "slippage_bps": 1.0,
+        "runs": 4,
+        "avg_final_cash": 99899.857969,
+        "avg_return_pct": -0.100142,
+        "avg_max_drawdown_pct": 0.37004
+      },
+      {
+        "slippage_bps": 2.0,
+        "runs": 4,
+        "avg_final_cash": 99892.629852,
+        "avg_return_pct": -0.10737,
+        "avg_max_drawdown_pct": 0.373645
+      }
+    ],
+    "recommendations": {
+      "recommended_params": {
+        "fee_bps": 0.0,
+        "slippage_bps": 0.0
+      },
+      "cost_tolerance": {
+        "max_fee_bps_non_negative_return": null,
+        "max_slippage_bps_non_negative_return": null
+      },
+      "conservative_params": {
+        "fee_bps": 0.0,
+        "slippage_bps": 0.0
+      },
+      "command_templates": [
+        {
+          "name": "recommended_run",
+          "command": "tradebot --backtest-csv \"data/real_3d_1h_binance.csv\" --backtest-symbols BTCUSDT,ETHUSDT,SOLUSDT --backtest-max-steps 72 --backtest-fee-bps 0.0 --backtest-slippage-bps 0.0 --pretty"
+        },
+        {
+          "name": "conservative_run",
+          "command": "tradebot --backtest-csv \"data/real_3d_1h_binance.csv\" --backtest-symbols BTCUSDT,ETHUSDT,SOLUSDT --backtest-max-steps 72 --backtest-fee-bps 0.0 --backtest-slippage-bps 0.0 --pretty"
+        }
+      ],
+      "notes": [
+        "best final_cash spread versus worst is 50.596811",
+        "drawdown cap for conservative candidate is 1.0%",
+        "all fee buckets show negative average return",
+        "all slippage buckets show negative average return"
+      ]
+    }
+  }
+}
