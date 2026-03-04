@@ -72,8 +72,19 @@ def test_backtest_runner_outputs_report(tmp_path):
     assert "sharpe" in report
     assert "final_cash" in report
     assert "max_drawdown_pct" in report
+    assert "sharpe_equity" in report
+    assert "max_drawdown_equity_pct" in report
+    assert "unrealized_pnl" in report
+    assert "final_equity" in report
+    assert "open_positions_end" in report
+    assert "forced_close_count" in report
     assert "cycle_status_counts" in report
     assert "equity_curve" in out
+    assert "equity_curve_mtm" in out
+    assert len(out["equity_curve"]) == len(out["equity_curve_mtm"])
+    assert "forced_closes" in out
+    assert report["open_positions_end"] == 0
+    assert report["final_equity"] == pytest.approx(report["final_cash"], rel=0, abs=1e-6)
     assert "trades" in out
     assert out["last_cycle"]["cycle"] == 30
 

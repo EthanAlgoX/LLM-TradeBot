@@ -131,6 +131,12 @@ class BacktestReport:
     profit_factor: float
     sharpe: float
     max_drawdown_pct: float
+    sharpe_equity: float
+    max_drawdown_equity_pct: float
+    unrealized_pnl: float
+    final_equity: float
+    open_positions_end: int
+    forced_close_count: int
     cycle_status_counts: dict[str, int]
 
     def to_dict(self) -> dict[str, object]:
@@ -156,6 +162,12 @@ class BacktestReport:
             "profit_factor": round(self.profit_factor, 6),
             "sharpe": round(self.sharpe, 6),
             "max_drawdown_pct": round(self.max_drawdown_pct, 6),
+            "sharpe_equity": round(self.sharpe_equity, 6),
+            "max_drawdown_equity_pct": round(self.max_drawdown_equity_pct, 6),
+            "unrealized_pnl": round(self.unrealized_pnl, 6),
+            "final_equity": round(self.final_equity, 6),
+            "open_positions_end": self.open_positions_end,
+            "forced_close_count": self.forced_close_count,
             "cycle_status_counts": self.cycle_status_counts,
         }
 
@@ -403,6 +415,54 @@ class BacktestRunner:
             cmd += f" --backtest-min-closed-trades {int(min_closed_trades)}"
         return cmd
 
+    def _dataset_close(self, symbol: str, cycle: int) -> float:
+        rows = self.dataset.bars_by_symbol.get(symbol)
+        if not rows:
+            return 0.0
+        idx = max(0, min(cycle - 1, self.dataset.steps - 1))
+        return float(rows[idx].close)
+
+    def _mark_to_market_equity(self, *, state: RuntimeState, cycle: int) -> float:
+        equity = float(state.cash)
+        for symbol, pos in state.positions.items():
+            px = self._dataset_close(symbol, cycle)
+            if px <= 0:
+                px = float(pos.entry_price)
+            sign = 1.0 if pos.side == "long" else -1.0
+            equity += (px - float(pos.entry_price)) * float(pos.qty) * sign
+        return equity
+
+    def _force_close_open_positions(self, *, state: RuntimeState, exec_provider: BacktestExecutionProvider) -> list[dict[str, object]]:
+        forced: list[dict[str, object]] = []
+        for symbol, pos in list(state.positions.items()):
+            final_price = self._dataset_close(symbol, self.dataset.steps)
+            action = "close_long" if pos.side == "long" else "close_short"
+            planned = ProposedAction(
+                schema_version=SCHEMA_V2,
+                trace_id=f"backtest:force_close:{state.cycle}:{symbol}",
+                symbol=symbol,
+                source="backtest_force_close",
+                action=action,
+                confidence=100.0,
+                reason="force close remaining position at backtest end",
+                order_params={
+                    "entry_price": final_price,
+                    "quantity": float(pos.qty),
+                    "leverage": float(pos.leverage),
+                },
+            )
+            result = exec_provider.execute(trace_id=planned.trace_id, planned=planned, state=state)
+            forced.append(
+                {
+                    "symbol": symbol,
+                    "action": action,
+                    "status": result.status,
+                    "message": result.message,
+                    "price": final_price,
+                }
+            )
+        return forced
+
     def _run_once(self, *, fee_bps: float, slippage_bps: float, include_trades: bool) -> dict[str, object]:
         cfg = copy.deepcopy(self.cfg)
         cfg.ai500_candidates = list(self.dataset.symbols)
@@ -419,6 +479,7 @@ class BacktestRunner:
 
         cycle_results: list[Any] = []
         cash_curve = [{"cycle": 0, "cash": bot.state.cash}]
+        equity_curve = [{"cycle": 0, "equity": bot.state.cash}]
         status_counts: dict[str, int] = {}
 
         for _ in range(self.dataset.steps):
@@ -426,7 +487,14 @@ class BacktestRunner:
             cycle_results.append(result)
             cash = float(result.details.get("cash", bot.state.cash))
             cash_curve.append({"cycle": result.cycle, "cash": cash})
+            equity_curve.append({"cycle": result.cycle, "equity": self._mark_to_market_equity(state=bot.state, cycle=result.cycle)})
             status_counts[result.status] = status_counts.get(result.status, 0) + 1
+
+        forced_closes = self._force_close_open_positions(state=bot.state, exec_provider=exec_provider)
+        if cash_curve:
+            cash_curve[-1]["cash"] = float(bot.state.cash)
+        if equity_curve:
+            equity_curve[-1]["equity"] = self._mark_to_market_equity(state=bot.state, cycle=bot.state.cycle)
 
         closed = [t for t in bot.state.trades if t.action in {"close_long", "close_short"}]
         wins = len([t for t in closed if t.pnl > 0])
@@ -454,6 +522,18 @@ class BacktestRunner:
             if vol > 0:
                 sharpe = mean(rets) / vol * (len(rets) ** 0.5)
 
+        eq_rets: list[float] = []
+        for i in range(1, len(equity_curve)):
+            prev_eq = float(equity_curve[i - 1]["equity"])
+            now_eq = float(equity_curve[i]["equity"])
+            if prev_eq > 0:
+                eq_rets.append((now_eq / prev_eq) - 1.0)
+        sharpe_equity = 0.0
+        if eq_rets:
+            vol_eq = pstdev(eq_rets)
+            if vol_eq > 0:
+                sharpe_equity = mean(eq_rets) / vol_eq * (len(eq_rets) ** 0.5)
+
         peak = float(cash_curve[0]["cash"])
         max_dd = 0.0
         for point in cash_curve:
@@ -462,6 +542,18 @@ class BacktestRunner:
             if peak > 0:
                 dd = (peak - x) / peak
                 max_dd = max(max_dd, dd)
+
+        peak_eq = float(equity_curve[0]["equity"])
+        max_dd_eq = 0.0
+        for point in equity_curve:
+            x = float(point["equity"])
+            peak_eq = max(peak_eq, x)
+            if peak_eq > 0:
+                dd_eq = (peak_eq - x) / peak_eq
+                max_dd_eq = max(max_dd_eq, dd_eq)
+
+        final_equity = self._mark_to_market_equity(state=bot.state, cycle=bot.state.cycle)
+        unrealized = final_equity - final_cash
 
         report = BacktestReport(
             dataset_path=self.dataset.source_path,
@@ -485,6 +577,12 @@ class BacktestRunner:
             profit_factor=profit_factor,
             sharpe=sharpe,
             max_drawdown_pct=max_dd * 100.0,
+            sharpe_equity=sharpe_equity,
+            max_drawdown_equity_pct=max_dd_eq * 100.0,
+            unrealized_pnl=unrealized,
+            final_equity=final_equity,
+            open_positions_end=len(bot.state.positions),
+            forced_close_count=len(forced_closes),
             cycle_status_counts=status_counts,
         )
 
@@ -492,12 +590,14 @@ class BacktestRunner:
             "mode": "backtest_csv",
             "report": report.to_dict(),
             "equity_curve": cash_curve,
+            "equity_curve_mtm": equity_curve,
             "last_cycle": {
                 "cycle": cycle_results[-1].cycle if cycle_results else 0,
                 "trace_id": cycle_results[-1].trace_id if cycle_results else "",
                 "status": cycle_results[-1].status if cycle_results else "",
                 "action": cycle_results[-1].action if cycle_results else "",
             },
+            "forced_closes": forced_closes,
         }
         if include_trades:
             payload["trades"] = [
