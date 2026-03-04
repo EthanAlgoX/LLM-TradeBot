@@ -377,6 +377,9 @@ def test_backtest_grid_runs_and_sorts(tmp_path):
     best_cash = float(out["results"][0]["final_cash"])
     worst_cash = float(out["results"][-1]["final_cash"])
     assert best_cash >= worst_cash
+    assert "partial_open_count" in out["results"][0]
+    assert "retried_open_count" in out["results"][0]
+    assert "rejected_open_count" in out["results"][0]
     analysis = out["analysis"]
     assert isinstance(analysis, dict)
     assert len(analysis["top_results"]) == 2

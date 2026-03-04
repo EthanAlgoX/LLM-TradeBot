@@ -22,7 +22,10 @@
       "profit_factor": 1.034683,
       "sharpe": 0.052904,
       "max_drawdown_pct": 0.294983,
-      "win_rate": 40.0
+      "win_rate": 40.0,
+      "partial_open_count": 0,
+      "retried_open_count": 0,
+      "rejected_open_count": 0
     },
     {
       "fee_bps": 0.0,
@@ -35,7 +38,10 @@
       "profit_factor": 1.014533,
       "sharpe": 0.023209,
       "max_drawdown_pct": 0.29937,
-      "win_rate": 40.0
+      "win_rate": 40.0,
+      "partial_open_count": 0,
+      "retried_open_count": 0,
+      "rejected_open_count": 0
     },
     {
       "fee_bps": 1.0,
@@ -48,7 +54,10 @@
       "profit_factor": 1.024512,
       "sharpe": 0.023219,
       "max_drawdown_pct": 0.299573,
-      "win_rate": 40.0
+      "win_rate": 40.0,
+      "partial_open_count": 0,
+      "retried_open_count": 0,
+      "rejected_open_count": 0
     },
     {
       "fee_bps": 0.0,
@@ -61,7 +70,10 @@
       "profit_factor": 0.994852,
       "sharpe": -0.006481,
       "max_drawdown_pct": 0.303757,
-      "win_rate": 40.0
+      "win_rate": 40.0,
+      "partial_open_count": 0,
+      "retried_open_count": 0,
+      "rejected_open_count": 0
     },
     {
       "fee_bps": 1.0,
@@ -74,7 +86,10 @@
       "profit_factor": 1.004599,
       "sharpe": -0.006486,
       "max_drawdown_pct": 0.30396,
-      "win_rate": 40.0
+      "win_rate": 40.0,
+      "partial_open_count": 0,
+      "retried_open_count": 0,
+      "rejected_open_count": 0
     },
     {
       "fee_bps": 1.0,
@@ -87,7 +102,10 @@
       "profit_factor": 0.985146,
       "sharpe": -0.036183,
       "max_drawdown_pct": 0.308348,
-      "win_rate": 40.0
+      "win_rate": 40.0,
+      "partial_open_count": 0,
+      "retried_open_count": 0,
+      "rejected_open_count": 0
     },
     {
       "fee_bps": 3.0,
@@ -100,7 +118,10 @@
       "profit_factor": 1.004525,
       "sharpe": -0.03622,
       "max_drawdown_pct": 0.308753,
-      "win_rate": 40.0
+      "win_rate": 40.0,
+      "partial_open_count": 0,
+      "retried_open_count": 0,
+      "rejected_open_count": 0
     },
     {
       "fee_bps": 3.0,
@@ -113,7 +134,10 @@
       "profit_factor": 0.985074,
       "sharpe": -0.065937,
       "max_drawdown_pct": 0.313141,
-      "win_rate": 40.0
+      "win_rate": 40.0,
+      "partial_open_count": 0,
+      "retried_open_count": 0,
+      "rejected_open_count": 0
     },
     {
       "fee_bps": 3.0,
@@ -126,7 +150,10 @@
       "profit_factor": 0.966066,
       "sharpe": -0.095641,
       "max_drawdown_pct": 0.317529,
-      "win_rate": 40.0
+      "win_rate": 40.0,
+      "partial_open_count": 0,
+      "retried_open_count": 0,
+      "rejected_open_count": 0
     },
     {
       "fee_bps": 5.0,
@@ -139,7 +166,10 @@
       "profit_factor": 0.984998,
       "sharpe": -0.095738,
       "max_drawdown_pct": 0.317934,
-      "win_rate": 40.0
+      "win_rate": 40.0,
+      "partial_open_count": 0,
+      "retried_open_count": 0,
+      "rejected_open_count": 0
     },
     {
       "fee_bps": 5.0,
@@ -152,7 +182,10 @@
       "profit_factor": 0.965992,
       "sharpe": -0.125459,
       "max_drawdown_pct": 0.322322,
-      "win_rate": 40.0
+      "win_rate": 40.0,
+      "partial_open_count": 0,
+      "retried_open_count": 0,
+      "rejected_open_count": 0
     },
     {
       "fee_bps": 5.0,
@@ -165,7 +198,10 @@
       "profit_factor": 0.947416,
       "sharpe": -0.15516,
       "max_drawdown_pct": 0.326711,
-      "win_rate": 40.0
+      "win_rate": 40.0,
+      "partial_open_count": 0,
+      "retried_open_count": 0,
+      "rejected_open_count": 0
     }
   ],
   "best": {
@@ -179,7 +215,10 @@
     "profit_factor": 1.034683,
     "sharpe": 0.052904,
     "max_drawdown_pct": 0.294983,
-    "win_rate": 40.0
+    "win_rate": 40.0,
+    "partial_open_count": 0,
+    "retried_open_count": 0,
+    "rejected_open_count": 0
   },
   "analysis": {
     "top_results": [
@@ -194,7 +233,10 @@
         "profit_factor": 1.034683,
         "sharpe": 0.052904,
         "max_drawdown_pct": 0.294983,
-        "win_rate": 40.0
+        "win_rate": 40.0,
+        "partial_open_count": 0,
+        "retried_open_count": 0,
+        "rejected_open_count": 0
       },
       {
         "fee_bps": 0.0,
@@ -207,7 +249,10 @@
         "profit_factor": 1.014533,
         "sharpe": 0.023209,
         "max_drawdown_pct": 0.29937,
-        "win_rate": 40.0
+        "win_rate": 40.0,
+        "partial_open_count": 0,
+        "retried_open_count": 0,
+        "rejected_open_count": 0
       },
       {
         "fee_bps": 1.0,
@@ -220,7 +265,10 @@
         "profit_factor": 1.024512,
         "sharpe": 0.023219,
         "max_drawdown_pct": 0.299573,
-        "win_rate": 40.0
+        "win_rate": 40.0,
+        "partial_open_count": 0,
+        "retried_open_count": 0,
+        "rejected_open_count": 0
       },
       {
         "fee_bps": 0.0,
@@ -233,7 +281,10 @@
         "profit_factor": 0.994852,
         "sharpe": -0.006481,
         "max_drawdown_pct": 0.303757,
-        "win_rate": 40.0
+        "win_rate": 40.0,
+        "partial_open_count": 0,
+        "retried_open_count": 0,
+        "rejected_open_count": 0
       },
       {
         "fee_bps": 1.0,
@@ -246,7 +297,10 @@
         "profit_factor": 1.004599,
         "sharpe": -0.006486,
         "max_drawdown_pct": 0.30396,
-        "win_rate": 40.0
+        "win_rate": 40.0,
+        "partial_open_count": 0,
+        "retried_open_count": 0,
+        "rejected_open_count": 0
       }
     ],
     "best_result": {
@@ -260,7 +314,10 @@
       "profit_factor": 1.034683,
       "sharpe": 0.052904,
       "max_drawdown_pct": 0.294983,
-      "win_rate": 40.0
+      "win_rate": 40.0,
+      "partial_open_count": 0,
+      "retried_open_count": 0,
+      "rejected_open_count": 0
     },
     "worst_result": {
       "fee_bps": 5.0,
@@ -273,7 +330,10 @@
       "profit_factor": 0.947416,
       "sharpe": -0.15516,
       "max_drawdown_pct": 0.326711,
-      "win_rate": 40.0
+      "win_rate": 40.0,
+      "partial_open_count": 0,
+      "retried_open_count": 0,
+      "rejected_open_count": 0
     },
     "constraint": {
       "max_drawdown_pct": null,
@@ -294,7 +354,10 @@
       "profit_factor": 1.034683,
       "sharpe": 0.052904,
       "max_drawdown_pct": 0.294983,
-      "win_rate": 40.0
+      "win_rate": 40.0,
+      "partial_open_count": 0,
+      "retried_open_count": 0,
+      "rejected_open_count": 0
     },
     "spread_final_cash": 56.189127,
     "fee_sensitivity": [

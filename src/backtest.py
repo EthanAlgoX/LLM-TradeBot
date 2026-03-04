@@ -1080,6 +1080,9 @@ class BacktestRunner:
                         "sharpe": report.get("sharpe"),
                         "max_drawdown_pct": report.get("max_drawdown_pct"),
                         "win_rate": report.get("win_rate"),
+                        "partial_open_count": report.get("partial_open_count"),
+                        "retried_open_count": report.get("retried_open_count"),
+                        "rejected_open_count": report.get("rejected_open_count"),
                     }
                 )
         sort_map: dict[str, tuple[str, bool]] = {
