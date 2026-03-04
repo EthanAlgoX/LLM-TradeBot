@@ -26,6 +26,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--backtest-fee-grid", help="Comma separated fee bps grid for parameter sweep")
     p.add_argument("--backtest-slippage-grid", help="Comma separated slippage bps grid for parameter sweep")
     p.add_argument("--backtest-top-n", type=int, help="Top N results to include in grid analysis")
+    p.add_argument("--backtest-max-drawdown-pct", type=float, help="Grid constraint: max drawdown percent")
+    p.add_argument("--backtest-min-closed-trades", type=int, help="Grid constraint: min closed trades")
     p.add_argument("--backtest-output", help="Write backtest JSON result to this file path")
     p.add_argument("--backtest-include-trades", action="store_true", help="Include full trade list in backtest output")
     p.add_argument("--data-provider", choices=["sim", "binance"], help="Market data provider")
@@ -176,6 +178,10 @@ def main() -> None:
         raise SystemExit("configuration error: --backtest-slippage-bps must be >= 0")
     if args.backtest_top_n is not None and args.backtest_top_n <= 0:
         raise SystemExit("configuration error: --backtest-top-n must be > 0")
+    if args.backtest_max_drawdown_pct is not None and args.backtest_max_drawdown_pct < 0:
+        raise SystemExit("configuration error: --backtest-max-drawdown-pct must be >= 0")
+    if args.backtest_min_closed_trades is not None and args.backtest_min_closed_trades < 0:
+        raise SystemExit("configuration error: --backtest-min-closed-trades must be >= 0")
     if (
         args.backtest_start
         or args.backtest_end
@@ -184,6 +190,8 @@ def main() -> None:
         or args.backtest_fee_bps is not None
         or args.backtest_slippage_bps is not None
         or args.backtest_top_n is not None
+        or args.backtest_max_drawdown_pct is not None
+        or args.backtest_min_closed_trades is not None
         or args.backtest_output
         or args.backtest_include_trades
     ) and not args.backtest_csv:
@@ -214,6 +222,10 @@ def main() -> None:
         raise SystemExit("configuration error: --backtest-include-trades is not supported in grid mode")
     if fee_grid is None and args.backtest_top_n is not None:
         raise SystemExit("configuration error: --backtest-top-n is only supported in grid mode")
+    if fee_grid is None and args.backtest_max_drawdown_pct is not None:
+        raise SystemExit("configuration error: --backtest-max-drawdown-pct is only supported in grid mode")
+    if fee_grid is None and args.backtest_min_closed_trades is not None:
+        raise SystemExit("configuration error: --backtest-min-closed-trades is only supported in grid mode")
     if args.replay_max_events is not None and args.replay_max_events <= 0:
         raise SystemExit("configuration error: --replay-max-events must be > 0")
     if (args.replay_stage or args.replay_max_events is not None or args.replay_summary_only) and not (args.replay_trace or args.replay_latest):
@@ -238,6 +250,8 @@ def main() -> None:
                 fee_bps_grid=fee_grid,
                 slippage_bps_grid=slippage_grid,
                 top_n=args.backtest_top_n or 5,
+                max_drawdown_pct=args.backtest_max_drawdown_pct,
+                min_closed_trades=args.backtest_min_closed_trades,
             )
         else:
             payload = runner.run(include_trades=args.backtest_include_trades)

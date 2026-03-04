@@ -418,12 +418,25 @@ class BacktestRunner:
     def run(self, *, include_trades: bool = False) -> dict[str, object]:
         return self._run_once(fee_bps=self.fee_bps, slippage_bps=self.slippage_bps, include_trades=include_trades)
 
-    def _analyze_grid_results(self, rows: list[dict[str, object]], *, top_n: int) -> dict[str, object]:
+    def _analyze_grid_results(
+        self,
+        rows: list[dict[str, object]],
+        *,
+        top_n: int,
+        max_drawdown_pct: float | None = None,
+        min_closed_trades: int | None = None,
+    ) -> dict[str, object]:
         if not rows:
             return {
                 "top_results": [],
                 "best_result": None,
                 "worst_result": None,
+                "constraint": {
+                    "max_drawdown_pct": max_drawdown_pct,
+                    "min_closed_trades": min_closed_trades,
+                },
+                "constrained_count": 0,
+                "constrained_best_result": None,
                 "spread_final_cash": 0.0,
                 "fee_sensitivity": [],
                 "slippage_sensitivity": [],
@@ -509,17 +522,39 @@ class BacktestRunner:
             else None,
             "notes": notes,
         }
+
+        constrained_rows = rows
+        if max_drawdown_pct is not None:
+            constrained_rows = [r for r in constrained_rows if _to_float(r.get("max_drawdown_pct")) <= max_drawdown_pct]
+        if min_closed_trades is not None:
+            constrained_rows = [r for r in constrained_rows if int(_to_float(r.get("closed_trades"))) >= min_closed_trades]
+        constrained_best = constrained_rows[0] if constrained_rows else None
+
         return {
             "top_results": rows[: max(1, top_n)],
             "best_result": best,
             "worst_result": worst,
+            "constraint": {
+                "max_drawdown_pct": max_drawdown_pct,
+                "min_closed_trades": min_closed_trades,
+            },
+            "constrained_count": len(constrained_rows),
+            "constrained_best_result": constrained_best,
             "spread_final_cash": round(spread, 6),
             "fee_sensitivity": fee_sensitivity,
             "slippage_sensitivity": slippage_sensitivity,
             "recommendations": recommendations,
         }
 
-    def run_grid(self, *, fee_bps_grid: list[float], slippage_bps_grid: list[float], top_n: int = 5) -> dict[str, object]:
+    def run_grid(
+        self,
+        *,
+        fee_bps_grid: list[float],
+        slippage_bps_grid: list[float],
+        top_n: int = 5,
+        max_drawdown_pct: float | None = None,
+        min_closed_trades: int | None = None,
+    ) -> dict[str, object]:
         grid_results: list[dict[str, object]] = []
         for fee in fee_bps_grid:
             for slip in slippage_bps_grid:
@@ -543,7 +578,12 @@ class BacktestRunner:
                     }
                 )
         grid_results.sort(key=lambda x: float(x.get("final_cash", 0.0) or 0.0), reverse=True)
-        analysis = self._analyze_grid_results(grid_results, top_n=max(1, top_n))
+        analysis = self._analyze_grid_results(
+            grid_results,
+            top_n=max(1, top_n),
+            max_drawdown_pct=max_drawdown_pct,
+            min_closed_trades=min_closed_trades,
+        )
         return {
             "mode": "backtest_grid",
             "dataset_path": self.dataset.source_path,

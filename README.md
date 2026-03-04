@@ -40,6 +40,12 @@ tradebot --backtest-csv data/bars.csv --backtest-fee-grid 0,1,3,5 --backtest-sli
 
 Grid output includes `analysis.recommendations` with suggested params and cost tolerance.
 
+Add grid constraints (pick best under risk/trade constraints):
+
+```bash
+tradebot --backtest-csv data/bars.csv --backtest-fee-grid 0,1,3,5 --backtest-slippage-grid 0,1,2 --backtest-max-drawdown-pct 5 --backtest-min-closed-trades 10 --pretty
+```
+
 Required CSV columns:
 
 - `ts` (ISO8601 datetime)

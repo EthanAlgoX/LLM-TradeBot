@@ -129,3 +129,18 @@ def test_backtest_grid_runs_and_sorts(tmp_path):
     assert rec["recommended_params"] is not None
     assert "cost_tolerance" in rec
     assert "notes" in rec
+    assert analysis["constrained_count"] == 4
+    assert analysis["constrained_best_result"] is not None
+
+    out2 = runner.run_grid(
+        fee_bps_grid=[0.0, 3.0],
+        slippage_bps_grid=[0.0, 2.0],
+        top_n=2,
+        max_drawdown_pct=0.0,
+        min_closed_trades=999,
+    )
+    analysis2 = out2["analysis"]
+    assert analysis2["constraint"]["max_drawdown_pct"] == 0.0
+    assert analysis2["constraint"]["min_closed_trades"] == 999
+    assert analysis2["constrained_count"] == 0
+    assert analysis2["constrained_best_result"] is None
