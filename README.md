@@ -38,6 +38,8 @@ Control analysis output size:
 tradebot --backtest-csv data/bars.csv --backtest-fee-grid 0,1,3,5 --backtest-slippage-grid 0,1,2 --backtest-top-n 5 --pretty
 ```
 
+Grid output includes `analysis.recommendations` with suggested params and cost tolerance.
+
 Required CSV columns:
 
 - `ts` (ISO8601 datetime)

@@ -124,3 +124,8 @@ def test_backtest_grid_runs_and_sorts(tmp_path):
     assert len(analysis["fee_sensitivity"]) == 2
     assert len(analysis["slippage_sensitivity"]) == 2
     assert float(analysis["spread_final_cash"]) >= 0
+    assert "recommendations" in analysis
+    rec = analysis["recommendations"]
+    assert rec["recommended_params"] is not None
+    assert "cost_tolerance" in rec
+    assert "notes" in rec

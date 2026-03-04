@@ -427,6 +427,12 @@ class BacktestRunner:
                 "spread_final_cash": 0.0,
                 "fee_sensitivity": [],
                 "slippage_sensitivity": [],
+                "recommendations": {
+                    "recommended_params": None,
+                    "cost_tolerance": {"max_fee_bps_non_negative_return": None, "max_slippage_bps_non_negative_return": None},
+                    "conservative_params": None,
+                    "notes": ["no grid results"],
+                },
             }
 
         fee_map: dict[float, list[dict[str, object]]] = {}
@@ -458,13 +464,59 @@ class BacktestRunner:
         best = rows[0]
         worst = rows[-1]
         spread = _to_float(best.get("final_cash")) - _to_float(worst.get("final_cash"))
+        fee_sensitivity = _aggregate(fee_map, "fee_bps")
+        slippage_sensitivity = _aggregate(slippage_map, "slippage_bps")
+
+        max_fee_ok: float | None = None
+        for row in fee_sensitivity:
+            if _to_float(row.get("avg_return_pct")) >= 0:
+                max_fee_ok = _to_float(row.get("fee_bps"))
+
+        max_slippage_ok: float | None = None
+        for row in slippage_sensitivity:
+            if _to_float(row.get("avg_return_pct")) >= 0:
+                max_slippage_ok = _to_float(row.get("slippage_bps"))
+
+        drawdown_cap = 1.0
+        conservative = next((r for r in rows if _to_float(r.get("max_drawdown_pct")) <= drawdown_cap), None)
+        notes: list[str] = [
+            f"best final_cash spread versus worst is {round(spread, 6)}",
+            f"drawdown cap for conservative candidate is {drawdown_cap}%",
+        ]
+        if max_fee_ok is not None:
+            notes.append(f"average return stays non-negative up to fee={max_fee_ok} bps")
+        else:
+            notes.append("all fee buckets show negative average return")
+        if max_slippage_ok is not None:
+            notes.append(f"average return stays non-negative up to slippage={max_slippage_ok} bps")
+        else:
+            notes.append("all slippage buckets show negative average return")
+
+        recommendations = {
+            "recommended_params": {
+                "fee_bps": _to_float(best.get("fee_bps")),
+                "slippage_bps": _to_float(best.get("slippage_bps")),
+            },
+            "cost_tolerance": {
+                "max_fee_bps_non_negative_return": max_fee_ok,
+                "max_slippage_bps_non_negative_return": max_slippage_ok,
+            },
+            "conservative_params": {
+                "fee_bps": _to_float(conservative.get("fee_bps")),
+                "slippage_bps": _to_float(conservative.get("slippage_bps")),
+            }
+            if conservative
+            else None,
+            "notes": notes,
+        }
         return {
             "top_results": rows[: max(1, top_n)],
             "best_result": best,
             "worst_result": worst,
             "spread_final_cash": round(spread, 6),
-            "fee_sensitivity": _aggregate(fee_map, "fee_bps"),
-            "slippage_sensitivity": _aggregate(slippage_map, "slippage_bps"),
+            "fee_sensitivity": fee_sensitivity,
+            "slippage_sensitivity": slippage_sensitivity,
+            "recommendations": recommendations,
         }
 
     def run_grid(self, *, fee_bps_grid: list[float], slippage_bps_grid: list[float], top_n: int = 5) -> dict[str, object]:
