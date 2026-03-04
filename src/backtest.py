@@ -471,6 +471,11 @@ class BacktestExecutionProvider(ExecutionProvider):
         self.total_fees_paid += fee
 
         if action == "open_long":
+            if symbol in state.positions:
+                return ExecutionResult(SCHEMA_V2, trace_id, symbol, action, "failed", "position already open")
+            required_margin = abs(fill * qty) / max(1.0, lev)
+            if required_margin + fee > state.cash:
+                return ExecutionResult(SCHEMA_V2, trace_id, symbol, action, "failed", "insufficient cash for margin")
             state.positions[symbol] = Position(symbol=symbol, side="long", qty=qty, entry_price=fill, leverage=lev, opened_cycle=state.cycle)
             self._store_risk_levels(symbol=symbol, planned=planned)
             state.cash -= fee
@@ -478,6 +483,11 @@ class BacktestExecutionProvider(ExecutionProvider):
             return ExecutionResult(SCHEMA_V2, trace_id, symbol, action, "success", f"backtest long opened fee={fee:.6f}", fill)
 
         if action == "open_short":
+            if symbol in state.positions:
+                return ExecutionResult(SCHEMA_V2, trace_id, symbol, action, "failed", "position already open")
+            required_margin = abs(fill * qty) / max(1.0, lev)
+            if required_margin + fee > state.cash:
+                return ExecutionResult(SCHEMA_V2, trace_id, symbol, action, "failed", "insufficient cash for margin")
             state.positions[symbol] = Position(symbol=symbol, side="short", qty=qty, entry_price=fill, leverage=lev, opened_cycle=state.cycle)
             self._store_risk_levels(symbol=symbol, planned=planned)
             state.cash -= fee

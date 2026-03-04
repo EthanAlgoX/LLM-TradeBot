@@ -240,6 +240,59 @@ def test_backtest_execution_provider_auto_take_profit_trigger():
     assert state.cash == pytest.approx(1_020.0, rel=0, abs=1e-9)
 
 
+def test_backtest_execution_provider_rejects_duplicate_open():
+    provider = BacktestExecutionProvider(fee_bps=0.0, slippage_bps=0.0)
+    state = RuntimeState(cycle=1, cash=1_000.0)
+
+    open_long = ProposedAction(
+        schema_version="v2",
+        trace_id="t1",
+        symbol="BTCUSDT",
+        source="rule",
+        action="open_long",
+        confidence=80.0,
+        reason="test",
+        order_params={"entry_price": 100.0, "stop_loss": 90.0, "take_profit": 120.0, "quantity": 1.0, "leverage": 1.0},
+    )
+    r1 = provider.execute(trace_id="t1", planned=open_long, state=state)
+    assert r1.status == "success"
+
+    state.cycle = 2
+    open_short = ProposedAction(
+        schema_version="v2",
+        trace_id="t2",
+        symbol="BTCUSDT",
+        source="rule",
+        action="open_short",
+        confidence=80.0,
+        reason="test",
+        order_params={"entry_price": 100.0, "stop_loss": 110.0, "take_profit": 80.0, "quantity": 1.0, "leverage": 1.0},
+    )
+    r2 = provider.execute(trace_id="t2", planned=open_short, state=state)
+    assert r2.status == "failed"
+    assert "position already open" in r2.message
+
+
+def test_backtest_execution_provider_checks_margin_before_open():
+    provider = BacktestExecutionProvider(fee_bps=0.0, slippage_bps=0.0)
+    state = RuntimeState(cycle=1, cash=10.0)
+
+    open_long = ProposedAction(
+        schema_version="v2",
+        trace_id="t1",
+        symbol="BTCUSDT",
+        source="rule",
+        action="open_long",
+        confidence=80.0,
+        reason="test",
+        order_params={"entry_price": 100.0, "stop_loss": 90.0, "take_profit": 120.0, "quantity": 1.0, "leverage": 1.0},
+    )
+    r = provider.execute(trace_id="t1", planned=open_long, state=state)
+    assert r.status == "failed"
+    assert "insufficient cash for margin" in r.message
+    assert "BTCUSDT" not in state.positions
+
+
 def test_backtest_grid_runs_and_sorts(tmp_path):
     csv_path = tmp_path / "bars.csv"
     _write_sample_csv(csv_path)
