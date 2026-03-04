@@ -26,6 +26,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--backtest-fee-grid", help="Comma separated fee bps grid for parameter sweep")
     p.add_argument("--backtest-slippage-grid", help="Comma separated slippage bps grid for parameter sweep")
     p.add_argument("--backtest-top-n", type=int, help="Top N results to include in grid analysis")
+    p.add_argument(
+        "--backtest-rank-by",
+        choices=["final_cash", "total_return_pct", "sharpe", "profit_factor", "win_rate", "max_drawdown_pct"],
+        help="Grid ranking metric",
+    )
     p.add_argument("--backtest-max-drawdown-pct", type=float, help="Grid constraint: max drawdown percent")
     p.add_argument("--backtest-min-closed-trades", type=int, help="Grid constraint: min closed trades")
     p.add_argument("--backtest-output", help="Write backtest JSON result to this file path")
@@ -190,6 +195,7 @@ def main() -> None:
         or args.backtest_fee_bps is not None
         or args.backtest_slippage_bps is not None
         or args.backtest_top_n is not None
+        or args.backtest_rank_by is not None
         or args.backtest_max_drawdown_pct is not None
         or args.backtest_min_closed_trades is not None
         or args.backtest_output
@@ -222,6 +228,8 @@ def main() -> None:
         raise SystemExit("configuration error: --backtest-include-trades is not supported in grid mode")
     if fee_grid is None and args.backtest_top_n is not None:
         raise SystemExit("configuration error: --backtest-top-n is only supported in grid mode")
+    if fee_grid is None and args.backtest_rank_by is not None:
+        raise SystemExit("configuration error: --backtest-rank-by is only supported in grid mode")
     if fee_grid is None and args.backtest_max_drawdown_pct is not None:
         raise SystemExit("configuration error: --backtest-max-drawdown-pct is only supported in grid mode")
     if fee_grid is None and args.backtest_min_closed_trades is not None:
@@ -250,6 +258,7 @@ def main() -> None:
                 fee_bps_grid=fee_grid,
                 slippage_bps_grid=slippage_grid,
                 top_n=args.backtest_top_n or 5,
+                rank_by=args.backtest_rank_by or "final_cash",
                 max_drawdown_pct=args.backtest_max_drawdown_pct,
                 min_closed_trades=args.backtest_min_closed_trades,
             )

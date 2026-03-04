@@ -41,6 +41,12 @@ tradebot --backtest-csv data/bars.csv --backtest-fee-grid 0,1,3,5 --backtest-sli
 Grid output includes `analysis.recommendations` with suggested params and cost tolerance.
 It also includes `analysis.recommendations.command_templates` for directly runnable commands.
 
+Rank grid by risk metric instead of cash:
+
+```bash
+tradebot --backtest-csv data/bars.csv --backtest-fee-grid 0,1,3,5 --backtest-slippage-grid 0,1,2 --backtest-rank-by max_drawdown_pct --pretty
+```
+
 Add grid constraints (pick best under risk/trade constraints):
 
 ```bash

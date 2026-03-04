@@ -148,3 +148,14 @@ def test_backtest_grid_runs_and_sorts(tmp_path):
     assert analysis2["constrained_count"] == 0
     assert analysis2["constrained_best_result"] is None
     assert len(analysis2["recommendations"]["command_templates"]) >= 1
+
+    out3 = runner.run_grid(
+        fee_bps_grid=[0.0, 3.0],
+        slippage_bps_grid=[0.0, 2.0],
+        top_n=2,
+        rank_by="max_drawdown_pct",
+    )
+    assert out3["rank_by"] == "max_drawdown_pct"
+    assert out3["rank_order"] == "asc"
+    results3 = out3["results"]
+    assert float(results3[0]["max_drawdown_pct"]) <= float(results3[-1]["max_drawdown_pct"])

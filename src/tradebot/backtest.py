@@ -445,6 +445,7 @@ class BacktestRunner:
         rows: list[dict[str, object]],
         *,
         top_n: int,
+        rank_by: str,
         max_drawdown_pct: float | None = None,
         min_closed_trades: int | None = None,
     ) -> dict[str, object]:
@@ -457,6 +458,7 @@ class BacktestRunner:
                     "max_drawdown_pct": max_drawdown_pct,
                     "min_closed_trades": min_closed_trades,
                 },
+                "ranking": {"rank_by": rank_by},
                 "constrained_count": 0,
                 "constrained_best_result": None,
                 "spread_final_cash": 0.0,
@@ -499,7 +501,8 @@ class BacktestRunner:
 
         best = rows[0]
         worst = rows[-1]
-        spread = _to_float(best.get("final_cash")) - _to_float(worst.get("final_cash"))
+        final_cash_values = [_to_float(r.get("final_cash")) for r in rows]
+        spread = (max(final_cash_values) - min(final_cash_values)) if final_cash_values else 0.0
         fee_sensitivity = _aggregate(fee_map, "fee_bps")
         slippage_sensitivity = _aggregate(slippage_map, "slippage_bps")
 
@@ -595,6 +598,7 @@ class BacktestRunner:
                 "max_drawdown_pct": max_drawdown_pct,
                 "min_closed_trades": min_closed_trades,
             },
+            "ranking": {"rank_by": rank_by},
             "constrained_count": len(constrained_rows),
             "constrained_best_result": constrained_best,
             "spread_final_cash": round(spread, 6),
@@ -609,6 +613,7 @@ class BacktestRunner:
         fee_bps_grid: list[float],
         slippage_bps_grid: list[float],
         top_n: int = 5,
+        rank_by: str = "final_cash",
         max_drawdown_pct: float | None = None,
         min_closed_trades: int | None = None,
     ) -> dict[str, object]:
@@ -634,10 +639,22 @@ class BacktestRunner:
                         "win_rate": report.get("win_rate"),
                     }
                 )
-        grid_results.sort(key=lambda x: float(x.get("final_cash", 0.0) or 0.0), reverse=True)
+        sort_map: dict[str, tuple[str, bool]] = {
+            "final_cash": ("final_cash", True),
+            "total_return_pct": ("total_return_pct", True),
+            "sharpe": ("sharpe", True),
+            "profit_factor": ("profit_factor", True),
+            "win_rate": ("win_rate", True),
+            "max_drawdown_pct": ("max_drawdown_pct", False),
+        }
+        if rank_by not in sort_map:
+            raise ValueError(f"unsupported rank_by={rank_by}")
+        field, reverse = sort_map[rank_by]
+        grid_results.sort(key=lambda x: _to_float(x.get(field)), reverse=reverse)
         analysis = self._analyze_grid_results(
             grid_results,
             top_n=max(1, top_n),
+            rank_by=rank_by,
             max_drawdown_pct=max_drawdown_pct,
             min_closed_trades=min_closed_trades,
         )
@@ -646,6 +663,8 @@ class BacktestRunner:
             "dataset_path": self.dataset.source_path,
             "symbols": self.dataset.symbols,
             "steps": self.dataset.steps,
+            "rank_by": rank_by,
+            "rank_order": "desc" if reverse else "asc",
             "runs": len(grid_results),
             "results": grid_results,
             "best": grid_results[0] if grid_results else None,
