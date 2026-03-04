@@ -123,6 +123,12 @@ Configure backtest execution realism (liquidity cap + retries):
 tradebot --backtest-csv data/bars.csv --backtest-max-open-notional-share 0.02 --backtest-max-open-retries 2 --pretty
 ```
 
+Configure funding model (positive means longs pay shorts each cycle):
+
+```bash
+tradebot --backtest-csv data/bars.csv --backtest-funding-rate-bps-per-cycle 0.5 --pretty
+```
+
 Run parameter sweep (grid backtest):
 
 ```bash
@@ -245,6 +251,7 @@ Environment variables:
 - `TRADEBOT_BACKTEST_SLIPPAGE_BPS=1`
 - `TRADEBOT_BACKTEST_MAX_OPEN_NOTIONAL_SHARE_OF_BAR=0.02`
 - `TRADEBOT_BACKTEST_MAX_OPEN_RETRIES=2`
+- `TRADEBOT_BACKTEST_FUNDING_RATE_BPS_PER_CYCLE=0`
 
 ## Live execution safeguards
 

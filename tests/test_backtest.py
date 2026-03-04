@@ -7,7 +7,7 @@ import pytest
 from backtest import BacktestBar, BacktestExecutionProvider, BacktestMarketRankProvider, BacktestRunner, CSVBacktestDataset, render_backtest_markdown
 from config import RuntimeConfig
 from contracts import ProposedAction
-from state import RuntimeState
+from state import Position, RuntimeState
 
 
 def _write_sample_csv(path):
@@ -98,6 +98,8 @@ def test_backtest_runner_outputs_report(tmp_path):
     assert "sharpe" in report
     assert "final_cash" in report
     assert "max_drawdown_pct" in report
+    assert "total_funding_pnl" in report
+    assert "funding_rate_bps_per_cycle" in report
     assert "sharpe_equity" in report
     assert "max_drawdown_equity_pct" in report
     assert "unrealized_pnl" in report
@@ -361,6 +363,38 @@ def test_backtest_execution_provider_rejects_when_no_liquidity():
     assert "BTCUSDT" not in state.positions
 
 
+def test_backtest_runner_apply_funding_positive_rate_long_pays(tmp_path):
+    csv_path = tmp_path / "bars.csv"
+    csv_path.write_text(
+        "\n".join(
+            [
+                "ts,symbol,close,quote_volume",
+                "2026-01-01T00:00:00,BTCUSDT,100,1000",
+                "2026-01-01T01:00:00,BTCUSDT,100,1000",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    cfg = RuntimeConfig(backtest_funding_rate_bps_per_cycle=10.0)
+    runner = BacktestRunner(cfg=cfg, csv_path=str(csv_path), symbols=["BTCUSDT"], max_steps=2)
+    state = RuntimeState(cycle=1, cash=1_000.0)
+    state.positions["BTCUSDT"] = Position(
+        symbol="BTCUSDT",
+        side="long",
+        qty=1.0,
+        entry_price=100.0,
+        leverage=1.0,
+        opened_cycle=1,
+    )
+    events: list[dict[str, object]] = []
+    pnl = runner._apply_funding(state=state, cycle=1, funding_rate_bps=10.0, sink=events)
+    assert pnl == pytest.approx(-0.1, rel=0, abs=1e-9)
+    assert state.cash == pytest.approx(999.9, rel=0, abs=1e-9)
+    assert len(events) == 1
+    assert events[0]["symbol"] == "BTCUSDT"
+    assert events[0]["pnl"] == pytest.approx(-0.1, rel=0, abs=1e-9)
+
+
 def test_backtest_grid_runs_and_sorts(tmp_path):
     csv_path = tmp_path / "bars.csv"
     _write_sample_csv(csv_path)
@@ -380,6 +414,7 @@ def test_backtest_grid_runs_and_sorts(tmp_path):
     assert "partial_open_count" in out["results"][0]
     assert "retried_open_count" in out["results"][0]
     assert "rejected_open_count" in out["results"][0]
+    assert "total_funding_pnl" in out["results"][0]
     analysis = out["analysis"]
     assert isinstance(analysis, dict)
     assert len(analysis["top_results"]) == 2

@@ -35,6 +35,7 @@ def render_backtest_markdown(payload: dict[str, object], *, top_n: int = 5) -> s
                 f"- Steps: `{report.get('steps', 0)}`",
                 f"- Return(%): `{report.get('total_return_pct', 0)}`",
                 f"- Realized PnL: `{report.get('realized_pnl', 0)}`",
+                f"- Funding PnL: `{report.get('total_funding_pnl', 0)}`",
                 f"- Final Cash: `{report.get('final_cash', 0)}`",
                 f"- Max Drawdown(%): `{report.get('max_drawdown_pct', 0)}`",
                 f"- Sharpe: `{report.get('sharpe', 0)}`",
@@ -119,8 +120,10 @@ class BacktestReport:
     final_cash: float
     total_return_pct: float
     realized_pnl: float
+    total_funding_pnl: float
     fee_bps: float
     slippage_bps: float
+    funding_rate_bps_per_cycle: float
     total_fees: float
     closed_trades: int
     wins: int
@@ -155,8 +158,10 @@ class BacktestReport:
             "final_cash": round(self.final_cash, 6),
             "total_return_pct": round(self.total_return_pct, 6),
             "realized_pnl": round(self.realized_pnl, 6),
+            "total_funding_pnl": round(self.total_funding_pnl, 6),
             "fee_bps": round(self.fee_bps, 6),
             "slippage_bps": round(self.slippage_bps, 6),
+            "funding_rate_bps_per_cycle": round(self.funding_rate_bps_per_cycle, 6),
             "total_fees": round(self.total_fees, 6),
             "closed_trades": self.closed_trades,
             "wins": self.wins,
@@ -629,6 +634,7 @@ class BacktestRunner:
         slippage_bps: float | None = None,
         max_open_notional_share_of_bar: float | None = None,
         max_open_retries: int | None = None,
+        funding_rate_bps_per_cycle: float | None = None,
     ) -> None:
         self.cfg = cfg
         self.fee_bps = cfg.backtest_fee_bps if fee_bps is None else max(0.0, fee_bps)
@@ -639,6 +645,11 @@ class BacktestRunner:
             else max(0.0, max_open_notional_share_of_bar)
         )
         self.max_open_retries = cfg.backtest_max_open_retries if max_open_retries is None else max(0, int(max_open_retries))
+        self.funding_rate_bps_per_cycle = (
+            cfg.backtest_funding_rate_bps_per_cycle
+            if funding_rate_bps_per_cycle is None
+            else float(funding_rate_bps_per_cycle)
+        )
         self.dataset = CSVBacktestDataset.from_csv(
             csv_path,
             start=start,
@@ -662,6 +673,7 @@ class BacktestRunner:
             f"--backtest-max-steps {self.dataset.steps} "
             f"--backtest-fee-bps {round(fee_bps, 6)} "
             f"--backtest-slippage-bps {round(slippage_bps, 6)} "
+            f"--backtest-funding-rate-bps-per-cycle {round(self.funding_rate_bps_per_cycle, 6)} "
             f"--backtest-max-open-notional-share {round(self.max_open_notional_share_of_bar, 6)} "
             f"--backtest-max-open-retries {self.max_open_retries} --pretty"
         )
@@ -687,6 +699,42 @@ class BacktestRunner:
             sign = 1.0 if pos.side == "long" else -1.0
             equity += (px - float(pos.entry_price)) * float(pos.qty) * sign
         return equity
+
+    def _apply_funding(
+        self,
+        *,
+        state: RuntimeState,
+        cycle: int,
+        funding_rate_bps: float,
+        sink: list[dict[str, object]] | None = None,
+    ) -> float:
+        if abs(funding_rate_bps) <= 1e-12:
+            return 0.0
+        total = 0.0
+        for symbol, pos in state.positions.items():
+            px = self._dataset_close(symbol, cycle)
+            if px <= 0:
+                px = float(pos.entry_price)
+            notional = abs(px * float(pos.qty))
+            side_sign = 1.0 if pos.side == "long" else -1.0
+            # Positive funding means longs pay shorts; negative does the opposite.
+            pnl = -(side_sign * funding_rate_bps / 10_000.0) * notional
+            state.cash += pnl
+            total += pnl
+            if sink is not None:
+                sink.append(
+                    {
+                        "cycle": cycle,
+                        "symbol": symbol,
+                        "side": pos.side,
+                        "price": px,
+                        "qty": float(pos.qty),
+                        "notional": notional,
+                        "funding_rate_bps": funding_rate_bps,
+                        "pnl": pnl,
+                    }
+                )
+        return total
 
     def _force_close_open_positions(self, *, state: RuntimeState, exec_provider: BacktestExecutionProvider) -> list[dict[str, object]]:
         forced: list[dict[str, object]] = []
@@ -744,6 +792,8 @@ class BacktestRunner:
         equity_curve = [{"cycle": 0, "equity": bot.state.cash}]
         status_counts: dict[str, int] = {}
         auto_risk_closes: list[dict[str, object]] = []
+        funding_events: list[dict[str, object]] = []
+        total_funding_pnl = 0.0
 
         for _ in range(self.dataset.steps):
             result = asyncio.run(bot.run_cycle())
@@ -751,6 +801,12 @@ class BacktestRunner:
             cycle_risk_closes = exec_provider.auto_close_triggered_positions(state=bot.state, cycle=bot.state.cycle)
             if cycle_risk_closes:
                 auto_risk_closes.extend(cycle_risk_closes)
+            total_funding_pnl += self._apply_funding(
+                state=bot.state,
+                cycle=bot.state.cycle,
+                funding_rate_bps=self.funding_rate_bps_per_cycle,
+                sink=funding_events,
+            )
 
             cash = float(bot.state.cash)
             cash_curve.append({"cycle": result.cycle, "cash": cash})
@@ -836,8 +892,10 @@ class BacktestRunner:
             final_cash=final_cash,
             total_return_pct=((final_cash / initial_cash) - 1.0) * 100.0 if initial_cash else 0.0,
             realized_pnl=realized,
+            total_funding_pnl=total_funding_pnl,
             fee_bps=fee_bps,
             slippage_bps=slippage_bps,
+            funding_rate_bps_per_cycle=self.funding_rate_bps_per_cycle,
             total_fees=exec_provider.total_fees_paid,
             closed_trades=len(closed),
             wins=wins,
@@ -875,6 +933,7 @@ class BacktestRunner:
             },
             "forced_closes": forced_closes,
             "auto_risk_closes": auto_risk_closes,
+            "funding_events": funding_events,
         }
         if include_trades:
             payload["trades"] = [
@@ -1084,6 +1143,7 @@ class BacktestRunner:
                         "final_cash": report.get("final_cash"),
                         "total_return_pct": report.get("total_return_pct"),
                         "realized_pnl": report.get("realized_pnl"),
+                        "total_funding_pnl": report.get("total_funding_pnl"),
                         "total_fees": report.get("total_fees"),
                         "closed_trades": report.get("closed_trades"),
                         "profit_factor": report.get("profit_factor"),

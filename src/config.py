@@ -47,6 +47,7 @@ class RuntimeConfig:
     backtest_slippage_bps: float = 1.0
     backtest_max_open_notional_share_of_bar: float = 0.02
     backtest_max_open_retries: int = 2
+    backtest_funding_rate_bps_per_cycle: float = 0.0
 
     # AI500 candidate universe (reference from LLM-TradeBot)
     ai500_candidates: list[str] = field(
@@ -84,4 +85,10 @@ class RuntimeConfig:
             )
         )
         cfg.backtest_max_open_retries = int(os.getenv("TRADEBOT_BACKTEST_MAX_OPEN_RETRIES", str(cfg.backtest_max_open_retries)))
+        cfg.backtest_funding_rate_bps_per_cycle = float(
+            os.getenv(
+                "TRADEBOT_BACKTEST_FUNDING_RATE_BPS_PER_CYCLE",
+                str(cfg.backtest_funding_rate_bps_per_cycle),
+            )
+        )
         return cfg

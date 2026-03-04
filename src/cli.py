@@ -33,6 +33,11 @@ def build_parser() -> argparse.ArgumentParser:
         type=int,
         help="Maximum retries for open order fills on subsequent bars when liquidity is insufficient",
     )
+    p.add_argument(
+        "--backtest-funding-rate-bps-per-cycle",
+        type=float,
+        help="Funding rate (bps) applied per cycle on open positions; positive means longs pay shorts",
+    )
     p.add_argument("--backtest-fee-grid", help="Comma separated fee bps grid for parameter sweep")
     p.add_argument("--backtest-slippage-grid", help="Comma separated slippage bps grid for parameter sweep")
     p.add_argument("--backtest-top-n", type=int, help="Top N results to include in grid analysis")
@@ -211,6 +216,7 @@ def main() -> None:
         or args.backtest_slippage_bps is not None
         or args.backtest_max_open_notional_share is not None
         or args.backtest_max_open_retries is not None
+        or args.backtest_funding_rate_bps_per_cycle is not None
         or args.backtest_top_n is not None
         or args.backtest_rank_by is not None
         or args.backtest_max_drawdown_pct is not None
@@ -272,6 +278,7 @@ def main() -> None:
             slippage_bps=args.backtest_slippage_bps,
             max_open_notional_share_of_bar=args.backtest_max_open_notional_share,
             max_open_retries=args.backtest_max_open_retries,
+            funding_rate_bps_per_cycle=args.backtest_funding_rate_bps_per_cycle,
         )
         if fee_grid is not None and slippage_grid is not None:
             payload = runner.run_grid(

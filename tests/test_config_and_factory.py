@@ -14,6 +14,7 @@ def test_runtime_config_from_env(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("TRADEBOT_LIVE_CONFIRM", "NO")
     monkeypatch.setenv("TRADEBOT_BACKTEST_MAX_OPEN_NOTIONAL_SHARE_OF_BAR", "0.015")
     monkeypatch.setenv("TRADEBOT_BACKTEST_MAX_OPEN_RETRIES", "4")
+    monkeypatch.setenv("TRADEBOT_BACKTEST_FUNDING_RATE_BPS_PER_CYCLE", "1.5")
     cfg = RuntimeConfig.from_env()
 
     assert cfg.data_provider == "binance"
@@ -22,6 +23,7 @@ def test_runtime_config_from_env(monkeypatch: pytest.MonkeyPatch):
     assert cfg.live_confirm_token == "NO"
     assert cfg.backtest_max_open_notional_share_of_bar == 0.015
     assert cfg.backtest_max_open_retries == 4
+    assert cfg.backtest_funding_rate_bps_per_cycle == 1.5
 
 
 def test_factory_default_sim():

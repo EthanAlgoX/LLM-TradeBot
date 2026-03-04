@@ -14,8 +14,10 @@
     "final_cash": 99981.828134,
     "total_return_pct": -0.018172,
     "realized_pnl": -18.171866,
+    "total_funding_pnl": 0.0,
     "fee_bps": 3.0,
     "slippage_bps": 1.0,
+    "funding_rate_bps_per_cycle": 0.0,
     "total_fees": 24.081055,
     "closed_trades": 20,
     "wins": 8,
@@ -635,7 +637,7 @@
   ],
   "last_cycle": {
     "cycle": 72,
-    "trace_id": "cycle:72:20260304T193032Z",
+    "trace_id": "cycle:72:20260304T193352Z",
     "status": "success",
     "action": "close_long"
   },
@@ -740,6 +742,7 @@
       "take_profit": 2154.5888
     }
   ],
+  "funding_events": [],
   "trades": [
     {
       "cycle": 5,
