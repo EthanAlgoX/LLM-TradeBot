@@ -23,6 +23,16 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--backtest-max-steps", type=int, help="Maximum aligned steps for backtest")
     p.add_argument("--backtest-fee-bps", type=float, help="Per-side fee in bps for backtest execution")
     p.add_argument("--backtest-slippage-bps", type=float, help="Per-fill slippage in bps for backtest execution")
+    p.add_argument(
+        "--backtest-max-open-notional-share",
+        type=float,
+        help="Max notional share of one bar quote volume allowed for a single open order (0 disables liquidity cap)",
+    )
+    p.add_argument(
+        "--backtest-max-open-retries",
+        type=int,
+        help="Maximum retries for open order fills on subsequent bars when liquidity is insufficient",
+    )
     p.add_argument("--backtest-fee-grid", help="Comma separated fee bps grid for parameter sweep")
     p.add_argument("--backtest-slippage-grid", help="Comma separated slippage bps grid for parameter sweep")
     p.add_argument("--backtest-top-n", type=int, help="Top N results to include in grid analysis")
@@ -182,6 +192,10 @@ def main() -> None:
         raise SystemExit("configuration error: --backtest-fee-bps must be >= 0")
     if args.backtest_slippage_bps is not None and args.backtest_slippage_bps < 0:
         raise SystemExit("configuration error: --backtest-slippage-bps must be >= 0")
+    if args.backtest_max_open_notional_share is not None and args.backtest_max_open_notional_share < 0:
+        raise SystemExit("configuration error: --backtest-max-open-notional-share must be >= 0")
+    if args.backtest_max_open_retries is not None and args.backtest_max_open_retries < 0:
+        raise SystemExit("configuration error: --backtest-max-open-retries must be >= 0")
     if args.backtest_top_n is not None and args.backtest_top_n <= 0:
         raise SystemExit("configuration error: --backtest-top-n must be > 0")
     if args.backtest_max_drawdown_pct is not None and args.backtest_max_drawdown_pct < 0:
@@ -195,6 +209,8 @@ def main() -> None:
         or args.backtest_max_steps is not None
         or args.backtest_fee_bps is not None
         or args.backtest_slippage_bps is not None
+        or args.backtest_max_open_notional_share is not None
+        or args.backtest_max_open_retries is not None
         or args.backtest_top_n is not None
         or args.backtest_rank_by is not None
         or args.backtest_max_drawdown_pct is not None
@@ -254,6 +270,8 @@ def main() -> None:
             max_steps=args.backtest_max_steps,
             fee_bps=args.backtest_fee_bps,
             slippage_bps=args.backtest_slippage_bps,
+            max_open_notional_share_of_bar=args.backtest_max_open_notional_share,
+            max_open_retries=args.backtest_max_open_retries,
         )
         if fee_grid is not None and slippage_grid is not None:
             payload = runner.run_grid(

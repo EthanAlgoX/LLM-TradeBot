@@ -117,6 +117,12 @@ Configure execution cost model and write report:
 tradebot --backtest-csv data/bars.csv --backtest-fee-bps 3 --backtest-slippage-bps 1 --backtest-output reports/backtest.json --backtest-summary-output reports/backtest.md --pretty
 ```
 
+Configure backtest execution realism (liquidity cap + retries):
+
+```bash
+tradebot --backtest-csv data/bars.csv --backtest-max-open-notional-share 0.02 --backtest-max-open-retries 2 --pretty
+```
+
 Run parameter sweep (grid backtest):
 
 ```bash
@@ -165,6 +171,7 @@ writes `data/real_3d_1h_binance.csv`, then runs:
 
 - single-run audit report (fee `3`, slippage `1`)
 - grid audit report (fee `0,1,3,5`, slippage `0,1,2`)
+- execution realism defaults: max open notional share `0.02`, max open retries `2`
 
 Outputs:
 
@@ -236,6 +243,8 @@ Environment variables:
 - `TRADEBOT_PERSISTENCE_PATH=data/tradebot.db`
 - `TRADEBOT_BACKTEST_FEE_BPS=3`
 - `TRADEBOT_BACKTEST_SLIPPAGE_BPS=1`
+- `TRADEBOT_BACKTEST_MAX_OPEN_NOTIONAL_SHARE_OF_BAR=0.02`
+- `TRADEBOT_BACKTEST_MAX_OPEN_RETRIES=2`
 
 ## Live execution safeguards
 

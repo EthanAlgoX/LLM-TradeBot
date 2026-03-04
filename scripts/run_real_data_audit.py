@@ -23,6 +23,8 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--max-steps", type=int, help="Backtest max steps, defaults to --hours")
     p.add_argument("--single-fee-bps", type=float, default=3.0)
     p.add_argument("--single-slippage-bps", type=float, default=1.0)
+    p.add_argument("--max-open-notional-share", type=float, default=0.02)
+    p.add_argument("--max-open-retries", type=int, default=2)
     p.add_argument("--grid-fees", default="0,1,3,5")
     p.add_argument("--grid-slippages", default="0,1,2")
     p.add_argument("--grid-top-n", type=int, default=5)
@@ -83,6 +85,10 @@ def main() -> None:
         raise SystemExit("no symbols provided")
     if args.hours <= 1:
         raise SystemExit("--hours must be > 1")
+    if args.max_open_notional_share < 0:
+        raise SystemExit("--max-open-notional-share must be >= 0")
+    if args.max_open_retries < 0:
+        raise SystemExit("--max-open-retries must be >= 0")
 
     csv_output = Path(args.csv_output)
     if args.skip_fetch:
@@ -114,6 +120,10 @@ def main() -> None:
         symbol_arg,
         "--backtest-max-steps",
         str(max_steps),
+        "--backtest-max-open-notional-share",
+        str(args.max_open_notional_share),
+        "--backtest-max-open-retries",
+        str(args.max_open_retries),
     ]
 
     run_cmd(

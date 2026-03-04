@@ -429,11 +429,11 @@
       "command_templates": [
         {
           "name": "recommended_run",
-          "command": "tradebot --backtest-csv \"data/real_3d_1h_binance.csv\" --backtest-symbols BTCUSDT,ETHUSDT,SOLUSDT --backtest-max-steps 72 --backtest-fee-bps 0.0 --backtest-slippage-bps 0.0 --pretty"
+          "command": "tradebot --backtest-csv \"data/real_3d_1h_binance.csv\" --backtest-symbols BTCUSDT,ETHUSDT,SOLUSDT --backtest-max-steps 72 --backtest-fee-bps 0.0 --backtest-slippage-bps 0.0 --backtest-max-open-notional-share 0.02 --backtest-max-open-retries 2 --pretty"
         },
         {
           "name": "conservative_run",
-          "command": "tradebot --backtest-csv \"data/real_3d_1h_binance.csv\" --backtest-symbols BTCUSDT,ETHUSDT,SOLUSDT --backtest-max-steps 72 --backtest-fee-bps 0.0 --backtest-slippage-bps 0.0 --pretty"
+          "command": "tradebot --backtest-csv \"data/real_3d_1h_binance.csv\" --backtest-symbols BTCUSDT,ETHUSDT,SOLUSDT --backtest-max-steps 72 --backtest-fee-bps 0.0 --backtest-slippage-bps 0.0 --backtest-max-open-notional-share 0.02 --backtest-max-open-retries 2 --pretty"
         }
       ],
       "notes": [

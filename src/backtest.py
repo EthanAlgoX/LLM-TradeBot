@@ -627,10 +627,18 @@ class BacktestRunner:
         max_steps: int | None = None,
         fee_bps: float | None = None,
         slippage_bps: float | None = None,
+        max_open_notional_share_of_bar: float | None = None,
+        max_open_retries: int | None = None,
     ) -> None:
         self.cfg = cfg
         self.fee_bps = cfg.backtest_fee_bps if fee_bps is None else max(0.0, fee_bps)
         self.slippage_bps = cfg.backtest_slippage_bps if slippage_bps is None else max(0.0, slippage_bps)
+        self.max_open_notional_share_of_bar = (
+            cfg.backtest_max_open_notional_share_of_bar
+            if max_open_notional_share_of_bar is None
+            else max(0.0, max_open_notional_share_of_bar)
+        )
+        self.max_open_retries = cfg.backtest_max_open_retries if max_open_retries is None else max(0, int(max_open_retries))
         self.dataset = CSVBacktestDataset.from_csv(
             csv_path,
             start=start,
@@ -653,7 +661,9 @@ class BacktestRunner:
             f"--backtest-symbols {symbol_part} "
             f"--backtest-max-steps {self.dataset.steps} "
             f"--backtest-fee-bps {round(fee_bps, 6)} "
-            f"--backtest-slippage-bps {round(slippage_bps, 6)} --pretty"
+            f"--backtest-slippage-bps {round(slippage_bps, 6)} "
+            f"--backtest-max-open-notional-share {round(self.max_open_notional_share_of_bar, 6)} "
+            f"--backtest-max-open-retries {self.max_open_retries} --pretty"
         )
         if max_drawdown_pct is not None:
             cmd += f" --backtest-max-drawdown-pct {round(max_drawdown_pct, 6)}"
@@ -718,8 +728,8 @@ class BacktestRunner:
             fee_bps=fee_bps,
             slippage_bps=slippage_bps,
             dataset=self.dataset,
-            max_open_notional_share_of_bar=0.02,
-            max_open_retries=2,
+            max_open_notional_share_of_bar=self.max_open_notional_share_of_bar,
+            max_open_retries=self.max_open_retries,
         )
 
         bot = MultiAgentTradeBot(

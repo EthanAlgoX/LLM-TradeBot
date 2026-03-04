@@ -45,6 +45,8 @@ class RuntimeConfig:
     persistence_path: str = "data/tradebot.db"
     backtest_fee_bps: float = 3.0
     backtest_slippage_bps: float = 1.0
+    backtest_max_open_notional_share_of_bar: float = 0.02
+    backtest_max_open_retries: int = 2
 
     # AI500 candidate universe (reference from LLM-TradeBot)
     ai500_candidates: list[str] = field(
@@ -75,4 +77,11 @@ class RuntimeConfig:
         cfg.persistence_path = os.getenv("TRADEBOT_PERSISTENCE_PATH", cfg.persistence_path)
         cfg.backtest_fee_bps = float(os.getenv("TRADEBOT_BACKTEST_FEE_BPS", str(cfg.backtest_fee_bps)))
         cfg.backtest_slippage_bps = float(os.getenv("TRADEBOT_BACKTEST_SLIPPAGE_BPS", str(cfg.backtest_slippage_bps)))
+        cfg.backtest_max_open_notional_share_of_bar = float(
+            os.getenv(
+                "TRADEBOT_BACKTEST_MAX_OPEN_NOTIONAL_SHARE_OF_BAR",
+                str(cfg.backtest_max_open_notional_share_of_bar),
+            )
+        )
+        cfg.backtest_max_open_retries = int(os.getenv("TRADEBOT_BACKTEST_MAX_OPEN_RETRIES", str(cfg.backtest_max_open_retries)))
         return cfg
