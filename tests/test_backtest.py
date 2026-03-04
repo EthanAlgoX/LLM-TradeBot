@@ -106,6 +106,9 @@ def test_backtest_runner_outputs_report(tmp_path):
     assert "forced_close_count" in report
     assert "auto_risk_close_count" in report
     assert "auto_risk_close_breakdown" in report
+    assert "partial_open_count" in report
+    assert "retried_open_count" in report
+    assert "rejected_open_count" in report
     assert "cycle_status_counts" in report
     assert "equity_curve" in out
     assert "equity_curve_mtm" in out
@@ -290,6 +293,71 @@ def test_backtest_execution_provider_checks_margin_before_open():
     r = provider.execute(trace_id="t1", planned=open_long, state=state)
     assert r.status == "failed"
     assert "insufficient cash for margin" in r.message
+    assert "BTCUSDT" not in state.positions
+
+
+def test_backtest_execution_provider_partial_fill_with_retry():
+    bars = [
+        BacktestBar(ts=datetime(2026, 1, 1, 0, 0, 0), symbol="BTCUSDT", close=100.0, quote_volume=1000.0),
+        BacktestBar(ts=datetime(2026, 1, 1, 1, 0, 0), symbol="BTCUSDT", close=100.0, quote_volume=50.0),
+        BacktestBar(ts=datetime(2026, 1, 1, 2, 0, 0), symbol="BTCUSDT", close=100.0, quote_volume=200.0),
+    ]
+    dataset = CSVBacktestDataset(bars_by_symbol={"BTCUSDT": bars}, steps=3, source_path="synthetic.csv")
+    provider = BacktestExecutionProvider(
+        fee_bps=0.0,
+        slippage_bps=0.0,
+        dataset=dataset,
+        max_open_notional_share_of_bar=0.5,
+        max_open_retries=1,
+    )
+    state = RuntimeState(cycle=1, cash=1_000.0)
+    open_long = ProposedAction(
+        schema_version="v2",
+        trace_id="t1",
+        symbol="BTCUSDT",
+        source="rule",
+        action="open_long",
+        confidence=80.0,
+        reason="test",
+        order_params={"entry_price": 100.0, "stop_loss": 90.0, "take_profit": 120.0, "quantity": 1.0, "leverage": 1.0},
+    )
+    r = provider.execute(trace_id="t1", planned=open_long, state=state)
+    assert r.status == "success"
+    assert state.positions["BTCUSDT"].qty == pytest.approx(1.0, rel=0, abs=1e-9)
+    assert "retries=1" in r.message
+    assert provider.retried_open_count == 1
+    assert provider.partial_open_count == 0
+
+
+def test_backtest_execution_provider_rejects_when_no_liquidity():
+    bars = [
+        BacktestBar(ts=datetime(2026, 1, 1, 0, 0, 0), symbol="BTCUSDT", close=100.0, quote_volume=1000.0),
+        BacktestBar(ts=datetime(2026, 1, 1, 1, 0, 0), symbol="BTCUSDT", close=100.0, quote_volume=0.0),
+        BacktestBar(ts=datetime(2026, 1, 1, 2, 0, 0), symbol="BTCUSDT", close=100.0, quote_volume=0.0),
+    ]
+    dataset = CSVBacktestDataset(bars_by_symbol={"BTCUSDT": bars}, steps=3, source_path="synthetic.csv")
+    provider = BacktestExecutionProvider(
+        fee_bps=0.0,
+        slippage_bps=0.0,
+        dataset=dataset,
+        max_open_notional_share_of_bar=0.5,
+        max_open_retries=1,
+    )
+    state = RuntimeState(cycle=1, cash=1_000.0)
+    open_long = ProposedAction(
+        schema_version="v2",
+        trace_id="t1",
+        symbol="BTCUSDT",
+        source="rule",
+        action="open_long",
+        confidence=80.0,
+        reason="test",
+        order_params={"entry_price": 100.0, "stop_loss": 90.0, "take_profit": 120.0, "quantity": 1.0, "leverage": 1.0},
+    )
+    r = provider.execute(trace_id="t1", planned=open_long, state=state)
+    assert r.status == "failed"
+    assert "insufficient liquidity" in r.message
+    assert provider.rejected_open_count == 1
     assert "BTCUSDT" not in state.positions
 
 

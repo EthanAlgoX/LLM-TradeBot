@@ -37,6 +37,9 @@
       "stop_loss": 6,
       "take_profit": 3
     },
+    "partial_open_count": 0,
+    "retried_open_count": 0,
+    "rejected_open_count": 0,
     "cycle_status_counts": {
       "wait": 45,
       "success": 27
@@ -632,7 +635,7 @@
   ],
   "last_cycle": {
     "cycle": 72,
-    "trace_id": "cycle:72:20260304T192304Z",
+    "trace_id": "cycle:72:20260304T192658Z",
     "status": "success",
     "action": "close_long"
   },

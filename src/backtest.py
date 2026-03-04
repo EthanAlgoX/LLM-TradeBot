@@ -139,6 +139,9 @@ class BacktestReport:
     forced_close_count: int
     auto_risk_close_count: int
     auto_risk_close_breakdown: dict[str, int]
+    partial_open_count: int
+    retried_open_count: int
+    rejected_open_count: int
     cycle_status_counts: dict[str, int]
 
     def to_dict(self) -> dict[str, object]:
@@ -172,6 +175,9 @@ class BacktestReport:
             "forced_close_count": self.forced_close_count,
             "auto_risk_close_count": self.auto_risk_close_count,
             "auto_risk_close_breakdown": self.auto_risk_close_breakdown,
+            "partial_open_count": self.partial_open_count,
+            "retried_open_count": self.retried_open_count,
+            "rejected_open_count": self.rejected_open_count,
             "cycle_status_counts": self.cycle_status_counts,
         }
 
@@ -329,12 +335,19 @@ class BacktestExecutionProvider(ExecutionProvider):
         fee_bps: float = 3.0,
         slippage_bps: float = 1.0,
         dataset: CSVBacktestDataset | None = None,
+        max_open_notional_share_of_bar: float = 0.0,
+        max_open_retries: int = 2,
     ) -> None:
         self.fee_bps = max(0.0, fee_bps)
         self.slippage_bps = max(0.0, slippage_bps)
         self.total_fees_paid = 0.0
         self.dataset = dataset
+        self.max_open_notional_share_of_bar = max(0.0, max_open_notional_share_of_bar)
+        self.max_open_retries = max(0, int(max_open_retries))
         self.position_risk_levels: dict[str, dict[str, float | None]] = {}
+        self.partial_open_count = 0
+        self.retried_open_count = 0
+        self.rejected_open_count = 0
 
     def _fill_price(self, mark_price: float, action: str) -> float:
         slip = self.slippage_bps / 10_000.0
@@ -356,6 +369,110 @@ class BacktestExecutionProvider(ExecutionProvider):
             return fallback_price
         idx = max(0, min(cycle, self.dataset.steps - 1))
         return float(rows[idx].close)
+
+    def _resolve_quote_volume(self, *, symbol: str, cycle: int) -> float:
+        if not self.dataset:
+            return -1.0
+        rows = self.dataset.bars_by_symbol.get(symbol)
+        if not rows:
+            return -1.0
+        idx = max(0, min(cycle, self.dataset.steps - 1))
+        return max(0.0, float(rows[idx].quote_volume))
+
+    def _max_fill_qty_from_liquidity(self, *, fill_price: float, quote_volume: float) -> float:
+        if self.max_open_notional_share_of_bar <= 0:
+            return float("inf")
+        if quote_volume < 0:
+            return float("inf")
+        if fill_price <= 0 or quote_volume <= 0:
+            return 0.0
+        max_notional = quote_volume * self.max_open_notional_share_of_bar
+        return max_notional / fill_price
+
+    def _execute_open(
+        self,
+        *,
+        trace_id: str,
+        action: str,
+        symbol: str,
+        qty: float,
+        lev: float,
+        planned_price: float,
+        planned: ProposedAction,
+        state: RuntimeState,
+    ) -> ExecutionResult:
+        if symbol in state.positions:
+            self.rejected_open_count += 1
+            return ExecutionResult(SCHEMA_V2, trace_id, symbol, action, "failed", "position already open")
+
+        remaining = qty
+        fills: list[tuple[float, float]] = []
+        retries_used = 0
+
+        for attempt in range(self.max_open_retries + 1):
+            cycle_for_fill = state.cycle + attempt
+            mark_price = self._resolve_mark_price(symbol=symbol, cycle=cycle_for_fill, fallback_price=planned_price)
+            fill_price = self._fill_price(mark_price, action)
+            qv = self._resolve_quote_volume(symbol=symbol, cycle=cycle_for_fill)
+            max_fill_qty = self._max_fill_qty_from_liquidity(fill_price=fill_price, quote_volume=qv)
+            chunk = min(remaining, max_fill_qty)
+            if chunk > 0:
+                fills.append((chunk, fill_price))
+                remaining -= chunk
+                if attempt > 0:
+                    retries_used += 1
+            if remaining <= 1e-12:
+                break
+
+        filled_qty = sum(x[0] for x in fills)
+        if filled_qty <= 0:
+            self.rejected_open_count += 1
+            return ExecutionResult(SCHEMA_V2, trace_id, symbol, action, "failed", "insufficient liquidity")
+
+        weighted_notional = sum(q * px for q, px in fills)
+        avg_fill = weighted_notional / max(1e-12, filled_qty)
+        fee_total = sum(self._fee(px, q) for q, px in fills)
+
+        required_margin = abs(avg_fill * filled_qty) / max(1.0, lev)
+        if required_margin + fee_total > state.cash:
+            self.rejected_open_count += 1
+            return ExecutionResult(SCHEMA_V2, trace_id, symbol, action, "failed", "insufficient cash for margin")
+
+        side = "long" if action == "open_long" else "short"
+        state.positions[symbol] = Position(symbol=symbol, side=side, qty=filled_qty, entry_price=avg_fill, leverage=lev, opened_cycle=state.cycle)
+        self._store_risk_levels(symbol=symbol, planned=planned)
+        self.total_fees_paid += fee_total
+        state.cash -= fee_total
+        state.trades.append(TradeRecord(state.cycle, symbol, action, filled_qty, avg_fill, -fee_total))
+
+        partial = filled_qty + 1e-12 < qty
+        if partial:
+            self.partial_open_count += 1
+        if retries_used > 0:
+            self.retried_open_count += 1
+
+        side_name = "long" if action == "open_long" else "short"
+        if partial:
+            return ExecutionResult(
+                SCHEMA_V2,
+                trace_id,
+                symbol,
+                action,
+                "success",
+                f"backtest {side_name} opened partial qty={filled_qty:.6f}/{qty:.6f} retries={retries_used} fee={fee_total:.6f}",
+                avg_fill,
+            )
+        if retries_used > 0:
+            return ExecutionResult(
+                SCHEMA_V2,
+                trace_id,
+                symbol,
+                action,
+                "success",
+                f"backtest {side_name} opened retries={retries_used} fee={fee_total:.6f}",
+                avg_fill,
+            )
+        return ExecutionResult(SCHEMA_V2, trace_id, symbol, action, "success", f"backtest {side_name} opened fee={fee_total:.6f}", avg_fill)
 
     def _store_risk_levels(self, *, symbol: str, planned: ProposedAction) -> None:
         stop = float(planned.order_params.get("stop_loss", 0.0) or 0.0)
@@ -457,7 +574,6 @@ class BacktestExecutionProvider(ExecutionProvider):
         symbol = planned.symbol
         action = planned.action
         planned_price = float(planned.order_params.get("entry_price", 0) or 0)
-        mark_price = self._resolve_mark_price(symbol=symbol, cycle=state.cycle, fallback_price=planned_price)
         qty = float(planned.order_params.get("quantity", 0) or 0)
         lev = float(planned.order_params.get("leverage", 1.0) or 1.0)
 
@@ -466,38 +582,36 @@ class BacktestExecutionProvider(ExecutionProvider):
         if qty <= 0:
             return ExecutionResult(SCHEMA_V2, trace_id, symbol, action, "failed", "invalid quantity")
 
-        fill = self._fill_price(mark_price, action)
-        fee = self._fee(fill, qty)
-        self.total_fees_paid += fee
-
         if action == "open_long":
-            if symbol in state.positions:
-                return ExecutionResult(SCHEMA_V2, trace_id, symbol, action, "failed", "position already open")
-            required_margin = abs(fill * qty) / max(1.0, lev)
-            if required_margin + fee > state.cash:
-                return ExecutionResult(SCHEMA_V2, trace_id, symbol, action, "failed", "insufficient cash for margin")
-            state.positions[symbol] = Position(symbol=symbol, side="long", qty=qty, entry_price=fill, leverage=lev, opened_cycle=state.cycle)
-            self._store_risk_levels(symbol=symbol, planned=planned)
-            state.cash -= fee
-            state.trades.append(TradeRecord(state.cycle, symbol, action, qty, fill, -fee))
-            return ExecutionResult(SCHEMA_V2, trace_id, symbol, action, "success", f"backtest long opened fee={fee:.6f}", fill)
+            return self._execute_open(
+                trace_id=trace_id,
+                action=action,
+                symbol=symbol,
+                qty=qty,
+                lev=lev,
+                planned_price=planned_price,
+                planned=planned,
+                state=state,
+            )
 
         if action == "open_short":
-            if symbol in state.positions:
-                return ExecutionResult(SCHEMA_V2, trace_id, symbol, action, "failed", "position already open")
-            required_margin = abs(fill * qty) / max(1.0, lev)
-            if required_margin + fee > state.cash:
-                return ExecutionResult(SCHEMA_V2, trace_id, symbol, action, "failed", "insufficient cash for margin")
-            state.positions[symbol] = Position(symbol=symbol, side="short", qty=qty, entry_price=fill, leverage=lev, opened_cycle=state.cycle)
-            self._store_risk_levels(symbol=symbol, planned=planned)
-            state.cash -= fee
-            state.trades.append(TradeRecord(state.cycle, symbol, action, qty, fill, -fee))
-            return ExecutionResult(SCHEMA_V2, trace_id, symbol, action, "success", f"backtest short opened fee={fee:.6f}", fill)
+            return self._execute_open(
+                trace_id=trace_id,
+                action=action,
+                symbol=symbol,
+                qty=qty,
+                lev=lev,
+                planned_price=planned_price,
+                planned=planned,
+                state=state,
+            )
 
         if action in {"close_long", "close_short"}:
-            self.total_fees_paid -= fee
+            mark_price = self._resolve_mark_price(symbol=symbol, cycle=state.cycle, fallback_price=planned_price)
             return self._close_position(trace_id=trace_id, symbol=symbol, action=action, state=state, mark_price=mark_price)
 
+        mark_price = self._resolve_mark_price(symbol=symbol, cycle=state.cycle, fallback_price=planned_price)
+        fill = self._fill_price(mark_price, action)
         return ExecutionResult(SCHEMA_V2, trace_id, symbol, action, "failed", "unknown action", fill)
 
 
@@ -600,7 +714,13 @@ class BacktestRunner:
         cfg.ai500_candidates = list(self.dataset.symbols)
         cfg.selector.top_n = min(cfg.selector.top_n, len(self.dataset.symbols))
         cfg.persistence_enabled = False
-        exec_provider = BacktestExecutionProvider(fee_bps=fee_bps, slippage_bps=slippage_bps, dataset=self.dataset)
+        exec_provider = BacktestExecutionProvider(
+            fee_bps=fee_bps,
+            slippage_bps=slippage_bps,
+            dataset=self.dataset,
+            max_open_notional_share_of_bar=0.02,
+            max_open_retries=2,
+        )
 
         bot = MultiAgentTradeBot(
             cfg=cfg,
@@ -726,6 +846,9 @@ class BacktestRunner:
             forced_close_count=len(forced_closes),
             auto_risk_close_count=len(auto_risk_closes),
             auto_risk_close_breakdown=auto_risk_breakdown,
+            partial_open_count=exec_provider.partial_open_count,
+            retried_open_count=exec_provider.retried_open_count,
+            rejected_open_count=exec_provider.rejected_open_count,
             cycle_status_counts=status_counts,
         )
 
