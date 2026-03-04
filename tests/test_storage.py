@@ -52,6 +52,23 @@ def test_sqlite_state_store_roundtrip(tmp_path):
     assert erow is not None
     assert int(erow[0]) == 2
 
+    latest = store.latest_trace_id()
+    assert latest == "cycle:3:test"
+    summary = store.load_cycle_summary("cycle:3:test")
+    assert summary is not None
+    assert summary["cycle"] == 3
+    assert summary["status"] == "wait"
+    loaded_events = store.load_events("cycle:3:test")
+    assert len(loaded_events) == 2
+    assert loaded_events[1]["stage"] == "selector"
+    assert loaded_events[1]["phase"] == "end"
+    assert len(store.load_events("cycle:3:test", stage="selector")) == 2
+    assert len(store.load_events("cycle:3:test", stage="analysis")) == 0
+    assert len(store.load_events("cycle:3:test", limit=1)) == 1
+    assert store.load_events("cycle:3:test", limit=1)[0]["seq"] == 1
+    assert len(store.load_events("cycle:3:test", stage="selector", limit=1)) == 1
+    assert store.load_events("cycle:3:test", stage="selector", limit=1)[0]["phase"] == "end"
+
 
 def test_bot_persistence_recovers_cycle(tmp_path):
     db = tmp_path / "tradebot.db"

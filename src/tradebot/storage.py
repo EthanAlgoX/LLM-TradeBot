@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import sqlite3
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from tradebot.contracts import CycleResult
 from tradebot.state import Position, RuntimeState, TradeRecord
@@ -209,3 +209,64 @@ class SQLiteStateStore:
             conn.execute("DELETE FROM trades")
             conn.execute("DELETE FROM cycles")
             conn.execute("DELETE FROM events")
+
+    def latest_trace_id(self) -> str | None:
+        with self._connect() as conn:
+            self._ensure_schema(conn)
+            row = conn.execute("SELECT trace_id FROM cycles ORDER BY cycle DESC, id DESC LIMIT 1").fetchone()
+            if row is None:
+                return None
+            return str(row["trace_id"])
+
+    def load_cycle_summary(self, trace_id: str) -> dict[str, Any] | None:
+        with self._connect() as conn:
+            self._ensure_schema(conn)
+            row = conn.execute(
+                """
+                SELECT cycle, trace_id, status, action, selected_symbols_json, details_json, created_at
+                FROM cycles
+                WHERE trace_id = ?
+                LIMIT 1
+                """,
+                (trace_id,),
+            ).fetchone()
+            if row is None:
+                return None
+            return {
+                "cycle": int(row["cycle"]),
+                "trace_id": str(row["trace_id"]),
+                "status": str(row["status"]),
+                "action": str(row["action"]),
+                "selected_symbols": json.loads(str(row["selected_symbols_json"])),
+                "details": json.loads(str(row["details_json"])),
+                "created_at": str(row["created_at"]),
+            }
+
+    def load_events(self, trace_id: str, *, stage: str | None = None, limit: int | None = None) -> list[dict[str, Any]]:
+        with self._connect() as conn:
+            self._ensure_schema(conn)
+            sql = """
+                SELECT seq, ts, stage, phase, agent, data_json
+                FROM events
+                WHERE trace_id = ?
+            """
+            params: list[Any] = [trace_id]
+            if stage:
+                sql += " AND stage = ?"
+                params.append(stage)
+            sql += " ORDER BY seq ASC"
+            rows = conn.execute(sql, tuple(params)).fetchall()
+            if limit is not None and limit > 0:
+                rows = rows[-limit:]
+            out = [
+                {
+                    "seq": int(row["seq"]),
+                    "ts": str(row["ts"]),
+                    "stage": str(row["stage"]),
+                    "phase": str(row["phase"]),
+                    "agent": str(row["agent"]),
+                    "data": json.loads(str(row["data_json"])),
+                }
+                for row in rows
+            ]
+            return out

@@ -37,6 +37,22 @@ Reset persisted state and start from cycle 1:
 tradebot --cycles 1 --persistence-path data/tradebot.db --reset-state --pretty
 ```
 
+Replay persisted agent runtime events:
+
+```bash
+# Replay latest cycle
+tradebot --persistence-path data/tradebot.db --replay-latest --pretty
+
+# Replay a specific trace
+tradebot --persistence-path data/tradebot.db --replay-trace "cycle:12:20260305T010203Z" --pretty
+
+# Replay only risk stage and keep last 20 events
+tradebot --persistence-path data/tradebot.db --replay-latest --replay-stage risk --replay-max-events 20 --pretty
+
+# Replay only aggregated stage stats (no raw events)
+tradebot --persistence-path data/tradebot.db --replay-latest --replay-summary-only --pretty
+```
+
 Environment variables:
 
 - `TRADEBOT_DATA_PROVIDER=sim|binance`
