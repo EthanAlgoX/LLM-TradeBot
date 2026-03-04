@@ -2,8 +2,12 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta
 
-from tradebot.backtest import BacktestRunner, CSVBacktestDataset
+import pytest
+
+from tradebot.backtest import BacktestExecutionProvider, BacktestRunner, CSVBacktestDataset
 from tradebot.config import RuntimeConfig
+from tradebot.contracts import ProposedAction
+from tradebot.state import RuntimeState
 
 
 def _write_sample_csv(path):
@@ -42,13 +46,54 @@ def test_backtest_runner_outputs_report(tmp_path):
         symbols=["BTCUSDT", "ETHUSDT", "SOLUSDT"],
         max_steps=30,
     )
-    out = runner.run()
+    out = runner.run(include_trades=True)
 
     assert out["mode"] == "backtest_csv"
     report = out["report"]
     assert report["steps"] == 30
     assert report["initial_cash"] == cfg.initial_cash
+    assert report["fee_bps"] == cfg.backtest_fee_bps
+    assert report["slippage_bps"] == cfg.backtest_slippage_bps
+    assert "total_fees" in report
     assert "final_cash" in report
     assert "max_drawdown_pct" in report
     assert "cycle_status_counts" in report
+    assert "equity_curve" in out
+    assert "trades" in out
     assert out["last_cycle"]["cycle"] == 30
+
+
+def test_backtest_execution_provider_applies_fee_and_slippage():
+    provider = BacktestExecutionProvider(fee_bps=10.0, slippage_bps=0.0)
+    state = RuntimeState(cycle=1, cash=10_000.0)
+
+    open_long = ProposedAction(
+        schema_version="v2",
+        trace_id="t1",
+        symbol="BTCUSDT",
+        source="rule",
+        action="open_long",
+        confidence=80.0,
+        reason="test",
+        order_params={"entry_price": 100.0, "quantity": 1.0, "leverage": 1.0},
+    )
+    close_long = ProposedAction(
+        schema_version="v2",
+        trace_id="t2",
+        symbol="BTCUSDT",
+        source="rule",
+        action="close_long",
+        confidence=80.0,
+        reason="test",
+        order_params={"entry_price": 100.0, "quantity": 1.0, "leverage": 1.0},
+    )
+
+    r1 = provider.execute(trace_id="t1", planned=open_long, state=state)
+    assert r1.status == "success"
+    assert state.cash == pytest.approx(9_999.9, rel=0, abs=1e-9)
+
+    state.cycle = 2
+    r2 = provider.execute(trace_id="t2", planned=close_long, state=state)
+    assert r2.status == "success"
+    assert state.cash == pytest.approx(9_999.8, rel=0, abs=1e-9)
+    assert provider.total_fees_paid == pytest.approx(0.2, rel=0, abs=1e-9)

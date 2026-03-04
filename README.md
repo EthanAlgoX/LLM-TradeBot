@@ -20,6 +20,12 @@ Run historical replay backtest from CSV:
 tradebot --backtest-csv data/bars.csv --backtest-symbols BTCUSDT,ETHUSDT,SOLUSDT --backtest-max-steps 500 --pretty
 ```
 
+Configure execution cost model and write report:
+
+```bash
+tradebot --backtest-csv data/bars.csv --backtest-fee-bps 3 --backtest-slippage-bps 1 --backtest-output reports/backtest.json --pretty
+```
+
 Required CSV columns:
 
 - `ts` (ISO8601 datetime)
@@ -81,6 +87,8 @@ Environment variables:
 - `TRADEBOT_LIVE_CONFIRM=YES` (required for `binance_live`, default `NO`)
 - `TRADEBOT_PERSISTENCE_ENABLED=1`
 - `TRADEBOT_PERSISTENCE_PATH=data/tradebot.db`
+- `TRADEBOT_BACKTEST_FEE_BPS=3`
+- `TRADEBOT_BACKTEST_SLIPPAGE_BPS=1`
 
 ## Live execution safeguards
 
