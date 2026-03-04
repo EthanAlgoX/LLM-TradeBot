@@ -5,12 +5,12 @@ import json
 import re
 import sqlite3
 
-from tradebot.config import RuntimeConfig
-from tradebot.contracts import CycleResult
-from tradebot.events import RuntimeEvent
-from tradebot.orchestrator import MultiAgentTradeBot
-from tradebot.state import Position, RuntimeState, TradeRecord
-from tradebot.storage import SQLiteStateStore
+from config import RuntimeConfig
+from contracts import CycleResult
+from events import RuntimeEvent
+from orchestrator import MultiAgentTradeBot
+from state import Position, RuntimeState, TradeRecord
+from storage import SQLiteStateStore
 
 
 def test_sqlite_state_store_roundtrip(tmp_path):

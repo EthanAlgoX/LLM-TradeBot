@@ -1,6 +1,6 @@
 import asyncio
 
-from tradebot.orchestrator import MultiAgentTradeBot
+from orchestrator import MultiAgentTradeBot
 
 
 def test_pipeline_runs_and_selects_top10():

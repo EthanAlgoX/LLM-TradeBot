@@ -15,10 +15,11 @@ dependencies = []
 dev = ["pytest>=8.0"]
 
 [project.scripts]
-tradebot = "tradebot.cli:main"
+tradebot = "cli:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
+py-modules = ["backtest", "cli", "config", "contracts", "events", "orchestrator", "state", "storage"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

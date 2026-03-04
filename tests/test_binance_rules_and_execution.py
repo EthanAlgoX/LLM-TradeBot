@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from tradebot.agents.execution import ExecutionPlannerAgent
-from tradebot.config import RuntimeConfig
-from tradebot.contracts import ProposedAction, RiskDecision
-from tradebot.providers.binance_rules import BinanceSymbolRules, format_quantity, quantize_quantity
-from tradebot.providers.execution import BinanceCredentials, BinanceFuturesExecutionProvider
-from tradebot.state import Position, RuntimeState
+from agents.execution import ExecutionPlannerAgent
+from config import RuntimeConfig
+from contracts import ProposedAction, RiskDecision
+from providers.binance_rules import BinanceSymbolRules, format_quantity, quantize_quantity
+from providers.execution import BinanceCredentials, BinanceFuturesExecutionProvider
+from state import Position, RuntimeState
 
 
 class StaticRulesProvider:

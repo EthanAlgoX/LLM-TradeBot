@@ -1,10 +1,10 @@
 import pytest
 
-from tradebot.config import RuntimeConfig
-from tradebot.providers.factory import build_execution_provider, build_market_data_provider, build_market_rank_provider
-from tradebot.providers.data import FallbackMarketDataProvider, SimMarketDataProvider
-from tradebot.providers.execution import PaperExecutionProvider, SimExecutionProvider
-from tradebot.providers.ranking import BinanceMarketRankProvider, MockMarketRankProvider
+from config import RuntimeConfig
+from providers.factory import build_execution_provider, build_market_data_provider, build_market_rank_provider
+from providers.data import FallbackMarketDataProvider, SimMarketDataProvider
+from providers.execution import PaperExecutionProvider, SimExecutionProvider
+from providers.ranking import BinanceMarketRankProvider, MockMarketRankProvider
 
 
 def test_runtime_config_from_env(monkeypatch: pytest.MonkeyPatch):

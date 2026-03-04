@@ -1,4 +1,4 @@
-from tradebot.cli import _build_stage_summary
+from cli import _build_stage_summary
 
 
 def test_build_stage_summary_counts_and_duration():

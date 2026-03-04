@@ -1,7 +1,7 @@
-from tradebot.agents.risk import RiskAuditAgent
-from tradebot.config import RuntimeConfig
-from tradebot.contracts import ProposedAction
-from tradebot.state import RuntimeState
+from agents.risk import RiskAuditAgent
+from config import RuntimeConfig
+from contracts import ProposedAction
+from state import RuntimeState
 
 
 def test_risk_blocks_over_leverage():

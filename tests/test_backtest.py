@@ -4,10 +4,10 @@ from datetime import datetime, timedelta
 
 import pytest
 
-from tradebot.backtest import BacktestExecutionProvider, BacktestRunner, CSVBacktestDataset, render_backtest_markdown
-from tradebot.config import RuntimeConfig
-from tradebot.contracts import ProposedAction
-from tradebot.state import RuntimeState
+from backtest import BacktestExecutionProvider, BacktestRunner, CSVBacktestDataset, render_backtest_markdown
+from config import RuntimeConfig
+from contracts import ProposedAction
+from state import RuntimeState
 
 
 def _write_sample_csv(path):
