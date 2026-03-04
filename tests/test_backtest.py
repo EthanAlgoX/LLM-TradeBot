@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 
 import pytest
 
-from tradebot.backtest import BacktestExecutionProvider, BacktestRunner, CSVBacktestDataset
+from tradebot.backtest import BacktestExecutionProvider, BacktestRunner, CSVBacktestDataset, render_backtest_markdown
 from tradebot.config import RuntimeConfig
 from tradebot.contracts import ProposedAction
 from tradebot.state import RuntimeState
@@ -159,3 +159,18 @@ def test_backtest_grid_runs_and_sorts(tmp_path):
     assert out3["rank_order"] == "asc"
     results3 = out3["results"]
     assert float(results3[0]["max_drawdown_pct"]) <= float(results3[-1]["max_drawdown_pct"])
+
+    md = render_backtest_markdown(out3, top_n=2)
+    assert "# Backtest Summary (backtest_grid)" in md
+    assert "## Top Results" in md
+
+
+def test_render_backtest_markdown_csv(tmp_path):
+    csv_path = tmp_path / "bars.csv"
+    _write_sample_csv(csv_path)
+    cfg = RuntimeConfig()
+    runner = BacktestRunner(cfg=cfg, csv_path=str(csv_path), symbols=["BTCUSDT", "ETHUSDT", "SOLUSDT"], max_steps=10)
+    out = runner.run()
+    md = render_backtest_markdown(out)
+    assert "# Backtest Summary (backtest_csv)" in md
+    assert "## Report" in md

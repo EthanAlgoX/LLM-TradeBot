@@ -18,6 +18,81 @@ from tradebot.providers.ranking import MarketRankProvider, MarketRankRow
 from tradebot.state import Position, RuntimeState, TradeRecord
 
 
+def render_backtest_markdown(payload: dict[str, object], *, top_n: int = 5) -> str:
+    mode = str(payload.get("mode", "unknown"))
+    lines: list[str] = [f"# Backtest Summary ({mode})", ""]
+
+    if mode == "backtest_csv":
+        report = payload.get("report", {})
+        if not isinstance(report, dict):
+            report = {}
+        lines.extend(
+            [
+                "## Report",
+                "",
+                f"- Dataset: `{report.get('dataset_path', '')}`",
+                f"- Symbols: `{','.join(report.get('symbols', [])) if isinstance(report.get('symbols'), list) else ''}`",
+                f"- Steps: `{report.get('steps', 0)}`",
+                f"- Return(%): `{report.get('total_return_pct', 0)}`",
+                f"- Realized PnL: `{report.get('realized_pnl', 0)}`",
+                f"- Final Cash: `{report.get('final_cash', 0)}`",
+                f"- Max Drawdown(%): `{report.get('max_drawdown_pct', 0)}`",
+                f"- Sharpe: `{report.get('sharpe', 0)}`",
+                f"- Profit Factor: `{report.get('profit_factor', 0)}`",
+                "",
+            ]
+        )
+        return "\n".join(lines).strip() + "\n"
+
+    if mode == "backtest_grid":
+        best = payload.get("best", {})
+        if not isinstance(best, dict):
+            best = {}
+        analysis = payload.get("analysis", {})
+        if not isinstance(analysis, dict):
+            analysis = {}
+        top = analysis.get("top_results", payload.get("results", []))
+        if not isinstance(top, list):
+            top = []
+        top = top[: max(1, top_n)]
+
+        lines.extend(
+            [
+                "## Best",
+                "",
+                f"- Rank By: `{payload.get('rank_by', 'final_cash')}`",
+                f"- Fee/Slippage: `{best.get('fee_bps', 0)}` / `{best.get('slippage_bps', 0)}` bps",
+                f"- Final Cash: `{best.get('final_cash', 0)}`",
+                f"- Return(%): `{best.get('total_return_pct', 0)}`",
+                f"- Max Drawdown(%): `{best.get('max_drawdown_pct', 0)}`",
+                "",
+                "## Top Results",
+                "",
+                "| Rank | Fee(bps) | Slippage(bps) | Final Cash | Return(%) | MaxDD(%) | Sharpe |",
+                "| --- | ---: | ---: | ---: | ---: | ---: | ---: |",
+            ]
+        )
+        for idx, row in enumerate(top, start=1):
+            if not isinstance(row, dict):
+                continue
+            lines.append(
+                f"| {idx} | {row.get('fee_bps', 0)} | {row.get('slippage_bps', 0)} | {row.get('final_cash', 0)} | "
+                f"{row.get('total_return_pct', 0)} | {row.get('max_drawdown_pct', 0)} | {row.get('sharpe', 0)} |"
+            )
+
+        rec = analysis.get("recommendations", {})
+        if isinstance(rec, dict):
+            notes = rec.get("notes", [])
+            if isinstance(notes, list) and notes:
+                lines.extend(["", "## Notes", ""])
+                lines.extend([f"- {x}" for x in notes])
+        lines.append("")
+        return "\n".join(lines).strip() + "\n"
+
+    lines.extend(["No summary available for mode.", ""])
+    return "\n".join(lines).strip() + "\n"
+
+
 def _to_float(value: object, default: float = 0.0) -> float:
     try:
         return float(value)

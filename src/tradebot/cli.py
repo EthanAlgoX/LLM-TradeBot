@@ -7,7 +7,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from tradebot.backtest import BacktestRunner
+from tradebot.backtest import BacktestRunner, render_backtest_markdown
 from tradebot.config import RuntimeConfig
 from tradebot.orchestrator import MultiAgentTradeBot
 from tradebot.storage import SQLiteStateStore
@@ -34,6 +34,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--backtest-max-drawdown-pct", type=float, help="Grid constraint: max drawdown percent")
     p.add_argument("--backtest-min-closed-trades", type=int, help="Grid constraint: min closed trades")
     p.add_argument("--backtest-output", help="Write backtest JSON result to this file path")
+    p.add_argument("--backtest-summary-output", help="Write backtest markdown summary to this file path")
     p.add_argument("--backtest-include-trades", action="store_true", help="Include full trade list in backtest output")
     p.add_argument("--data-provider", choices=["sim", "binance"], help="Market data provider")
     p.add_argument("--market-rank-provider", choices=["mock", "binance"], help="Market-rank provider")
@@ -199,6 +200,7 @@ def main() -> None:
         or args.backtest_max_drawdown_pct is not None
         or args.backtest_min_closed_trades is not None
         or args.backtest_output
+        or args.backtest_summary_output
         or args.backtest_include_trades
     ) and not args.backtest_csv:
         raise SystemExit("configuration error: --backtest-* filters require --backtest-csv")
@@ -268,6 +270,10 @@ def main() -> None:
             out_path = Path(args.backtest_output)
             out_path.parent.mkdir(parents=True, exist_ok=True)
             out_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        if args.backtest_summary_output:
+            md_path = Path(args.backtest_summary_output)
+            md_path.parent.mkdir(parents=True, exist_ok=True)
+            md_path.write_text(render_backtest_markdown(payload, top_n=args.backtest_top_n or 5), encoding="utf-8")
         _dump(payload, pretty=args.pretty)
         return
     try:

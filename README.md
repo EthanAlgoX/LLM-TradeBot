@@ -23,7 +23,7 @@ tradebot --backtest-csv data/bars.csv --backtest-symbols BTCUSDT,ETHUSDT,SOLUSDT
 Configure execution cost model and write report:
 
 ```bash
-tradebot --backtest-csv data/bars.csv --backtest-fee-bps 3 --backtest-slippage-bps 1 --backtest-output reports/backtest.json --pretty
+tradebot --backtest-csv data/bars.csv --backtest-fee-bps 3 --backtest-slippage-bps 1 --backtest-output reports/backtest.json --backtest-summary-output reports/backtest.md --pretty
 ```
 
 Run parameter sweep (grid backtest):
