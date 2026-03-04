@@ -227,14 +227,23 @@ class CSVBacktestDataset:
         if not parsed:
             raise ValueError("no bars loaded from csv after filters")
 
-        min_steps = min(len(rows) for rows in parsed.values())
+        # Align all symbols on timestamp intersection to avoid cross-symbol time skew.
+        symbol_maps: dict[str, dict[datetime, BacktestBar]] = {}
+        common_ts: set[datetime] | None = None
+        for sym, rows in parsed.items():
+            by_ts = {bar.ts: bar for bar in rows}
+            symbol_maps[sym] = by_ts
+            ts_set = set(by_ts.keys())
+            common_ts = ts_set if common_ts is None else (common_ts & ts_set)
+
+        aligned_ts = sorted(common_ts or [])
         if max_steps is not None and max_steps > 0:
-            min_steps = min(min_steps, max_steps)
-        if min_steps < 2:
+            aligned_ts = aligned_ts[:max_steps]
+        if len(aligned_ts) < 2:
             raise ValueError("backtest requires at least 2 aligned bars per symbol")
 
-        trimmed = {sym: rows[:min_steps] for sym, rows in parsed.items()}
-        return cls(bars_by_symbol=trimmed, steps=min_steps, source_path=str(p))
+        trimmed = {sym: [symbol_maps[sym][ts] for ts in aligned_ts] for sym in parsed.keys()}
+        return cls(bars_by_symbol=trimmed, steps=len(aligned_ts), source_path=str(p))
 
     def start_ts(self) -> datetime:
         return min(rows[0].ts for rows in self.bars_by_symbol.values())
@@ -310,10 +319,17 @@ class BacktestMarketRankProvider(MarketRankProvider):
 
 
 class BacktestExecutionProvider(ExecutionProvider):
-    def __init__(self, *, fee_bps: float = 3.0, slippage_bps: float = 1.0) -> None:
+    def __init__(
+        self,
+        *,
+        fee_bps: float = 3.0,
+        slippage_bps: float = 1.0,
+        dataset: CSVBacktestDataset | None = None,
+    ) -> None:
         self.fee_bps = max(0.0, fee_bps)
         self.slippage_bps = max(0.0, slippage_bps)
         self.total_fees_paid = 0.0
+        self.dataset = dataset
 
     def _fill_price(self, mark_price: float, action: str) -> float:
         slip = self.slippage_bps / 10_000.0
@@ -326,10 +342,21 @@ class BacktestExecutionProvider(ExecutionProvider):
     def _fee(self, fill_price: float, qty: float) -> float:
         return abs(fill_price * qty) * self.fee_bps / 10_000.0
 
+    def _resolve_mark_price(self, *, symbol: str, cycle: int, fallback_price: float) -> float:
+        # Fill on the next bar when dataset is available. For the last cycle, fallback to final bar.
+        if not self.dataset:
+            return fallback_price
+        rows = self.dataset.bars_by_symbol.get(symbol)
+        if not rows:
+            return fallback_price
+        idx = max(0, min(cycle, self.dataset.steps - 1))
+        return float(rows[idx].close)
+
     def execute(self, *, trace_id: str, planned: ProposedAction, state: RuntimeState) -> ExecutionResult:
         symbol = planned.symbol
         action = planned.action
-        mark_price = float(planned.order_params.get("entry_price", 0) or 0)
+        planned_price = float(planned.order_params.get("entry_price", 0) or 0)
+        mark_price = self._resolve_mark_price(symbol=symbol, cycle=state.cycle, fallback_price=planned_price)
         qty = float(planned.order_params.get("quantity", 0) or 0)
         lev = float(planned.order_params.get("leverage", 1.0) or 1.0)
 
@@ -468,7 +495,7 @@ class BacktestRunner:
         cfg.ai500_candidates = list(self.dataset.symbols)
         cfg.selector.top_n = min(cfg.selector.top_n, len(self.dataset.symbols))
         cfg.persistence_enabled = False
-        exec_provider = BacktestExecutionProvider(fee_bps=fee_bps, slippage_bps=slippage_bps)
+        exec_provider = BacktestExecutionProvider(fee_bps=fee_bps, slippage_bps=slippage_bps, dataset=self.dataset)
 
         bot = MultiAgentTradeBot(
             cfg=cfg,

@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 
 import pytest
 
-from backtest import BacktestExecutionProvider, BacktestMarketRankProvider, BacktestRunner, CSVBacktestDataset, render_backtest_markdown
+from backtest import BacktestBar, BacktestExecutionProvider, BacktestMarketRankProvider, BacktestRunner, CSVBacktestDataset, render_backtest_markdown
 from config import RuntimeConfig
 from contracts import ProposedAction
 from state import RuntimeState
@@ -45,6 +45,32 @@ def test_backtest_market_rank_no_lookahead_on_first_cycle(tmp_path):
 
     assert "BTCUSDT" in out
     assert "trend=0.00%" in out["BTCUSDT"].reason
+
+
+def test_backtest_dataset_aligns_on_timestamp_intersection(tmp_path):
+    csv_path = tmp_path / "misaligned.csv"
+    csv_path.write_text(
+        "\n".join(
+            [
+                "ts,symbol,close,quote_volume",
+                "2026-01-01T00:00:00,BTCUSDT,100,1000",
+                "2026-01-01T00:00:00,ETHUSDT,200,1200",
+                "2026-01-01T00:01:00,BTCUSDT,101,1001",
+                "2026-01-01T00:02:00,BTCUSDT,102,1002",
+                "2026-01-01T00:02:00,ETHUSDT,202,1202",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    dataset = CSVBacktestDataset.from_csv(str(csv_path), symbols=["BTCUSDT", "ETHUSDT"])
+    assert dataset.steps == 2
+    assert dataset.start_ts().isoformat().startswith("2026-01-01T00:00:00")
+    assert dataset.end_ts().isoformat().startswith("2026-01-01T00:02:00")
+    assert [x.ts.isoformat() for x in dataset.bars_by_symbol["BTCUSDT"]] == [
+        "2026-01-01T00:00:00",
+        "2026-01-01T00:02:00",
+    ]
 
 
 def test_backtest_runner_outputs_report(tmp_path):
@@ -123,6 +149,49 @@ def test_backtest_execution_provider_applies_fee_and_slippage():
     assert r2.status == "success"
     assert state.cash == pytest.approx(9_999.8, rel=0, abs=1e-9)
     assert provider.total_fees_paid == pytest.approx(0.2, rel=0, abs=1e-9)
+
+
+def test_backtest_execution_provider_uses_next_bar_fill_with_dataset():
+    bars = [
+        BacktestBar(ts=datetime(2026, 1, 1, 0, 0, 0), symbol="BTCUSDT", close=100.0, quote_volume=1000.0),
+        BacktestBar(ts=datetime(2026, 1, 1, 1, 0, 0), symbol="BTCUSDT", close=110.0, quote_volume=1100.0),
+        BacktestBar(ts=datetime(2026, 1, 1, 2, 0, 0), symbol="BTCUSDT", close=120.0, quote_volume=1200.0),
+    ]
+    dataset = CSVBacktestDataset(bars_by_symbol={"BTCUSDT": bars}, steps=3, source_path="synthetic.csv")
+    provider = BacktestExecutionProvider(fee_bps=0.0, slippage_bps=0.0, dataset=dataset)
+    state = RuntimeState(cycle=1, cash=1_000.0)
+
+    open_long = ProposedAction(
+        schema_version="v2",
+        trace_id="t1",
+        symbol="BTCUSDT",
+        source="rule",
+        action="open_long",
+        confidence=80.0,
+        reason="test",
+        order_params={"entry_price": 100.0, "quantity": 1.0, "leverage": 1.0},
+    )
+    close_long = ProposedAction(
+        schema_version="v2",
+        trace_id="t2",
+        symbol="BTCUSDT",
+        source="rule",
+        action="close_long",
+        confidence=80.0,
+        reason="test",
+        order_params={"entry_price": 110.0, "quantity": 1.0, "leverage": 1.0},
+    )
+
+    r1 = provider.execute(trace_id="t1", planned=open_long, state=state)
+    assert r1.status == "success"
+    assert r1.fill_price == pytest.approx(110.0, rel=0, abs=1e-9)
+    assert state.positions["BTCUSDT"].entry_price == pytest.approx(110.0, rel=0, abs=1e-9)
+
+    state.cycle = 2
+    r2 = provider.execute(trace_id="t2", planned=close_long, state=state)
+    assert r2.status == "success"
+    assert r2.fill_price == pytest.approx(120.0, rel=0, abs=1e-9)
+    assert state.cash == pytest.approx(1_010.0, rel=0, abs=1e-9)
 
 
 def test_backtest_grid_runs_and_sorts(tmp_path):
