@@ -305,6 +305,28 @@ class BacktestRunner:
             max_steps=max_steps,
         )
 
+    def _build_backtest_command(
+        self,
+        *,
+        fee_bps: float,
+        slippage_bps: float,
+        max_drawdown_pct: float | None = None,
+        min_closed_trades: int | None = None,
+    ) -> str:
+        symbol_part = ",".join(self.dataset.symbols)
+        cmd = (
+            f'tradebot --backtest-csv "{self.dataset.source_path}" '
+            f"--backtest-symbols {symbol_part} "
+            f"--backtest-max-steps {self.dataset.steps} "
+            f"--backtest-fee-bps {round(fee_bps, 6)} "
+            f"--backtest-slippage-bps {round(slippage_bps, 6)} --pretty"
+        )
+        if max_drawdown_pct is not None:
+            cmd += f" --backtest-max-drawdown-pct {round(max_drawdown_pct, 6)}"
+        if min_closed_trades is not None:
+            cmd += f" --backtest-min-closed-trades {int(min_closed_trades)}"
+        return cmd
+
     def _run_once(self, *, fee_bps: float, slippage_bps: float, include_trades: bool) -> dict[str, object]:
         cfg = copy.deepcopy(self.cfg)
         cfg.ai500_candidates = list(self.dataset.symbols)
@@ -444,6 +466,7 @@ class BacktestRunner:
                     "recommended_params": None,
                     "cost_tolerance": {"max_fee_bps_non_negative_return": None, "max_slippage_bps_non_negative_return": None},
                     "conservative_params": None,
+                    "command_templates": [],
                     "notes": ["no grid results"],
                 },
             }
@@ -520,6 +543,7 @@ class BacktestRunner:
             }
             if conservative
             else None,
+            "command_templates": [],
             "notes": notes,
         }
 
@@ -529,6 +553,39 @@ class BacktestRunner:
         if min_closed_trades is not None:
             constrained_rows = [r for r in constrained_rows if int(_to_float(r.get("closed_trades"))) >= min_closed_trades]
         constrained_best = constrained_rows[0] if constrained_rows else None
+
+        cmd_templates: list[dict[str, str]] = [
+            {
+                "name": "recommended_run",
+                "command": self._build_backtest_command(
+                    fee_bps=_to_float(best.get("fee_bps")),
+                    slippage_bps=_to_float(best.get("slippage_bps")),
+                ),
+            }
+        ]
+        if conservative is not None:
+            cmd_templates.append(
+                {
+                    "name": "conservative_run",
+                    "command": self._build_backtest_command(
+                        fee_bps=_to_float(conservative.get("fee_bps")),
+                        slippage_bps=_to_float(conservative.get("slippage_bps")),
+                    ),
+                }
+            )
+        if constrained_best is not None and (max_drawdown_pct is not None or min_closed_trades is not None):
+            cmd_templates.append(
+                {
+                    "name": "constrained_best_run",
+                    "command": self._build_backtest_command(
+                        fee_bps=_to_float(constrained_best.get("fee_bps")),
+                        slippage_bps=_to_float(constrained_best.get("slippage_bps")),
+                        max_drawdown_pct=max_drawdown_pct,
+                        min_closed_trades=min_closed_trades,
+                    ),
+                }
+            )
+        recommendations["command_templates"] = cmd_templates
 
         return {
             "top_results": rows[: max(1, top_n)],

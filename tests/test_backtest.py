@@ -129,6 +129,9 @@ def test_backtest_grid_runs_and_sorts(tmp_path):
     assert rec["recommended_params"] is not None
     assert "cost_tolerance" in rec
     assert "notes" in rec
+    assert "command_templates" in rec
+    assert len(rec["command_templates"]) >= 1
+    assert "tradebot --backtest-csv" in rec["command_templates"][0]["command"]
     assert analysis["constrained_count"] == 4
     assert analysis["constrained_best_result"] is not None
 
@@ -144,3 +147,4 @@ def test_backtest_grid_runs_and_sorts(tmp_path):
     assert analysis2["constraint"]["min_closed_trades"] == 999
     assert analysis2["constrained_count"] == 0
     assert analysis2["constrained_best_result"] is None
+    assert len(analysis2["recommendations"]["command_templates"]) >= 1
