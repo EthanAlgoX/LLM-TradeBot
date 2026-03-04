@@ -14,6 +14,7 @@
     {
       "fee_bps": 0.0,
       "slippage_bps": 0.0,
+      "funding_rate_bps_per_cycle": 0.0,
       "final_cash": 100013.936207,
       "total_return_pct": 0.013936,
       "realized_pnl": 13.936207,
@@ -31,6 +32,7 @@
     {
       "fee_bps": 0.0,
       "slippage_bps": 1.0,
+      "funding_rate_bps_per_cycle": 0.0,
       "final_cash": 100005.909189,
       "total_return_pct": 0.005909,
       "realized_pnl": 5.909189,
@@ -48,6 +50,7 @@
     {
       "fee_bps": 1.0,
       "slippage_bps": 0.0,
+      "funding_rate_bps_per_cycle": 0.0,
       "final_cash": 100005.909189,
       "total_return_pct": 0.005909,
       "realized_pnl": 5.909189,
@@ -65,6 +68,7 @@
     {
       "fee_bps": 0.0,
       "slippage_bps": 2.0,
+      "funding_rate_bps_per_cycle": 0.0,
       "final_cash": 99997.882171,
       "total_return_pct": -0.002118,
       "realized_pnl": -2.117829,
@@ -82,6 +86,7 @@
     {
       "fee_bps": 1.0,
       "slippage_bps": 1.0,
+      "funding_rate_bps_per_cycle": 0.0,
       "final_cash": 99997.882171,
       "total_return_pct": -0.002118,
       "realized_pnl": -2.117829,
@@ -99,6 +104,7 @@
     {
       "fee_bps": 1.0,
       "slippage_bps": 2.0,
+      "funding_rate_bps_per_cycle": 0.0,
       "final_cash": 99989.855153,
       "total_return_pct": -0.010145,
       "realized_pnl": -10.144847,
@@ -116,6 +122,7 @@
     {
       "fee_bps": 3.0,
       "slippage_bps": 0.0,
+      "funding_rate_bps_per_cycle": 0.0,
       "final_cash": 99989.855152,
       "total_return_pct": -0.010145,
       "realized_pnl": -10.144848,
@@ -133,6 +140,7 @@
     {
       "fee_bps": 3.0,
       "slippage_bps": 1.0,
+      "funding_rate_bps_per_cycle": 0.0,
       "final_cash": 99981.828134,
       "total_return_pct": -0.018172,
       "realized_pnl": -18.171866,
@@ -150,6 +158,7 @@
     {
       "fee_bps": 3.0,
       "slippage_bps": 2.0,
+      "funding_rate_bps_per_cycle": 0.0,
       "final_cash": 99973.801117,
       "total_return_pct": -0.026199,
       "realized_pnl": -26.198883,
@@ -167,6 +176,7 @@
     {
       "fee_bps": 5.0,
       "slippage_bps": 0.0,
+      "funding_rate_bps_per_cycle": 0.0,
       "final_cash": 99973.801116,
       "total_return_pct": -0.026199,
       "realized_pnl": -26.198884,
@@ -184,6 +194,7 @@
     {
       "fee_bps": 5.0,
       "slippage_bps": 1.0,
+      "funding_rate_bps_per_cycle": 0.0,
       "final_cash": 99965.774098,
       "total_return_pct": -0.034226,
       "realized_pnl": -34.225902,
@@ -201,6 +212,7 @@
     {
       "fee_bps": 5.0,
       "slippage_bps": 2.0,
+      "funding_rate_bps_per_cycle": 0.0,
       "final_cash": 99957.74708,
       "total_return_pct": -0.042253,
       "realized_pnl": -42.25292,
@@ -219,6 +231,7 @@
   "best": {
     "fee_bps": 0.0,
     "slippage_bps": 0.0,
+    "funding_rate_bps_per_cycle": 0.0,
     "final_cash": 100013.936207,
     "total_return_pct": 0.013936,
     "realized_pnl": 13.936207,
@@ -238,6 +251,7 @@
       {
         "fee_bps": 0.0,
         "slippage_bps": 0.0,
+        "funding_rate_bps_per_cycle": 0.0,
         "final_cash": 100013.936207,
         "total_return_pct": 0.013936,
         "realized_pnl": 13.936207,
@@ -255,6 +269,7 @@
       {
         "fee_bps": 0.0,
         "slippage_bps": 1.0,
+        "funding_rate_bps_per_cycle": 0.0,
         "final_cash": 100005.909189,
         "total_return_pct": 0.005909,
         "realized_pnl": 5.909189,
@@ -272,6 +287,7 @@
       {
         "fee_bps": 1.0,
         "slippage_bps": 0.0,
+        "funding_rate_bps_per_cycle": 0.0,
         "final_cash": 100005.909189,
         "total_return_pct": 0.005909,
         "realized_pnl": 5.909189,
@@ -289,6 +305,7 @@
       {
         "fee_bps": 0.0,
         "slippage_bps": 2.0,
+        "funding_rate_bps_per_cycle": 0.0,
         "final_cash": 99997.882171,
         "total_return_pct": -0.002118,
         "realized_pnl": -2.117829,
@@ -306,6 +323,7 @@
       {
         "fee_bps": 1.0,
         "slippage_bps": 1.0,
+        "funding_rate_bps_per_cycle": 0.0,
         "final_cash": 99997.882171,
         "total_return_pct": -0.002118,
         "realized_pnl": -2.117829,
@@ -324,6 +342,7 @@
     "best_result": {
       "fee_bps": 0.0,
       "slippage_bps": 0.0,
+      "funding_rate_bps_per_cycle": 0.0,
       "final_cash": 100013.936207,
       "total_return_pct": 0.013936,
       "realized_pnl": 13.936207,
@@ -341,6 +360,7 @@
     "worst_result": {
       "fee_bps": 5.0,
       "slippage_bps": 2.0,
+      "funding_rate_bps_per_cycle": 0.0,
       "final_cash": 99957.74708,
       "total_return_pct": -0.042253,
       "realized_pnl": -42.25292,
@@ -366,6 +386,7 @@
     "constrained_best_result": {
       "fee_bps": 0.0,
       "slippage_bps": 0.0,
+      "funding_rate_bps_per_cycle": 0.0,
       "final_cash": 100013.936207,
       "total_return_pct": 0.013936,
       "realized_pnl": 13.936207,
@@ -434,10 +455,20 @@
         "avg_max_drawdown_pct": 0.314086
       }
     ],
+    "funding_sensitivity": [
+      {
+        "funding_rate_bps_per_cycle": 0.0,
+        "runs": 12,
+        "avg_final_cash": 99987.848398,
+        "avg_return_pct": -0.012152,
+        "avg_max_drawdown_pct": 0.309698
+      }
+    ],
     "recommendations": {
       "recommended_params": {
         "fee_bps": 0.0,
-        "slippage_bps": 0.0
+        "slippage_bps": 0.0,
+        "funding_rate_bps_per_cycle": 0.0
       },
       "cost_tolerance": {
         "max_fee_bps_non_negative_return": 0.0,
@@ -445,7 +476,8 @@
       },
       "conservative_params": {
         "fee_bps": 0.0,
-        "slippage_bps": 0.0
+        "slippage_bps": 0.0,
+        "funding_rate_bps_per_cycle": 0.0
       },
       "command_templates": [
         {

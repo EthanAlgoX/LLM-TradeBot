@@ -28,6 +28,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--max-open-retries", type=int, default=2)
     p.add_argument("--grid-fees", default="0,1,3,5")
     p.add_argument("--grid-slippages", default="0,1,2")
+    p.add_argument("--grid-funding", help="Optional funding-rate bps-per-cycle grid, e.g. -0.5,0,0.5")
     p.add_argument("--grid-top-n", type=int, default=5)
     p.add_argument("--grid-rank-by", default="max_drawdown_pct")
     p.add_argument("--csv-output", default="data/real_3d_1h_binance.csv")
@@ -153,6 +154,11 @@ def main() -> None:
             args.grid_fees,
             "--backtest-slippage-grid",
             args.grid_slippages,
+            *(
+                ["--backtest-funding-grid", args.grid_funding]
+                if args.grid_funding
+                else []
+            ),
             "--backtest-top-n",
             str(args.grid_top_n),
             "--backtest-rank-by",

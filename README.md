@@ -135,6 +135,12 @@ Run parameter sweep (grid backtest):
 tradebot --backtest-csv data/bars.csv --backtest-fee-grid 0,1,3,5 --backtest-slippage-grid 0,1,2 --backtest-output reports/backtest_grid.json --pretty
 ```
 
+Run 3D parameter sweep including funding-rate:
+
+```bash
+tradebot --backtest-csv data/bars.csv --backtest-fee-grid 0,1,3,5 --backtest-slippage-grid 0,1,2 --backtest-funding-grid -0.5,0,0.5 --backtest-output reports/backtest_grid.json --pretty
+```
+
 Control analysis output size:
 
 ```bash

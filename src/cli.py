@@ -40,6 +40,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p.add_argument("--backtest-fee-grid", help="Comma separated fee bps grid for parameter sweep")
     p.add_argument("--backtest-slippage-grid", help="Comma separated slippage bps grid for parameter sweep")
+    p.add_argument("--backtest-funding-grid", help="Comma separated funding-rate bps-per-cycle grid for parameter sweep")
     p.add_argument("--backtest-top-n", type=int, help="Top N results to include in grid analysis")
     p.add_argument(
         "--backtest-rank-by",
@@ -217,6 +218,7 @@ def main() -> None:
         or args.backtest_max_open_notional_share is not None
         or args.backtest_max_open_retries is not None
         or args.backtest_funding_rate_bps_per_cycle is not None
+        or args.backtest_funding_grid is not None
         or args.backtest_top_n is not None
         or args.backtest_rank_by is not None
         or args.backtest_max_drawdown_pct is not None
@@ -232,6 +234,7 @@ def main() -> None:
         raise SystemExit("configuration error: backtest mode cannot be combined with --reset-state")
     fee_grid: list[float] | None = None
     slippage_grid: list[float] | None = None
+    funding_grid: list[float] | None = None
     if args.backtest_fee_grid is not None:
         try:
             fee_grid = _parse_float_grid(args.backtest_fee_grid)
@@ -242,12 +245,19 @@ def main() -> None:
             slippage_grid = _parse_float_grid(args.backtest_slippage_grid)
         except ValueError as exc:
             raise SystemExit(f"configuration error: invalid --backtest-slippage-grid ({exc})") from exc
+    if args.backtest_funding_grid is not None:
+        try:
+            funding_grid = _parse_float_grid(args.backtest_funding_grid)
+        except ValueError as exc:
+            raise SystemExit(f"configuration error: invalid --backtest-funding-grid ({exc})") from exc
     if fee_grid is not None and any(x < 0 for x in fee_grid):
         raise SystemExit("configuration error: --backtest-fee-grid values must be >= 0")
     if slippage_grid is not None and any(x < 0 for x in slippage_grid):
         raise SystemExit("configuration error: --backtest-slippage-grid values must be >= 0")
     if (fee_grid is not None) != (slippage_grid is not None):
         raise SystemExit("configuration error: --backtest-fee-grid and --backtest-slippage-grid must be used together")
+    if funding_grid is not None and fee_grid is None:
+        raise SystemExit("configuration error: --backtest-funding-grid requires fee/slippage grid mode")
     if fee_grid is not None and args.backtest_include_trades:
         raise SystemExit("configuration error: --backtest-include-trades is not supported in grid mode")
     if fee_grid is None and args.backtest_top_n is not None:
@@ -284,6 +294,7 @@ def main() -> None:
             payload = runner.run_grid(
                 fee_bps_grid=fee_grid,
                 slippage_bps_grid=slippage_grid,
+                funding_rate_bps_grid=funding_grid,
                 top_n=args.backtest_top_n or 5,
                 rank_by=args.backtest_rank_by or "final_cash",
                 max_drawdown_pct=args.backtest_max_drawdown_pct,

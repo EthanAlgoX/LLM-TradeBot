@@ -411,6 +411,7 @@ def test_backtest_grid_runs_and_sorts(tmp_path):
     best_cash = float(out["results"][0]["final_cash"])
     worst_cash = float(out["results"][-1]["final_cash"])
     assert best_cash >= worst_cash
+    assert "funding_rate_bps_per_cycle" in out["results"][0]
     assert "partial_open_count" in out["results"][0]
     assert "retried_open_count" in out["results"][0]
     assert "rejected_open_count" in out["results"][0]
@@ -420,6 +421,7 @@ def test_backtest_grid_runs_and_sorts(tmp_path):
     assert len(analysis["top_results"]) == 2
     assert len(analysis["fee_sensitivity"]) == 2
     assert len(analysis["slippage_sensitivity"]) == 2
+    assert len(analysis["funding_sensitivity"]) == 1
     assert float(analysis["spread_final_cash"]) >= 0
     assert "recommendations" in analysis
     rec = analysis["recommendations"]
@@ -456,6 +458,15 @@ def test_backtest_grid_runs_and_sorts(tmp_path):
     assert out3["rank_order"] == "asc"
     results3 = out3["results"]
     assert float(results3[0]["max_drawdown_pct"]) <= float(results3[-1]["max_drawdown_pct"])
+
+    out4 = runner.run_grid(
+        fee_bps_grid=[0.0, 3.0],
+        slippage_bps_grid=[0.0, 2.0],
+        funding_rate_bps_grid=[0.0, 1.0],
+        top_n=2,
+    )
+    assert out4["runs"] == 8
+    assert len(out4["analysis"]["funding_sensitivity"]) == 2
 
     md = render_backtest_markdown(out3, top_n=2)
     assert "# Backtest Summary (backtest_grid)" in md

@@ -63,21 +63,22 @@ def render_backtest_markdown(payload: dict[str, object], *, top_n: int = 5) -> s
                 "",
                 f"- Rank By: `{payload.get('rank_by', 'final_cash')}`",
                 f"- Fee/Slippage: `{best.get('fee_bps', 0)}` / `{best.get('slippage_bps', 0)}` bps",
+                f"- Funding(bps/cycle): `{best.get('funding_rate_bps_per_cycle', 0)}`",
                 f"- Final Cash: `{best.get('final_cash', 0)}`",
                 f"- Return(%): `{best.get('total_return_pct', 0)}`",
                 f"- Max Drawdown(%): `{best.get('max_drawdown_pct', 0)}`",
                 "",
                 "## Top Results",
                 "",
-                "| Rank | Fee(bps) | Slippage(bps) | Final Cash | Return(%) | MaxDD(%) | Sharpe |",
-                "| --- | ---: | ---: | ---: | ---: | ---: | ---: |",
+                "| Rank | Fee(bps) | Slippage(bps) | Funding(bps/cycle) | Final Cash | Return(%) | MaxDD(%) | Sharpe |",
+                "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
             ]
         )
         for idx, row in enumerate(top, start=1):
             if not isinstance(row, dict):
                 continue
             lines.append(
-                f"| {idx} | {row.get('fee_bps', 0)} | {row.get('slippage_bps', 0)} | {row.get('final_cash', 0)} | "
+                f"| {idx} | {row.get('fee_bps', 0)} | {row.get('slippage_bps', 0)} | {row.get('funding_rate_bps_per_cycle', 0)} | {row.get('final_cash', 0)} | "
                 f"{row.get('total_return_pct', 0)} | {row.get('max_drawdown_pct', 0)} | {row.get('sharpe', 0)} |"
             )
 
@@ -663,17 +664,19 @@ class BacktestRunner:
         *,
         fee_bps: float,
         slippage_bps: float,
+        funding_rate_bps_per_cycle: float | None = None,
         max_drawdown_pct: float | None = None,
         min_closed_trades: int | None = None,
     ) -> str:
         symbol_part = ",".join(self.dataset.symbols)
+        funding_rate = self.funding_rate_bps_per_cycle if funding_rate_bps_per_cycle is None else float(funding_rate_bps_per_cycle)
         cmd = (
             f'tradebot --backtest-csv "{self.dataset.source_path}" '
             f"--backtest-symbols {symbol_part} "
             f"--backtest-max-steps {self.dataset.steps} "
             f"--backtest-fee-bps {round(fee_bps, 6)} "
             f"--backtest-slippage-bps {round(slippage_bps, 6)} "
-            f"--backtest-funding-rate-bps-per-cycle {round(self.funding_rate_bps_per_cycle, 6)} "
+            f"--backtest-funding-rate-bps-per-cycle {round(funding_rate, 6)} "
             f"--backtest-max-open-notional-share {round(self.max_open_notional_share_of_bar, 6)} "
             f"--backtest-max-open-retries {self.max_open_retries} --pretty"
         )
@@ -767,7 +770,14 @@ class BacktestRunner:
             )
         return forced
 
-    def _run_once(self, *, fee_bps: float, slippage_bps: float, include_trades: bool) -> dict[str, object]:
+    def _run_once(
+        self,
+        *,
+        fee_bps: float,
+        slippage_bps: float,
+        funding_rate_bps_per_cycle: float,
+        include_trades: bool,
+    ) -> dict[str, object]:
         cfg = copy.deepcopy(self.cfg)
         cfg.ai500_candidates = list(self.dataset.symbols)
         cfg.selector.top_n = min(cfg.selector.top_n, len(self.dataset.symbols))
@@ -804,7 +814,7 @@ class BacktestRunner:
             total_funding_pnl += self._apply_funding(
                 state=bot.state,
                 cycle=bot.state.cycle,
-                funding_rate_bps=self.funding_rate_bps_per_cycle,
+                funding_rate_bps=funding_rate_bps_per_cycle,
                 sink=funding_events,
             )
 
@@ -895,7 +905,7 @@ class BacktestRunner:
             total_funding_pnl=total_funding_pnl,
             fee_bps=fee_bps,
             slippage_bps=slippage_bps,
-            funding_rate_bps_per_cycle=self.funding_rate_bps_per_cycle,
+            funding_rate_bps_per_cycle=funding_rate_bps_per_cycle,
             total_fees=exec_provider.total_fees_paid,
             closed_trades=len(closed),
             wins=wins,
@@ -950,7 +960,12 @@ class BacktestRunner:
         return payload
 
     def run(self, *, include_trades: bool = False) -> dict[str, object]:
-        return self._run_once(fee_bps=self.fee_bps, slippage_bps=self.slippage_bps, include_trades=include_trades)
+        return self._run_once(
+            fee_bps=self.fee_bps,
+            slippage_bps=self.slippage_bps,
+            funding_rate_bps_per_cycle=self.funding_rate_bps_per_cycle,
+            include_trades=include_trades,
+        )
 
     def _analyze_grid_results(
         self,
@@ -976,6 +991,7 @@ class BacktestRunner:
                 "spread_final_cash": 0.0,
                 "fee_sensitivity": [],
                 "slippage_sensitivity": [],
+                "funding_sensitivity": [],
                 "recommendations": {
                     "recommended_params": None,
                     "cost_tolerance": {"max_fee_bps_non_negative_return": None, "max_slippage_bps_non_negative_return": None},
@@ -987,11 +1003,14 @@ class BacktestRunner:
 
         fee_map: dict[float, list[dict[str, object]]] = {}
         slippage_map: dict[float, list[dict[str, object]]] = {}
+        funding_map: dict[float, list[dict[str, object]]] = {}
         for row in rows:
             fee = _to_float(row.get("fee_bps"))
             slip = _to_float(row.get("slippage_bps"))
+            funding = _to_float(row.get("funding_rate_bps_per_cycle"))
             fee_map.setdefault(fee, []).append(row)
             slippage_map.setdefault(slip, []).append(row)
+            funding_map.setdefault(funding, []).append(row)
 
         def _aggregate(grouped: dict[float, list[dict[str, object]]], field_name: str) -> list[dict[str, object]]:
             out: list[dict[str, object]] = []
@@ -1017,6 +1036,7 @@ class BacktestRunner:
         spread = (max(final_cash_values) - min(final_cash_values)) if final_cash_values else 0.0
         fee_sensitivity = _aggregate(fee_map, "fee_bps")
         slippage_sensitivity = _aggregate(slippage_map, "slippage_bps")
+        funding_sensitivity = _aggregate(funding_map, "funding_rate_bps_per_cycle")
 
         max_fee_ok: float | None = None
         for row in fee_sensitivity:
@@ -1047,6 +1067,7 @@ class BacktestRunner:
             "recommended_params": {
                 "fee_bps": _to_float(best.get("fee_bps")),
                 "slippage_bps": _to_float(best.get("slippage_bps")),
+                "funding_rate_bps_per_cycle": _to_float(best.get("funding_rate_bps_per_cycle")),
             },
             "cost_tolerance": {
                 "max_fee_bps_non_negative_return": max_fee_ok,
@@ -1055,6 +1076,7 @@ class BacktestRunner:
             "conservative_params": {
                 "fee_bps": _to_float(conservative.get("fee_bps")),
                 "slippage_bps": _to_float(conservative.get("slippage_bps")),
+                "funding_rate_bps_per_cycle": _to_float(conservative.get("funding_rate_bps_per_cycle")),
             }
             if conservative
             else None,
@@ -1075,6 +1097,7 @@ class BacktestRunner:
                 "command": self._build_backtest_command(
                     fee_bps=_to_float(best.get("fee_bps")),
                     slippage_bps=_to_float(best.get("slippage_bps")),
+                    funding_rate_bps_per_cycle=_to_float(best.get("funding_rate_bps_per_cycle")),
                 ),
             }
         ]
@@ -1085,6 +1108,7 @@ class BacktestRunner:
                     "command": self._build_backtest_command(
                         fee_bps=_to_float(conservative.get("fee_bps")),
                         slippage_bps=_to_float(conservative.get("slippage_bps")),
+                        funding_rate_bps_per_cycle=_to_float(conservative.get("funding_rate_bps_per_cycle")),
                     ),
                 }
             )
@@ -1095,6 +1119,7 @@ class BacktestRunner:
                     "command": self._build_backtest_command(
                         fee_bps=_to_float(constrained_best.get("fee_bps")),
                         slippage_bps=_to_float(constrained_best.get("slippage_bps")),
+                        funding_rate_bps_per_cycle=_to_float(constrained_best.get("funding_rate_bps_per_cycle")),
                         max_drawdown_pct=max_drawdown_pct,
                         min_closed_trades=min_closed_trades,
                     ),
@@ -1116,6 +1141,7 @@ class BacktestRunner:
             "spread_final_cash": round(spread, 6),
             "fee_sensitivity": fee_sensitivity,
             "slippage_sensitivity": slippage_sensitivity,
+            "funding_sensitivity": funding_sensitivity,
             "recommendations": recommendations,
         }
 
@@ -1124,37 +1150,46 @@ class BacktestRunner:
         *,
         fee_bps_grid: list[float],
         slippage_bps_grid: list[float],
+        funding_rate_bps_grid: list[float] | None = None,
         top_n: int = 5,
         rank_by: str = "final_cash",
         max_drawdown_pct: float | None = None,
         min_closed_trades: int | None = None,
     ) -> dict[str, object]:
         grid_results: list[dict[str, object]] = []
+        funding_grid = funding_rate_bps_grid if funding_rate_bps_grid is not None else [self.funding_rate_bps_per_cycle]
         for fee in fee_bps_grid:
             for slip in slippage_bps_grid:
-                result = self._run_once(fee_bps=max(0.0, fee), slippage_bps=max(0.0, slip), include_trades=False)
-                report = result["report"]
-                if not isinstance(report, dict):
-                    continue
-                grid_results.append(
-                    {
-                        "fee_bps": fee,
-                        "slippage_bps": slip,
-                        "final_cash": report.get("final_cash"),
-                        "total_return_pct": report.get("total_return_pct"),
-                        "realized_pnl": report.get("realized_pnl"),
-                        "total_funding_pnl": report.get("total_funding_pnl"),
-                        "total_fees": report.get("total_fees"),
-                        "closed_trades": report.get("closed_trades"),
-                        "profit_factor": report.get("profit_factor"),
-                        "sharpe": report.get("sharpe"),
-                        "max_drawdown_pct": report.get("max_drawdown_pct"),
-                        "win_rate": report.get("win_rate"),
-                        "partial_open_count": report.get("partial_open_count"),
-                        "retried_open_count": report.get("retried_open_count"),
-                        "rejected_open_count": report.get("rejected_open_count"),
-                    }
-                )
+                for funding in funding_grid:
+                    result = self._run_once(
+                        fee_bps=max(0.0, fee),
+                        slippage_bps=max(0.0, slip),
+                        funding_rate_bps_per_cycle=float(funding),
+                        include_trades=False,
+                    )
+                    report = result["report"]
+                    if not isinstance(report, dict):
+                        continue
+                    grid_results.append(
+                        {
+                            "fee_bps": fee,
+                            "slippage_bps": slip,
+                            "funding_rate_bps_per_cycle": funding,
+                            "final_cash": report.get("final_cash"),
+                            "total_return_pct": report.get("total_return_pct"),
+                            "realized_pnl": report.get("realized_pnl"),
+                            "total_funding_pnl": report.get("total_funding_pnl"),
+                            "total_fees": report.get("total_fees"),
+                            "closed_trades": report.get("closed_trades"),
+                            "profit_factor": report.get("profit_factor"),
+                            "sharpe": report.get("sharpe"),
+                            "max_drawdown_pct": report.get("max_drawdown_pct"),
+                            "win_rate": report.get("win_rate"),
+                            "partial_open_count": report.get("partial_open_count"),
+                            "retried_open_count": report.get("retried_open_count"),
+                            "rejected_open_count": report.get("rejected_open_count"),
+                        }
+                    )
         sort_map: dict[str, tuple[str, bool]] = {
             "final_cash": ("final_cash", True),
             "total_return_pct": ("total_return_pct", True),
