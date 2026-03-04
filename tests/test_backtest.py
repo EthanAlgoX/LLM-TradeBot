@@ -108,7 +108,7 @@ def test_backtest_grid_runs_and_sorts(tmp_path):
 
     cfg = RuntimeConfig()
     runner = BacktestRunner(cfg=cfg, csv_path=str(csv_path), symbols=["BTCUSDT", "ETHUSDT", "SOLUSDT"], max_steps=20)
-    out = runner.run_grid(fee_bps_grid=[0.0, 3.0], slippage_bps_grid=[0.0, 2.0])
+    out = runner.run_grid(fee_bps_grid=[0.0, 3.0], slippage_bps_grid=[0.0, 2.0], top_n=2)
 
     assert out["mode"] == "backtest_grid"
     assert out["runs"] == 4
@@ -118,3 +118,9 @@ def test_backtest_grid_runs_and_sorts(tmp_path):
     best_cash = float(out["results"][0]["final_cash"])
     worst_cash = float(out["results"][-1]["final_cash"])
     assert best_cash >= worst_cash
+    analysis = out["analysis"]
+    assert isinstance(analysis, dict)
+    assert len(analysis["top_results"]) == 2
+    assert len(analysis["fee_sensitivity"]) == 2
+    assert len(analysis["slippage_sensitivity"]) == 2
+    assert float(analysis["spread_final_cash"]) >= 0

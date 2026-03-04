@@ -32,6 +32,12 @@ Run parameter sweep (grid backtest):
 tradebot --backtest-csv data/bars.csv --backtest-fee-grid 0,1,3,5 --backtest-slippage-grid 0,1,2 --backtest-output reports/backtest_grid.json --pretty
 ```
 
+Control analysis output size:
+
+```bash
+tradebot --backtest-csv data/bars.csv --backtest-fee-grid 0,1,3,5 --backtest-slippage-grid 0,1,2 --backtest-top-n 5 --pretty
+```
+
 Required CSV columns:
 
 - `ts` (ISO8601 datetime)

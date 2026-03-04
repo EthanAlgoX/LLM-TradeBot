@@ -18,6 +18,13 @@ from tradebot.providers.ranking import MarketRankProvider, MarketRankRow
 from tradebot.state import Position, RuntimeState, TradeRecord
 
 
+def _to_float(value: object, default: float = 0.0) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
 @dataclass
 class BacktestBar:
     ts: datetime
@@ -411,7 +418,56 @@ class BacktestRunner:
     def run(self, *, include_trades: bool = False) -> dict[str, object]:
         return self._run_once(fee_bps=self.fee_bps, slippage_bps=self.slippage_bps, include_trades=include_trades)
 
-    def run_grid(self, *, fee_bps_grid: list[float], slippage_bps_grid: list[float]) -> dict[str, object]:
+    def _analyze_grid_results(self, rows: list[dict[str, object]], *, top_n: int) -> dict[str, object]:
+        if not rows:
+            return {
+                "top_results": [],
+                "best_result": None,
+                "worst_result": None,
+                "spread_final_cash": 0.0,
+                "fee_sensitivity": [],
+                "slippage_sensitivity": [],
+            }
+
+        fee_map: dict[float, list[dict[str, object]]] = {}
+        slippage_map: dict[float, list[dict[str, object]]] = {}
+        for row in rows:
+            fee = _to_float(row.get("fee_bps"))
+            slip = _to_float(row.get("slippage_bps"))
+            fee_map.setdefault(fee, []).append(row)
+            slippage_map.setdefault(slip, []).append(row)
+
+        def _aggregate(grouped: dict[float, list[dict[str, object]]], field_name: str) -> list[dict[str, object]]:
+            out: list[dict[str, object]] = []
+            for key, items in grouped.items():
+                finals = [_to_float(i.get("final_cash")) for i in items]
+                rets = [_to_float(i.get("total_return_pct")) for i in items]
+                dds = [_to_float(i.get("max_drawdown_pct")) for i in items]
+                out.append(
+                    {
+                        field_name: key,
+                        "runs": len(items),
+                        "avg_final_cash": round(mean(finals), 6) if finals else 0.0,
+                        "avg_return_pct": round(mean(rets), 6) if rets else 0.0,
+                        "avg_max_drawdown_pct": round(mean(dds), 6) if dds else 0.0,
+                    }
+                )
+            out.sort(key=lambda x: _to_float(x.get(field_name)))
+            return out
+
+        best = rows[0]
+        worst = rows[-1]
+        spread = _to_float(best.get("final_cash")) - _to_float(worst.get("final_cash"))
+        return {
+            "top_results": rows[: max(1, top_n)],
+            "best_result": best,
+            "worst_result": worst,
+            "spread_final_cash": round(spread, 6),
+            "fee_sensitivity": _aggregate(fee_map, "fee_bps"),
+            "slippage_sensitivity": _aggregate(slippage_map, "slippage_bps"),
+        }
+
+    def run_grid(self, *, fee_bps_grid: list[float], slippage_bps_grid: list[float], top_n: int = 5) -> dict[str, object]:
         grid_results: list[dict[str, object]] = []
         for fee in fee_bps_grid:
             for slip in slippage_bps_grid:
@@ -435,6 +491,7 @@ class BacktestRunner:
                     }
                 )
         grid_results.sort(key=lambda x: float(x.get("final_cash", 0.0) or 0.0), reverse=True)
+        analysis = self._analyze_grid_results(grid_results, top_n=max(1, top_n))
         return {
             "mode": "backtest_grid",
             "dataset_path": self.dataset.source_path,
@@ -443,4 +500,5 @@ class BacktestRunner:
             "runs": len(grid_results),
             "results": grid_results,
             "best": grid_results[0] if grid_results else None,
+            "analysis": analysis,
         }
