@@ -270,7 +270,8 @@ class BacktestMarketRankProvider(MarketRankProvider):
 
     def snapshot(self, symbols: list[str], cycle: int) -> dict[str, MarketRankRow]:
         out: dict[str, MarketRankRow] = {}
-        idx = max(0, min(cycle, self.dataset.steps - 1))
+        # Keep rank snapshot aligned with market data provider at the same cycle.
+        idx = max(0, min(cycle - 1, self.dataset.steps - 1))
 
         max_qv = 1.0
         for sym in symbols:

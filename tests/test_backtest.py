@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 
 import pytest
 
-from backtest import BacktestExecutionProvider, BacktestRunner, CSVBacktestDataset, render_backtest_markdown
+from backtest import BacktestExecutionProvider, BacktestMarketRankProvider, BacktestRunner, CSVBacktestDataset, render_backtest_markdown
 from config import RuntimeConfig
 from contracts import ProposedAction
 from state import RuntimeState
@@ -33,6 +33,18 @@ def test_backtest_dataset_load_and_filter(tmp_path):
     assert dataset.steps == 20
     assert dataset.symbols == ["BTCUSDT", "ETHUSDT"]
     assert dataset.start_ts().isoformat().startswith("2026-01-01T00:00:00")
+
+
+def test_backtest_market_rank_no_lookahead_on_first_cycle(tmp_path):
+    csv_path = tmp_path / "bars.csv"
+    _write_sample_csv(csv_path)
+    dataset = CSVBacktestDataset.from_csv(str(csv_path), symbols=["BTCUSDT"], max_steps=5)
+
+    rank_provider = BacktestMarketRankProvider(dataset)
+    out = rank_provider.snapshot(["BTCUSDT"], cycle=1)
+
+    assert "BTCUSDT" in out
+    assert "trend=0.00%" in out["BTCUSDT"].reason
 
 
 def test_backtest_runner_outputs_report(tmp_path):
