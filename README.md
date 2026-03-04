@@ -154,6 +154,25 @@ Optional CSV columns:
 
 - `quote_volume` (defaults to `0` if omitted)
 
+Automated real-data audit (3 days, 1h):
+
+```bash
+python scripts/run_real_data_audit.py
+```
+
+This command fetches Binance Futures real klines for `BTCUSDT,ETHUSDT,SOLUSDT`,
+writes `data/real_3d_1h_binance.csv`, then runs:
+
+- single-run audit report (fee `3`, slippage `1`)
+- grid audit report (fee `0,1,3,5`, slippage `0,1,2`)
+
+Outputs:
+
+- `reports/audit_real_3d_1h_single.json`
+- `reports/audit_real_3d_1h_single.md`
+- `reports/audit_real_3d_1h_grid.json`
+- `reports/audit_real_3d_1h_grid.md`
+
 ## Runtime modes
 
 - `sim` (default): fully deterministic local simulation
