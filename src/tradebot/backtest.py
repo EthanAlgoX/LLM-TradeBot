@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import asyncio
+import copy
 import csv
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from statistics import mean
+from statistics import mean, pstdev
 from typing import Any
 
 from tradebot.config import RuntimeConfig
@@ -44,6 +45,9 @@ class BacktestReport:
     losses: int
     win_rate: float
     avg_pnl_per_trade: float
+    expectancy: float
+    profit_factor: float
+    sharpe: float
     max_drawdown_pct: float
     cycle_status_counts: dict[str, int]
 
@@ -66,6 +70,9 @@ class BacktestReport:
             "losses": self.losses,
             "win_rate": round(self.win_rate, 6),
             "avg_pnl_per_trade": round(self.avg_pnl_per_trade, 6),
+            "expectancy": round(self.expectancy, 6),
+            "profit_factor": round(self.profit_factor, 6),
+            "sharpe": round(self.sharpe, 6),
             "max_drawdown_pct": round(self.max_drawdown_pct, 6),
             "cycle_status_counts": self.cycle_status_counts,
         }
@@ -291,15 +298,15 @@ class BacktestRunner:
             max_steps=max_steps,
         )
 
-    def run(self, *, include_trades: bool = False) -> dict[str, object]:
-        # Backtest scope uses only symbols existing in the dataset.
-        self.cfg.ai500_candidates = list(self.dataset.symbols)
-        self.cfg.selector.top_n = min(self.cfg.selector.top_n, len(self.dataset.symbols))
-        self.cfg.persistence_enabled = False
-        exec_provider = BacktestExecutionProvider(fee_bps=self.fee_bps, slippage_bps=self.slippage_bps)
+    def _run_once(self, *, fee_bps: float, slippage_bps: float, include_trades: bool) -> dict[str, object]:
+        cfg = copy.deepcopy(self.cfg)
+        cfg.ai500_candidates = list(self.dataset.symbols)
+        cfg.selector.top_n = min(cfg.selector.top_n, len(self.dataset.symbols))
+        cfg.persistence_enabled = False
+        exec_provider = BacktestExecutionProvider(fee_bps=fee_bps, slippage_bps=slippage_bps)
 
         bot = MultiAgentTradeBot(
-            cfg=self.cfg,
+            cfg=cfg,
             market_data_provider=BacktestMarketDataProvider(self.dataset),
             market_rank_provider=BacktestMarketRankProvider(self.dataset),
             execution_provider=exec_provider,
@@ -320,10 +327,27 @@ class BacktestRunner:
         wins = len([t for t in closed if t.pnl > 0])
         losses = len([t for t in closed if t.pnl < 0])
         final_cash = bot.state.cash
-        initial_cash = self.cfg.initial_cash
+        initial_cash = cfg.initial_cash
         realized = final_cash - initial_cash
         win_rate = wins / len(closed) if closed else 0.0
         avg_pnl = mean([t.pnl for t in closed]) if closed else 0.0
+
+        gross_profit = sum(t.pnl for t in closed if t.pnl > 0)
+        gross_loss = abs(sum(t.pnl for t in closed if t.pnl < 0))
+        profit_factor = gross_profit / gross_loss if gross_loss > 0 else (999.0 if gross_profit > 0 else 0.0)
+
+        # Per-cycle cash returns for Sharpe (unannualized).
+        rets: list[float] = []
+        for i in range(1, len(cash_curve)):
+            prev_cash = float(cash_curve[i - 1]["cash"])
+            now_cash = float(cash_curve[i]["cash"])
+            if prev_cash > 0:
+                rets.append((now_cash / prev_cash) - 1.0)
+        sharpe = 0.0
+        if rets:
+            vol = pstdev(rets)
+            if vol > 0:
+                sharpe = mean(rets) / vol * (len(rets) ** 0.5)
 
         peak = float(cash_curve[0]["cash"])
         max_dd = 0.0
@@ -344,14 +368,17 @@ class BacktestRunner:
             final_cash=final_cash,
             total_return_pct=((final_cash / initial_cash) - 1.0) * 100.0 if initial_cash else 0.0,
             realized_pnl=realized,
-            fee_bps=self.fee_bps,
-            slippage_bps=self.slippage_bps,
+            fee_bps=fee_bps,
+            slippage_bps=slippage_bps,
             total_fees=exec_provider.total_fees_paid,
             closed_trades=len(closed),
             wins=wins,
             losses=losses,
             win_rate=win_rate * 100.0,
             avg_pnl_per_trade=avg_pnl,
+            expectancy=avg_pnl,
+            profit_factor=profit_factor,
+            sharpe=sharpe,
             max_drawdown_pct=max_dd * 100.0,
             cycle_status_counts=status_counts,
         )
@@ -380,3 +407,40 @@ class BacktestRunner:
                 for t in bot.state.trades
             ]
         return payload
+
+    def run(self, *, include_trades: bool = False) -> dict[str, object]:
+        return self._run_once(fee_bps=self.fee_bps, slippage_bps=self.slippage_bps, include_trades=include_trades)
+
+    def run_grid(self, *, fee_bps_grid: list[float], slippage_bps_grid: list[float]) -> dict[str, object]:
+        grid_results: list[dict[str, object]] = []
+        for fee in fee_bps_grid:
+            for slip in slippage_bps_grid:
+                result = self._run_once(fee_bps=max(0.0, fee), slippage_bps=max(0.0, slip), include_trades=False)
+                report = result["report"]
+                if not isinstance(report, dict):
+                    continue
+                grid_results.append(
+                    {
+                        "fee_bps": fee,
+                        "slippage_bps": slip,
+                        "final_cash": report.get("final_cash"),
+                        "total_return_pct": report.get("total_return_pct"),
+                        "realized_pnl": report.get("realized_pnl"),
+                        "total_fees": report.get("total_fees"),
+                        "closed_trades": report.get("closed_trades"),
+                        "profit_factor": report.get("profit_factor"),
+                        "sharpe": report.get("sharpe"),
+                        "max_drawdown_pct": report.get("max_drawdown_pct"),
+                        "win_rate": report.get("win_rate"),
+                    }
+                )
+        grid_results.sort(key=lambda x: float(x.get("final_cash", 0.0) or 0.0), reverse=True)
+        return {
+            "mode": "backtest_grid",
+            "dataset_path": self.dataset.source_path,
+            "symbols": self.dataset.symbols,
+            "steps": self.dataset.steps,
+            "runs": len(grid_results),
+            "results": grid_results,
+            "best": grid_results[0] if grid_results else None,
+        }

@@ -23,6 +23,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--backtest-max-steps", type=int, help="Maximum aligned steps for backtest")
     p.add_argument("--backtest-fee-bps", type=float, help="Per-side fee in bps for backtest execution")
     p.add_argument("--backtest-slippage-bps", type=float, help="Per-fill slippage in bps for backtest execution")
+    p.add_argument("--backtest-fee-grid", help="Comma separated fee bps grid for parameter sweep")
+    p.add_argument("--backtest-slippage-grid", help="Comma separated slippage bps grid for parameter sweep")
     p.add_argument("--backtest-output", help="Write backtest JSON result to this file path")
     p.add_argument("--backtest-include-trades", action="store_true", help="Include full trade list in backtest output")
     p.add_argument("--data-provider", choices=["sim", "binance"], help="Market data provider")
@@ -94,6 +96,18 @@ def _build_stage_summary(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
         if t0 is not None and t1 is not None:
             row["duration_ms"] = max(0, int((t1 - t0).total_seconds() * 1000))
         del row["first_seq"]
+    return out
+
+
+def _parse_float_grid(raw: str) -> list[float]:
+    out: list[float] = []
+    for item in raw.split(","):
+        part = item.strip()
+        if not part:
+            continue
+        out.append(float(part))
+    if not out:
+        raise ValueError("empty grid")
     return out
 
 
@@ -174,6 +188,26 @@ def main() -> None:
         raise SystemExit("configuration error: backtest mode cannot be combined with replay mode")
     if args.backtest_csv and args.reset_state:
         raise SystemExit("configuration error: backtest mode cannot be combined with --reset-state")
+    fee_grid: list[float] | None = None
+    slippage_grid: list[float] | None = None
+    if args.backtest_fee_grid is not None:
+        try:
+            fee_grid = _parse_float_grid(args.backtest_fee_grid)
+        except ValueError as exc:
+            raise SystemExit(f"configuration error: invalid --backtest-fee-grid ({exc})") from exc
+    if args.backtest_slippage_grid is not None:
+        try:
+            slippage_grid = _parse_float_grid(args.backtest_slippage_grid)
+        except ValueError as exc:
+            raise SystemExit(f"configuration error: invalid --backtest-slippage-grid ({exc})") from exc
+    if fee_grid is not None and any(x < 0 for x in fee_grid):
+        raise SystemExit("configuration error: --backtest-fee-grid values must be >= 0")
+    if slippage_grid is not None and any(x < 0 for x in slippage_grid):
+        raise SystemExit("configuration error: --backtest-slippage-grid values must be >= 0")
+    if (fee_grid is not None) != (slippage_grid is not None):
+        raise SystemExit("configuration error: --backtest-fee-grid and --backtest-slippage-grid must be used together")
+    if fee_grid is not None and args.backtest_include_trades:
+        raise SystemExit("configuration error: --backtest-include-trades is not supported in grid mode")
     if args.replay_max_events is not None and args.replay_max_events <= 0:
         raise SystemExit("configuration error: --replay-max-events must be > 0")
     if (args.replay_stage or args.replay_max_events is not None or args.replay_summary_only) and not (args.replay_trace or args.replay_latest):
@@ -193,7 +227,10 @@ def main() -> None:
             fee_bps=args.backtest_fee_bps,
             slippage_bps=args.backtest_slippage_bps,
         )
-        payload = runner.run(include_trades=args.backtest_include_trades)
+        if fee_grid is not None and slippage_grid is not None:
+            payload = runner.run_grid(fee_bps_grid=fee_grid, slippage_bps_grid=slippage_grid)
+        else:
+            payload = runner.run(include_trades=args.backtest_include_trades)
         if args.backtest_output:
             out_path = Path(args.backtest_output)
             out_path.parent.mkdir(parents=True, exist_ok=True)

@@ -55,6 +55,9 @@ def test_backtest_runner_outputs_report(tmp_path):
     assert report["fee_bps"] == cfg.backtest_fee_bps
     assert report["slippage_bps"] == cfg.backtest_slippage_bps
     assert "total_fees" in report
+    assert "expectancy" in report
+    assert "profit_factor" in report
+    assert "sharpe" in report
     assert "final_cash" in report
     assert "max_drawdown_pct" in report
     assert "cycle_status_counts" in report
@@ -97,3 +100,21 @@ def test_backtest_execution_provider_applies_fee_and_slippage():
     assert r2.status == "success"
     assert state.cash == pytest.approx(9_999.8, rel=0, abs=1e-9)
     assert provider.total_fees_paid == pytest.approx(0.2, rel=0, abs=1e-9)
+
+
+def test_backtest_grid_runs_and_sorts(tmp_path):
+    csv_path = tmp_path / "bars.csv"
+    _write_sample_csv(csv_path)
+
+    cfg = RuntimeConfig()
+    runner = BacktestRunner(cfg=cfg, csv_path=str(csv_path), symbols=["BTCUSDT", "ETHUSDT", "SOLUSDT"], max_steps=20)
+    out = runner.run_grid(fee_bps_grid=[0.0, 3.0], slippage_bps_grid=[0.0, 2.0])
+
+    assert out["mode"] == "backtest_grid"
+    assert out["runs"] == 4
+    assert isinstance(out["results"], list)
+    assert len(out["results"]) == 4
+    assert out["best"] == out["results"][0]
+    best_cash = float(out["results"][0]["final_cash"])
+    worst_cash = float(out["results"][-1]["final_cash"])
+    assert best_cash >= worst_cash

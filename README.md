@@ -26,6 +26,12 @@ Configure execution cost model and write report:
 tradebot --backtest-csv data/bars.csv --backtest-fee-bps 3 --backtest-slippage-bps 1 --backtest-output reports/backtest.json --pretty
 ```
 
+Run parameter sweep (grid backtest):
+
+```bash
+tradebot --backtest-csv data/bars.csv --backtest-fee-grid 0,1,3,5 --backtest-slippage-grid 0,1,2 --backtest-output reports/backtest_grid.json --pretty
+```
+
 Required CSV columns:
 
 - `ts` (ISO8601 datetime)
