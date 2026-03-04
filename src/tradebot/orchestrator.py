@@ -23,15 +23,33 @@ from tradebot.config import RuntimeConfig
 from tradebot.contracts import CycleResult, ProposedAction, SCHEMA_V2
 from tradebot.events import EventBus
 from tradebot.providers import build_execution_provider, build_market_data_provider, build_market_rank_provider
+from tradebot.storage import SQLiteStateStore
 from tradebot.state import RuntimeState
 
 
 class MultiAgentTradeBot:
     """V2 multi-agent pipeline implementation for TradeBot."""
 
-    def __init__(self, cfg: RuntimeConfig | None = None, state: RuntimeState | None = None) -> None:
+    def __init__(
+        self,
+        cfg: RuntimeConfig | None = None,
+        state: RuntimeState | None = None,
+        state_store: SQLiteStateStore | None = None,
+        reset_state: bool = False,
+    ) -> None:
         self.cfg = cfg or RuntimeConfig()
-        self.state = state or RuntimeState(cash=self.cfg.initial_cash)
+        self.state_store = state_store
+        if self.state_store is None and self.cfg.persistence_enabled:
+            self.state_store = SQLiteStateStore(self.cfg.persistence_path)
+        if self.state_store is not None and reset_state:
+            self.state_store.reset()
+
+        if state is not None:
+            self.state = state
+        elif self.state_store is not None:
+            self.state = self.state_store.load_runtime_state(initial_cash=self.cfg.initial_cash)
+        else:
+            self.state = RuntimeState(cash=self.cfg.initial_cash)
         self.bus = EventBus()
 
         rank_provider = build_market_rank_provider(self.cfg)
@@ -76,6 +94,7 @@ class MultiAgentTradeBot:
         return proposal
 
     async def run_cycle(self) -> CycleResult:
+        events_start = len(self.bus.events)
         self.state.cycle += 1
         trace_id = f"cycle:{self.state.cycle}:{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}"
 
@@ -118,7 +137,7 @@ class MultiAgentTradeBot:
         status = "success" if executed else ("blocked" if blocked else "wait")
         action = executed[0]["action"] if executed else (selected_actions[0].action if selected_actions else "wait")
 
-        return CycleResult(
+        result = CycleResult(
             schema_version=SCHEMA_V2,
             cycle=self.state.cycle,
             trace_id=trace_id,
@@ -133,3 +152,7 @@ class MultiAgentTradeBot:
                 "post_trade_notes": post.notes,
             },
         )
+        if self.state_store is not None:
+            cycle_events = self.bus.events[events_start:]
+            self.state_store.persist(state=self.state, cycle_result=result, events=cycle_events)
+        return result

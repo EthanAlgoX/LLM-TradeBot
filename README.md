@@ -25,6 +25,18 @@ pytest
 tradebot --cycles 2 --data-provider binance --market-rank-provider binance --execution-provider paper --pretty
 ```
 
+Enable persistence (restart recovery):
+
+```bash
+tradebot --cycles 5 --persistence-path data/tradebot.db --pretty
+```
+
+Reset persisted state and start from cycle 1:
+
+```bash
+tradebot --cycles 1 --persistence-path data/tradebot.db --reset-state --pretty
+```
+
 Environment variables:
 
 - `TRADEBOT_DATA_PROVIDER=sim|binance`
@@ -33,6 +45,8 @@ Environment variables:
 - `TRADEBOT_BINANCE_API_KEY=...`
 - `TRADEBOT_BINANCE_API_SECRET=...`
 - `TRADEBOT_LIVE_CONFIRM=YES` (required for `binance_live`, default `NO`)
+- `TRADEBOT_PERSISTENCE_ENABLED=1`
+- `TRADEBOT_PERSISTENCE_PATH=data/tradebot.db`
 
 ## Live execution safeguards
 
@@ -41,3 +55,4 @@ Environment variables:
   - `minQty`/`maxQty` checks
   - `minNotional` checks (for open actions)
 - `close_long` / `close_short` use current local position quantity by default.
+- When persistence is enabled, each cycle's runtime events are stored in SQLite `events` table for trace replay.

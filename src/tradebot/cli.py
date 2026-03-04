@@ -15,6 +15,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--market-rank-provider", choices=["mock", "binance"], help="Market-rank provider")
     p.add_argument("--execution-provider", choices=["sim", "paper", "binance_live"], help="Execution provider")
     p.add_argument("--live-confirm", choices=["YES", "NO"], help="Safety switch for live execution")
+    p.add_argument("--persistence-path", help="Enable SQLite persistence and write state to this DB path")
+    p.add_argument("--no-persistence", action="store_true", help="Disable persistence even if enabled by env")
+    p.add_argument("--reset-state", action="store_true", help="Reset persisted state before running")
     p.add_argument("--pretty", action="store_true", help="Pretty-print JSON output")
     return p
 
@@ -30,8 +33,17 @@ def main() -> None:
         cfg.execution_provider = args.execution_provider
     if args.live_confirm:
         cfg.live_confirm_token = args.live_confirm
+    if args.persistence_path:
+        cfg.persistence_enabled = True
+        cfg.persistence_path = args.persistence_path
+    if args.reset_state:
+        cfg.persistence_enabled = True
+    if args.no_persistence:
+        if args.reset_state:
+            raise SystemExit("configuration error: --reset-state cannot be used with --no-persistence")
+        cfg.persistence_enabled = False
     try:
-        bot = MultiAgentTradeBot(cfg=cfg)
+        bot = MultiAgentTradeBot(cfg=cfg, reset_state=args.reset_state)
     except ValueError as exc:
         raise SystemExit(f"configuration error: {exc}") from exc
 

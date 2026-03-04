@@ -41,6 +41,8 @@ class RuntimeConfig:
     binance_api_key: str | None = None
     binance_api_secret: str | None = None
     live_confirm_token: str = "NO"
+    persistence_enabled: bool = False
+    persistence_path: str = "data/tradebot.db"
 
     # AI500 candidate universe (reference from LLM-TradeBot)
     ai500_candidates: list[str] = field(
@@ -67,4 +69,6 @@ class RuntimeConfig:
         cfg.binance_api_key = os.getenv("TRADEBOT_BINANCE_API_KEY")
         cfg.binance_api_secret = os.getenv("TRADEBOT_BINANCE_API_SECRET")
         cfg.live_confirm_token = os.getenv("TRADEBOT_LIVE_CONFIRM", cfg.live_confirm_token)
+        cfg.persistence_enabled = os.getenv("TRADEBOT_PERSISTENCE_ENABLED", "0") in {"1", "true", "True"}
+        cfg.persistence_path = os.getenv("TRADEBOT_PERSISTENCE_PATH", cfg.persistence_path)
         return cfg
