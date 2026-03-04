@@ -82,6 +82,16 @@ Enable persistence (restart recovery):
 tradebot --cycles 5 --persistence-path data/tradebot.db --pretty
 ```
 
+With persistence enabled, each cycle also writes trace files under `data/traces/<trace_id>/`:
+
+- `inputs.json`: selector output + market snapshot inputs
+- `agent_io.jsonl`: full multi-agent stage events (start/end + payload)
+- `trades.json`: cycle trades + full trade ledger + open positions
+- `cycle_result.json`: final cycle decision/output
+- `state_snapshot.json`: full runtime state snapshot after cycle
+
+And `data/traces/latest_trace_id.txt` points to the latest trace id.
+
 Reset persisted state and start from cycle 1:
 
 ```bash

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from dataclasses import asdict
 from datetime import datetime, timezone
 from typing import Any
 
@@ -76,12 +77,28 @@ class MultiAgentTradeBot:
         self.exec_agent = ExecutionAgent(provider=exec_provider)
         self.post_trade_agent = PostTradeAgent()
 
+    @staticmethod
+    def _to_payload(obj: Any) -> dict[str, Any]:
+        return asdict(obj)
+
     async def _analyze_symbol(self, *, trace_id: str, symbol: str, rank: int) -> ProposedAction:
         self.bus.emit(trace_id=trace_id, stage="data", phase="start", agent=self.data_agent.name, data={"symbol": symbol})
         snapshot = self.data_agent.fetch(trace_id=trace_id, symbol=symbol, state=self.state)
-        self.bus.emit(trace_id=trace_id, stage="data", phase="end", agent=self.data_agent.name, data={"symbol": symbol, "price": snapshot.price})
+        self.bus.emit(
+            trace_id=trace_id,
+            stage="data",
+            phase="end",
+            agent=self.data_agent.name,
+            data={"symbol": symbol, "snapshot": self._to_payload(snapshot)},
+        )
 
-        self.bus.emit(trace_id=trace_id, stage="analysis", phase="start", agent="analysis_fanout", data={"symbol": symbol})
+        self.bus.emit(
+            trace_id=trace_id,
+            stage="analysis",
+            phase="start",
+            agent="analysis_fanout",
+            data={"symbol": symbol, "input": {"snapshot": self._to_payload(snapshot), "rank": rank}},
+        )
         signal = await asyncio.to_thread(self.signal_agent.analyze, trace_id=trace_id, snapshot=snapshot)
         pred, ctx, sem = await asyncio.gather(
             asyncio.to_thread(self.pred_agent.predict, trace_id=trace_id, snapshot=snapshot, signal=signal),
@@ -95,7 +112,17 @@ class MultiAgentTradeBot:
             stage="analysis",
             phase="end",
             agent="analysis_fanout",
-            data={"symbol": symbol, "action": proposal.action, "confidence": proposal.confidence},
+            data={
+                "symbol": symbol,
+                "output": {
+                    "signal": self._to_payload(signal),
+                    "prediction": self._to_payload(pred),
+                    "context": self._to_payload(ctx),
+                    "semantic": self._to_payload(sem),
+                    "consensus": self._to_payload(consensus),
+                    "proposal": self._to_payload(proposal),
+                },
+            },
         )
         return proposal
 
@@ -108,37 +135,101 @@ class MultiAgentTradeBot:
         universe = self.selector.select(trace_id=trace_id, state=self.state)
         selected_symbols = [s.symbol for s in universe.top_symbols]
         rank_map = {s.symbol: s.rank for s in universe.top_symbols}
-        self.bus.emit(trace_id=trace_id, stage="selector", phase="end", agent=self.selector.name, data={"top_n": len(selected_symbols)})
+        self.bus.emit(
+            trace_id=trace_id,
+            stage="selector",
+            phase="end",
+            agent=self.selector.name,
+            data={
+                "top_n": len(selected_symbols),
+                "selected_symbols": selected_symbols,
+                "universe": self._to_payload(universe),
+            },
+        )
 
         proposals = await asyncio.gather(
             *[self._analyze_symbol(trace_id=trace_id, symbol=symbol, rank=rank_map.get(symbol, 999)) for symbol in selected_symbols]
         )
 
-        self.bus.emit(trace_id=trace_id, stage="portfolio", phase="start", agent=self.portfolio_agent.name)
+        self.bus.emit(
+            trace_id=trace_id,
+            stage="portfolio",
+            phase="start",
+            agent=self.portfolio_agent.name,
+            data={"proposals": [self._to_payload(p) for p in proposals]},
+        )
         selected_actions = self.portfolio_agent.select(list(proposals))
-        self.bus.emit(trace_id=trace_id, stage="portfolio", phase="end", agent=self.portfolio_agent.name, data={"selected": len(selected_actions)})
+        self.bus.emit(
+            trace_id=trace_id,
+            stage="portfolio",
+            phase="end",
+            agent=self.portfolio_agent.name,
+            data={"selected": len(selected_actions), "selected_actions": [self._to_payload(p) for p in selected_actions]},
+        )
 
         executed: list[dict[str, Any]] = []
         blocked: list[dict[str, Any]] = []
 
         for proposal in selected_actions:
-            self.bus.emit(trace_id=trace_id, stage="risk", phase="start", agent=self.risk_agent.name, data={"symbol": proposal.symbol})
+            self.bus.emit(
+                trace_id=trace_id,
+                stage="risk",
+                phase="start",
+                agent=self.risk_agent.name,
+                data={"proposal": self._to_payload(proposal)},
+            )
             risk = self.risk_agent.audit(trace_id=trace_id, proposal=proposal, state=self.state)
-            self.bus.emit(trace_id=trace_id, stage="risk", phase="end", agent=self.risk_agent.name, data={"symbol": proposal.symbol, "passed": risk.passed})
+            self.bus.emit(
+                trace_id=trace_id,
+                stage="risk",
+                phase="end",
+                agent=self.risk_agent.name,
+                data={"risk_decision": self._to_payload(risk)},
+            )
 
             if not risk.passed:
                 blocked.append({"symbol": proposal.symbol, "action": proposal.action, "reason": risk.blocked_reason})
                 continue
 
             planned = self.exec_planner.plan(proposal, risk, self.cfg, self.state)
-            self.bus.emit(trace_id=trace_id, stage="execution", phase="start", agent=self.exec_agent.name, data={"symbol": proposal.symbol, "action": planned.action})
+            self.bus.emit(
+                trace_id=trace_id,
+                stage="execution",
+                phase="start",
+                agent=self.exec_agent.name,
+                data={"planned_action": self._to_payload(planned)},
+            )
             result = self.exec_agent.execute(trace_id=trace_id, planned=planned, state=self.state)
-            self.bus.emit(trace_id=trace_id, stage="execution", phase="end", agent=self.exec_agent.name, data={"symbol": proposal.symbol, "status": result.status})
+            self.bus.emit(
+                trace_id=trace_id,
+                stage="execution",
+                phase="end",
+                agent=self.exec_agent.name,
+                data={"execution_result": self._to_payload(result)},
+            )
             executed.append({"symbol": result.symbol, "action": result.action, "status": result.status, "message": result.message})
 
-        self.bus.emit(trace_id=trace_id, stage="post_trade", phase="start", agent=self.post_trade_agent.name)
+        self.bus.emit(
+            trace_id=trace_id,
+            stage="post_trade",
+            phase="start",
+            agent=self.post_trade_agent.name,
+            data={
+                "input": {
+                    "cash": self.state.cash,
+                    "open_positions": list(self.state.positions.keys()),
+                    "reflection_hint": self.state.reflection_hint,
+                }
+            },
+        )
         post = self.post_trade_agent.run(trace_id=trace_id, symbol="_system", state=self.state)
-        self.bus.emit(trace_id=trace_id, stage="post_trade", phase="end", agent=self.post_trade_agent.name, data={"notes": len(post.notes)})
+        self.bus.emit(
+            trace_id=trace_id,
+            stage="post_trade",
+            phase="end",
+            agent=self.post_trade_agent.name,
+            data={"output": self._to_payload(post), "reflection_hint": self.state.reflection_hint},
+        )
 
         status = "success" if executed else ("blocked" if blocked else "wait")
         action = executed[0]["action"] if executed else (selected_actions[0].action if selected_actions else "wait")

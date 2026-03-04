@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+import json
+import re
 import sqlite3
 
 from tradebot.config import RuntimeConfig
@@ -98,3 +100,49 @@ def test_store_reset_clears_all_tables(tmp_path):
     assert bot2.state.cycle == 0
     result = asyncio.run(bot2.run_cycle())
     assert result.cycle == 1
+
+
+def test_persist_writes_trace_files(tmp_path):
+    db = tmp_path / "tradebot.db"
+    cfg = RuntimeConfig(persistence_enabled=True, persistence_path=str(db))
+
+    bot = MultiAgentTradeBot(cfg=cfg)
+    result = asyncio.run(bot.run_cycle())
+
+    safe_trace = re.sub(r"[^A-Za-z0-9._-]+", "_", result.trace_id)
+    trace_dir = tmp_path / "traces" / safe_trace
+    assert trace_dir.exists()
+
+    inputs = trace_dir / "inputs.json"
+    agent_io = trace_dir / "agent_io.jsonl"
+    trades = trace_dir / "trades.json"
+    cycle_result = trace_dir / "cycle_result.json"
+    state_snapshot = trace_dir / "state_snapshot.json"
+    latest_trace = tmp_path / "traces" / "latest_trace_id.txt"
+
+    assert inputs.exists()
+    assert agent_io.exists()
+    assert trades.exists()
+    assert cycle_result.exists()
+    assert state_snapshot.exists()
+    assert latest_trace.exists()
+    assert latest_trace.read_text(encoding="utf-8") == result.trace_id
+
+    inputs_data = json.loads(inputs.read_text(encoding="utf-8"))
+    assert inputs_data["trace_id"] == result.trace_id
+    assert inputs_data["cycle"] == result.cycle
+    assert isinstance(inputs_data["selected_symbols"], list)
+    assert isinstance(inputs_data["market_snapshots"], list)
+
+    lines = [x for x in agent_io.read_text(encoding="utf-8").splitlines() if x.strip()]
+    assert lines
+    first_event = json.loads(lines[0])
+    assert first_event["trace_id"] == result.trace_id
+    assert "stage" in first_event
+    assert "phase" in first_event
+
+    trades_data = json.loads(trades.read_text(encoding="utf-8"))
+    assert trades_data["trace_id"] == result.trace_id
+    assert trades_data["cycle"] == result.cycle
+    assert "all_trades" in trades_data
+    assert "cycle_trades" in trades_data

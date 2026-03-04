@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -86,6 +87,114 @@ class SQLiteStateStore:
             """
         )
         self._initialized = True
+
+    def _safe_trace_id(self, trace_id: str) -> str:
+        return re.sub(r"[^A-Za-z0-9._-]+", "_", trace_id)
+
+    def _write_json(self, path: Path, payload: dict[str, Any]) -> None:
+        path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    def _write_trace_files(self, *, state: RuntimeState, cycle_result: CycleResult, events: list["RuntimeEvent"]) -> None:
+        traces_root = self.db_path.parent / "traces"
+        trace_dir = traces_root / self._safe_trace_id(cycle_result.trace_id)
+        trace_dir.mkdir(parents=True, exist_ok=True)
+
+        positions = [
+            {
+                "symbol": p.symbol,
+                "side": p.side,
+                "qty": p.qty,
+                "entry_price": p.entry_price,
+                "leverage": p.leverage,
+                "opened_cycle": p.opened_cycle,
+            }
+            for p in state.positions.values()
+        ]
+        all_trades = [
+            {
+                "cycle": tr.cycle,
+                "symbol": tr.symbol,
+                "action": tr.action,
+                "qty": tr.qty,
+                "price": tr.price,
+                "pnl": tr.pnl,
+            }
+            for tr in state.trades
+        ]
+        cycle_trades = [tr for tr in all_trades if int(tr["cycle"]) == cycle_result.cycle]
+
+        selector_payload: dict[str, Any] | None = None
+        market_snapshots: list[dict[str, Any]] = []
+        for ev in events:
+            if ev.stage == "selector" and ev.phase == "end":
+                selector_payload = ev.data
+            if ev.stage == "data" and ev.phase == "end":
+                snap = ev.data.get("snapshot")
+                if isinstance(snap, dict):
+                    market_snapshots.append(snap)
+
+        self._write_json(
+            trace_dir / "inputs.json",
+            {
+                "trace_id": cycle_result.trace_id,
+                "cycle": cycle_result.cycle,
+                "selected_symbols": cycle_result.selected_symbols,
+                "selector": selector_payload or {},
+                "market_snapshots": market_snapshots,
+            },
+        )
+        with (trace_dir / "agent_io.jsonl").open("w", encoding="utf-8") as f:
+            for idx, ev in enumerate(events):
+                f.write(
+                    json.dumps(
+                        {
+                            "seq": idx,
+                            "trace_id": ev.trace_id,
+                            "ts": ev.ts,
+                            "stage": ev.stage,
+                            "phase": ev.phase,
+                            "agent": ev.agent,
+                            "data": ev.data,
+                        },
+                        ensure_ascii=False,
+                    )
+                    + "\n"
+                )
+        self._write_json(
+            trace_dir / "trades.json",
+            {
+                "trace_id": cycle_result.trace_id,
+                "cycle": cycle_result.cycle,
+                "cash": state.cash,
+                "cycle_trades": cycle_trades,
+                "all_trades": all_trades,
+                "open_positions": positions,
+            },
+        )
+        self._write_json(
+            trace_dir / "cycle_result.json",
+            {
+                "schema_version": cycle_result.schema_version,
+                "cycle": cycle_result.cycle,
+                "trace_id": cycle_result.trace_id,
+                "selected_symbols": cycle_result.selected_symbols,
+                "action": cycle_result.action,
+                "status": cycle_result.status,
+                "details": cycle_result.details,
+            },
+        )
+        self._write_json(
+            trace_dir / "state_snapshot.json",
+            {
+                "cycle": state.cycle,
+                "cash": state.cash,
+                "reflection_hint": state.reflection_hint,
+                "positions": positions,
+                "prices": state.prices,
+                "trades": all_trades,
+            },
+        )
+        (traces_root / "latest_trace_id.txt").write_text(cycle_result.trace_id, encoding="utf-8")
 
     def load_runtime_state(self, *, initial_cash: float) -> RuntimeState:
         with self._connect() as conn:
@@ -199,6 +308,7 @@ class SQLiteStateStore:
                         for idx, ev in enumerate(events)
                     ],
                 )
+        self._write_trace_files(state=state, cycle_result=cycle_result, events=events or [])
 
     def reset(self) -> None:
         with self._connect() as conn:
