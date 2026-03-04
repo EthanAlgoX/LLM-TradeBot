@@ -104,6 +104,8 @@ def test_backtest_runner_outputs_report(tmp_path):
     assert "final_equity" in report
     assert "open_positions_end" in report
     assert "forced_close_count" in report
+    assert "auto_risk_close_count" in report
+    assert "auto_risk_close_breakdown" in report
     assert "cycle_status_counts" in report
     assert "equity_curve" in out
     assert "equity_curve_mtm" in out
@@ -192,6 +194,50 @@ def test_backtest_execution_provider_uses_next_bar_fill_with_dataset():
     assert r2.status == "success"
     assert r2.fill_price == pytest.approx(120.0, rel=0, abs=1e-9)
     assert state.cash == pytest.approx(1_010.0, rel=0, abs=1e-9)
+
+
+def test_backtest_execution_provider_auto_take_profit_trigger():
+    bars = [
+        BacktestBar(ts=datetime(2026, 1, 1, 0, 0, 0), symbol="BTCUSDT", close=100.0, quote_volume=1000.0),
+        BacktestBar(ts=datetime(2026, 1, 1, 1, 0, 0), symbol="BTCUSDT", close=110.0, quote_volume=1100.0),
+        BacktestBar(ts=datetime(2026, 1, 1, 2, 0, 0), symbol="BTCUSDT", close=130.0, quote_volume=1200.0),
+    ]
+    dataset = CSVBacktestDataset(bars_by_symbol={"BTCUSDT": bars}, steps=3, source_path="synthetic.csv")
+    provider = BacktestExecutionProvider(fee_bps=0.0, slippage_bps=0.0, dataset=dataset)
+    state = RuntimeState(cycle=1, cash=1_000.0)
+
+    open_long = ProposedAction(
+        schema_version="v2",
+        trace_id="t1",
+        symbol="BTCUSDT",
+        source="rule",
+        action="open_long",
+        confidence=80.0,
+        reason="test",
+        order_params={
+            "entry_price": 100.0,
+            "stop_loss": 90.0,
+            "take_profit": 120.0,
+            "quantity": 1.0,
+            "leverage": 1.0,
+        },
+    )
+    r1 = provider.execute(trace_id="t1", planned=open_long, state=state)
+    assert r1.status == "success"
+    assert state.positions["BTCUSDT"].entry_price == pytest.approx(110.0, rel=0, abs=1e-9)
+
+    state.cycle = 2
+    no_trigger = provider.auto_close_triggered_positions(state=state, cycle=state.cycle)
+    assert no_trigger == []
+    assert "BTCUSDT" in state.positions
+
+    state.cycle = 3
+    triggered = provider.auto_close_triggered_positions(state=state, cycle=state.cycle)
+    assert len(triggered) == 1
+    assert triggered[0]["trigger"] == "take_profit"
+    assert triggered[0]["status"] == "success"
+    assert "BTCUSDT" not in state.positions
+    assert state.cash == pytest.approx(1_020.0, rel=0, abs=1e-9)
 
 
 def test_backtest_grid_runs_and_sorts(tmp_path):

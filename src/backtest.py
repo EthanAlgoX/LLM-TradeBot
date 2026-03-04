@@ -137,6 +137,8 @@ class BacktestReport:
     final_equity: float
     open_positions_end: int
     forced_close_count: int
+    auto_risk_close_count: int
+    auto_risk_close_breakdown: dict[str, int]
     cycle_status_counts: dict[str, int]
 
     def to_dict(self) -> dict[str, object]:
@@ -168,6 +170,8 @@ class BacktestReport:
             "final_equity": round(self.final_equity, 6),
             "open_positions_end": self.open_positions_end,
             "forced_close_count": self.forced_close_count,
+            "auto_risk_close_count": self.auto_risk_close_count,
+            "auto_risk_close_breakdown": self.auto_risk_close_breakdown,
             "cycle_status_counts": self.cycle_status_counts,
         }
 
@@ -330,6 +334,7 @@ class BacktestExecutionProvider(ExecutionProvider):
         self.slippage_bps = max(0.0, slippage_bps)
         self.total_fees_paid = 0.0
         self.dataset = dataset
+        self.position_risk_levels: dict[str, dict[str, float | None]] = {}
 
     def _fill_price(self, mark_price: float, action: str) -> float:
         slip = self.slippage_bps / 10_000.0
@@ -352,6 +357,102 @@ class BacktestExecutionProvider(ExecutionProvider):
         idx = max(0, min(cycle, self.dataset.steps - 1))
         return float(rows[idx].close)
 
+    def _store_risk_levels(self, *, symbol: str, planned: ProposedAction) -> None:
+        stop = float(planned.order_params.get("stop_loss", 0.0) or 0.0)
+        take = float(planned.order_params.get("take_profit", 0.0) or 0.0)
+        self.position_risk_levels[symbol] = {
+            "stop_loss": stop if stop > 0 else None,
+            "take_profit": take if take > 0 else None,
+        }
+
+    def _clear_risk_levels(self, symbol: str) -> None:
+        self.position_risk_levels.pop(symbol, None)
+
+    def _close_position(
+        self,
+        *,
+        trace_id: str,
+        symbol: str,
+        action: str,
+        state: RuntimeState,
+        mark_price: float,
+        message_prefix: str = "backtest close",
+    ) -> ExecutionResult:
+        pos = state.positions.get(symbol)
+        if not pos:
+            return ExecutionResult(SCHEMA_V2, trace_id, symbol, action, "failed", "no position")
+        fill = self._fill_price(mark_price, action)
+        fee = self._fee(fill, pos.qty)
+        self.total_fees_paid += fee
+        sign = 1.0 if pos.side == "long" else -1.0
+        gross_pnl = (fill - pos.entry_price) * pos.qty * sign
+        net_pnl = gross_pnl - fee
+        state.cash += net_pnl
+        state.trades.append(TradeRecord(state.cycle, symbol, action, pos.qty, fill, net_pnl))
+        del state.positions[symbol]
+        self._clear_risk_levels(symbol)
+        return ExecutionResult(SCHEMA_V2, trace_id, symbol, action, "success", f"{message_prefix} net_pnl={net_pnl:.6f}", fill)
+
+    def auto_close_triggered_positions(self, *, state: RuntimeState, cycle: int) -> list[dict[str, object]]:
+        if not self.dataset:
+            return []
+
+        out: list[dict[str, object]] = []
+        for symbol, pos in list(state.positions.items()):
+            # Positions opened this cycle cannot be stopped/taken within the same bar in this model.
+            if pos.opened_cycle >= cycle:
+                continue
+
+            levels = self.position_risk_levels.get(symbol, {})
+            stop = levels.get("stop_loss")
+            take = levels.get("take_profit")
+            if stop is None and take is None:
+                continue
+
+            rows = self.dataset.bars_by_symbol.get(symbol)
+            if not rows:
+                continue
+            idx = max(0, min(cycle - 1, self.dataset.steps - 1))
+            mark = float(rows[idx].close)
+
+            trigger: str | None = None
+            if pos.side == "long":
+                if stop is not None and mark <= float(stop):
+                    trigger = "stop_loss"
+                elif take is not None and mark >= float(take):
+                    trigger = "take_profit"
+            else:
+                if stop is not None and mark >= float(stop):
+                    trigger = "stop_loss"
+                elif take is not None and mark <= float(take):
+                    trigger = "take_profit"
+
+            if trigger is None:
+                continue
+
+            action = "close_long" if pos.side == "long" else "close_short"
+            result = self._close_position(
+                trace_id=f"backtest:auto_risk:{cycle}:{symbol}:{trigger}",
+                symbol=symbol,
+                action=action,
+                state=state,
+                mark_price=mark,
+                message_prefix=f"backtest {trigger}",
+            )
+            out.append(
+                {
+                    "symbol": symbol,
+                    "action": action,
+                    "trigger": trigger,
+                    "status": result.status,
+                    "message": result.message,
+                    "price": mark,
+                    "stop_loss": stop,
+                    "take_profit": take,
+                }
+            )
+        return out
+
     def execute(self, *, trace_id: str, planned: ProposedAction, state: RuntimeState) -> ExecutionResult:
         symbol = planned.symbol
         action = planned.action
@@ -371,27 +472,21 @@ class BacktestExecutionProvider(ExecutionProvider):
 
         if action == "open_long":
             state.positions[symbol] = Position(symbol=symbol, side="long", qty=qty, entry_price=fill, leverage=lev, opened_cycle=state.cycle)
+            self._store_risk_levels(symbol=symbol, planned=planned)
             state.cash -= fee
             state.trades.append(TradeRecord(state.cycle, symbol, action, qty, fill, -fee))
             return ExecutionResult(SCHEMA_V2, trace_id, symbol, action, "success", f"backtest long opened fee={fee:.6f}", fill)
 
         if action == "open_short":
             state.positions[symbol] = Position(symbol=symbol, side="short", qty=qty, entry_price=fill, leverage=lev, opened_cycle=state.cycle)
+            self._store_risk_levels(symbol=symbol, planned=planned)
             state.cash -= fee
             state.trades.append(TradeRecord(state.cycle, symbol, action, qty, fill, -fee))
             return ExecutionResult(SCHEMA_V2, trace_id, symbol, action, "success", f"backtest short opened fee={fee:.6f}", fill)
 
         if action in {"close_long", "close_short"}:
-            pos = state.positions.get(symbol)
-            if not pos:
-                return ExecutionResult(SCHEMA_V2, trace_id, symbol, action, "failed", "no position", fill)
-            sign = 1.0 if pos.side == "long" else -1.0
-            gross_pnl = (fill - pos.entry_price) * pos.qty * sign
-            net_pnl = gross_pnl - fee
-            state.cash += net_pnl
-            state.trades.append(TradeRecord(state.cycle, symbol, action, pos.qty, fill, net_pnl))
-            del state.positions[symbol]
-            return ExecutionResult(SCHEMA_V2, trace_id, symbol, action, "success", f"backtest close net_pnl={net_pnl:.6f}", fill)
+            self.total_fees_paid -= fee
+            return self._close_position(trace_id=trace_id, symbol=symbol, action=action, state=state, mark_price=mark_price)
 
         return ExecutionResult(SCHEMA_V2, trace_id, symbol, action, "failed", "unknown action", fill)
 
@@ -508,11 +603,16 @@ class BacktestRunner:
         cash_curve = [{"cycle": 0, "cash": bot.state.cash}]
         equity_curve = [{"cycle": 0, "equity": bot.state.cash}]
         status_counts: dict[str, int] = {}
+        auto_risk_closes: list[dict[str, object]] = []
 
         for _ in range(self.dataset.steps):
             result = asyncio.run(bot.run_cycle())
             cycle_results.append(result)
-            cash = float(result.details.get("cash", bot.state.cash))
+            cycle_risk_closes = exec_provider.auto_close_triggered_positions(state=bot.state, cycle=bot.state.cycle)
+            if cycle_risk_closes:
+                auto_risk_closes.extend(cycle_risk_closes)
+
+            cash = float(bot.state.cash)
             cash_curve.append({"cycle": result.cycle, "cash": cash})
             equity_curve.append({"cycle": result.cycle, "equity": self._mark_to_market_equity(state=bot.state, cycle=result.cycle)})
             status_counts[result.status] = status_counts.get(result.status, 0) + 1
@@ -581,6 +681,10 @@ class BacktestRunner:
 
         final_equity = self._mark_to_market_equity(state=bot.state, cycle=bot.state.cycle)
         unrealized = final_equity - final_cash
+        auto_risk_breakdown: dict[str, int] = {}
+        for row in auto_risk_closes:
+            k = str(row.get("trigger", "unknown"))
+            auto_risk_breakdown[k] = auto_risk_breakdown.get(k, 0) + 1
 
         report = BacktestReport(
             dataset_path=self.dataset.source_path,
@@ -610,6 +714,8 @@ class BacktestRunner:
             final_equity=final_equity,
             open_positions_end=len(bot.state.positions),
             forced_close_count=len(forced_closes),
+            auto_risk_close_count=len(auto_risk_closes),
+            auto_risk_close_breakdown=auto_risk_breakdown,
             cycle_status_counts=status_counts,
         )
 
@@ -625,6 +731,7 @@ class BacktestRunner:
                 "action": cycle_results[-1].action if cycle_results else "",
             },
             "forced_closes": forced_closes,
+            "auto_risk_closes": auto_risk_closes,
         }
         if include_trades:
             payload["trades"] = [
