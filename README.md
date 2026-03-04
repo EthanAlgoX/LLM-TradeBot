@@ -12,6 +12,97 @@ tradebot --cycles 3
 pytest
 ```
 
+## Architecture Map (Important Files)
+
+### 1) Entry / Runtime
+
+- `src/tradebot/cli.py`
+  - CLI entrypoint.
+  - Routes to runtime mode (`run cycles`), replay mode (`--replay-*`), or backtest mode (`--backtest-*`).
+- `src/tradebot/config.py`
+  - Central runtime config + `from_env()` environment loader.
+  - Includes provider selection, live safeguards, persistence config, and backtest defaults.
+
+### 2) Pipeline Orchestration
+
+- `src/tradebot/orchestrator.py`
+  - Core multi-agent scheduler for pipeline:
+    - `Selector -> Data -> Signal/Prediction/Context/Semantic -> Fusion -> Decision -> Portfolio -> Risk -> Execution -> Post-Trade`
+  - Builds/holds all agents.
+  - Emits runtime events.
+  - Integrates persistence store when enabled.
+
+### 3) Contracts / State / Events
+
+- `src/tradebot/contracts.py`
+  - Typed data contracts (`UniverseSet`, `MarketSnapshot`, `ProposedAction`, `CycleResult`, etc.).
+- `src/tradebot/state.py`
+  - Runtime state model (`RuntimeState`, positions, trade ledger, prices, reflection hint).
+- `src/tradebot/events.py`
+  - Event bus model for stage start/end events (`RuntimeEvent`, `EventBus`).
+
+### 4) Agent Layer
+
+- `src/tradebot/agents/selector.py`
+  - Unified selector (`ai500 + market rank + feedback`) and Top-N universe output.
+- `src/tradebot/agents/data.py`
+  - Converts market data provider output into `MarketSnapshot`.
+- `src/tradebot/agents/analysis.py`
+  - Signal / Prediction / Context / Semantic / Fusion agents.
+- `src/tradebot/agents/decision.py`
+  - Decision routing (fast trend / rule path / reversal close / hold/wait).
+- `src/tradebot/agents/portfolio.py`
+  - Opportunity ranking and action selection policy.
+- `src/tradebot/agents/risk.py`
+  - Risk audit (leverage, RR, caps, correction checks).
+- `src/tradebot/agents/execution.py`
+  - Execution planner + execution entry.
+- `src/tradebot/agents/post_trade.py`
+  - Position monitor and reflection feedback loop.
+
+### 5) Provider Layer (Pluggable Adapters)
+
+- `src/tradebot/providers/factory.py`
+  - Provider factory wiring from config.
+- `src/tradebot/providers/data.py`
+  - Market data providers (`sim`, `binance`, fallback wrapper).
+- `src/tradebot/providers/ranking.py`
+  - Market rank providers (`mock`, `binance`).
+- `src/tradebot/providers/execution.py`
+  - Execution providers (`sim`, `paper`, `binance_live`).
+- `src/tradebot/providers/binance_rules.py`
+  - Binance futures symbol rules (`exchangeInfo`) parser and quantity formatting/quantization.
+
+### 6) Persistence / Replay
+
+- `src/tradebot/storage.py`
+  - SQLite persistence store:
+    - runtime state
+    - positions/prices/trades
+    - cycle outputs
+    - stage events
+  - Supports reset and replay querying APIs.
+
+### 7) Backtest
+
+- `src/tradebot/backtest.py`
+  - CSV dataset loader.
+  - Backtest market data/rank providers.
+  - Backtest execution model with fee/slippage.
+  - Single-run and grid backtest engine.
+  - Grid analysis, recommendations, and markdown summary rendering.
+
+### 8) Tests
+
+- `tests/test_pipeline.py` / `tests/test_risk.py`
+  - Core pipeline and risk behavior checks.
+- `tests/test_config_and_factory.py`
+  - Config/env and provider factory tests.
+- `tests/test_storage.py`
+  - Persistence + replay + reset tests.
+- `tests/test_backtest.py` / `tests/test_cli_replay.py`
+  - Backtest and replay analytics tests.
+
 ## Backtest (CSV)
 
 Run historical replay backtest from CSV:
