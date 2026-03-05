@@ -5,19 +5,19 @@
 - Dataset: `data/real_3d_1h_binance.csv`
 - Symbols: `BTCUSDT,ETHUSDT,SOLUSDT`
 - Steps: `72`
-- Return(%): `-0.018172`
-- Realized PnL: `-18.171866`
+- Return(%): `0.071329`
+- Realized PnL: `71.328733`
 - Funding PnL: `0.0`
-- Final Cash: `99981.828134`
-- Max Drawdown(%): `0.313141`
-- Sharpe: `-0.065937`
-- Profit Factor: `0.985074`
+- Final Cash: `100071.328733`
+- Max Drawdown(%): `0.126334`
+- Sharpe: `0.450272`
+- Profit Factor: `1.644723`
 - Execution Success(%): `100.0`
-- Directional Accuracy(%): `40.0`
+- Directional Accuracy(%): `45.454545`
 - Source Match(%): `100.0`
 
 ## Source Accuracy
 
 - Top Source: `fast_trend`
-- Top Source Accuracy(%): `40.0`
-- Top Source Closed Trades: `20`
+- Top Source Accuracy(%): `45.454545`
+- Top Source Closed Trades: `11`
