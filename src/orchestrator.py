@@ -207,7 +207,17 @@ class MultiAgentTradeBot:
                 agent=self.exec_agent.name,
                 data={"execution_result": self._to_payload(result)},
             )
-            executed.append({"symbol": result.symbol, "action": result.action, "status": result.status, "message": result.message})
+            executed.append(
+                {
+                    "symbol": result.symbol,
+                    "action": result.action,
+                    "status": result.status,
+                    "message": result.message,
+                    "source": planned.source,
+                    "confidence": planned.confidence,
+                    "reason": planned.reason,
+                }
+            )
 
         self.bus.emit(
             trace_id=trace_id,

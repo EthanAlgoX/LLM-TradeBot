@@ -112,6 +112,23 @@ def test_backtest_runner_outputs_report(tmp_path):
     assert "retried_open_count" in report
     assert "rejected_open_count" in report
     assert "cycle_status_counts" in report
+    assert "execution_attempts" in report
+    assert "execution_successes" in report
+    assert "execution_success_rate" in report
+    assert "directional_total" in report
+    assert "directional_correct" in report
+    assert "directional_flats" in report
+    assert "directional_accuracy_pct" in report
+    assert "open_source_match_rate_pct" in report
+    assert "unmatched_close_count" in report
+    assert "source_accuracy" in report
+    assert isinstance(report["source_accuracy"], list)
+    assert report["execution_attempts"] >= report["execution_successes"] >= 0
+    if report["source_accuracy"]:
+        top_source = report["source_accuracy"][0]
+        assert "source" in top_source
+        assert "accuracy_pct" in top_source
+        assert "closed_trades" in top_source
     assert "equity_curve" in out
     assert "equity_curve_mtm" in out
     assert len(out["equity_curve"]) == len(out["equity_curve_mtm"])
@@ -482,3 +499,4 @@ def test_render_backtest_markdown_csv(tmp_path):
     md = render_backtest_markdown(out)
     assert "# Backtest Summary (backtest_csv)" in md
     assert "## Report" in md
+    assert "Directional Accuracy(%)" in md

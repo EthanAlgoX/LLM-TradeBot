@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import copy
 import csv
+from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -40,9 +41,26 @@ def render_backtest_markdown(payload: dict[str, object], *, top_n: int = 5) -> s
                 f"- Max Drawdown(%): `{report.get('max_drawdown_pct', 0)}`",
                 f"- Sharpe: `{report.get('sharpe', 0)}`",
                 f"- Profit Factor: `{report.get('profit_factor', 0)}`",
+                f"- Execution Success(%): `{report.get('execution_success_rate', 0)}`",
+                f"- Directional Accuracy(%): `{report.get('directional_accuracy_pct', 0)}`",
+                f"- Source Match(%): `{report.get('open_source_match_rate_pct', 0)}`",
                 "",
             ]
         )
+        source_accuracy = report.get("source_accuracy", [])
+        if isinstance(source_accuracy, list) and source_accuracy:
+            top_source = source_accuracy[0]
+            if isinstance(top_source, dict):
+                lines.extend(
+                    [
+                        "## Source Accuracy",
+                        "",
+                        f"- Top Source: `{top_source.get('source', 'unknown')}`",
+                        f"- Top Source Accuracy(%): `{top_source.get('accuracy_pct', 0)}`",
+                        f"- Top Source Closed Trades: `{top_source.get('closed_trades', 0)}`",
+                        "",
+                    ]
+                )
         return "\n".join(lines).strip() + "\n"
 
     if mode == "backtest_grid":
@@ -147,6 +165,16 @@ class BacktestReport:
     retried_open_count: int
     rejected_open_count: int
     cycle_status_counts: dict[str, int]
+    execution_attempts: int
+    execution_successes: int
+    execution_success_rate: float
+    directional_total: int
+    directional_correct: int
+    directional_flats: int
+    directional_accuracy_pct: float
+    open_source_match_rate_pct: float
+    unmatched_close_count: int
+    source_accuracy: list[dict[str, object]]
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -185,6 +213,30 @@ class BacktestReport:
             "retried_open_count": self.retried_open_count,
             "rejected_open_count": self.rejected_open_count,
             "cycle_status_counts": self.cycle_status_counts,
+            "execution_attempts": self.execution_attempts,
+            "execution_successes": self.execution_successes,
+            "execution_success_rate": round(self.execution_success_rate, 6),
+            "directional_total": self.directional_total,
+            "directional_correct": self.directional_correct,
+            "directional_flats": self.directional_flats,
+            "directional_accuracy_pct": round(self.directional_accuracy_pct, 6),
+            "open_source_match_rate_pct": round(self.open_source_match_rate_pct, 6),
+            "unmatched_close_count": self.unmatched_close_count,
+            "source_accuracy": [
+                {
+                    "source": str(row.get("source", "unknown")),
+                    "closed_trades": int(_to_float(row.get("closed_trades"))),
+                    "wins": int(_to_float(row.get("wins"))),
+                    "losses": int(_to_float(row.get("losses"))),
+                    "flats": int(_to_float(row.get("flats"))),
+                    "accuracy_pct": round(_to_float(row.get("accuracy_pct")), 6),
+                    "total_pnl": round(_to_float(row.get("total_pnl")), 6),
+                    "avg_pnl": round(_to_float(row.get("avg_pnl")), 6),
+                    "avg_confidence": round(_to_float(row.get("avg_confidence")), 6),
+                }
+                for row in self.source_accuracy
+                if isinstance(row, dict)
+            ],
         }
 
 
@@ -770,6 +822,154 @@ class BacktestRunner:
             )
         return forced
 
+    def _collect_execution_records(self, cycle_results: list[Any]) -> list[dict[str, object]]:
+        records: list[dict[str, object]] = []
+        for result in cycle_results:
+            cycle = int(_to_float(getattr(result, "cycle", 0)))
+            details = getattr(result, "details", {})
+            if not isinstance(details, dict):
+                continue
+            executed = details.get("executed", [])
+            if not isinstance(executed, list):
+                continue
+            for row in executed:
+                if not isinstance(row, dict):
+                    continue
+                records.append(
+                    {
+                        "cycle": cycle,
+                        "symbol": str(row.get("symbol", "")),
+                        "action": str(row.get("action", "")),
+                        "status": str(row.get("status", "")),
+                        "source": str(row.get("source", "unknown") or "unknown"),
+                        "confidence": _to_float(row.get("confidence")),
+                    }
+                )
+        return records
+
+    def _compute_decision_accuracy(
+        self,
+        *,
+        trades: list[TradeRecord],
+        execution_records: list[dict[str, object]],
+    ) -> dict[str, object]:
+        open_actions = {"open_long", "open_short"}
+        close_actions = {"close_long", "close_short"}
+
+        open_meta_by_key: dict[tuple[int, str, str], list[dict[str, object]]] = defaultdict(list)
+        execution_successes = 0
+        for row in execution_records:
+            status = str(row.get("status", ""))
+            action = str(row.get("action", ""))
+            symbol = str(row.get("symbol", ""))
+            if status == "success":
+                execution_successes += 1
+                if action in open_actions and symbol:
+                    key = (int(_to_float(row.get("cycle"))), symbol, action)
+                    open_meta_by_key[key].append(row)
+
+        open_trades = 0
+        matched_open_trades = 0
+        unmatched_close_count = 0
+        directional_total = 0
+        directional_correct = 0
+        directional_flats = 0
+        active_open_by_symbol: dict[str, dict[str, object]] = {}
+        source_stats: dict[str, dict[str, float]] = {}
+
+        for t in trades:
+            if t.action in open_actions:
+                open_trades += 1
+                key = (int(t.cycle), t.symbol, t.action)
+                queue = open_meta_by_key.get(key, [])
+                meta = queue.pop(0) if queue else None
+                if meta is not None:
+                    matched_open_trades += 1
+                source = str(meta.get("source", "unknown") if isinstance(meta, dict) else "unknown")
+                active_open_by_symbol[t.symbol] = {
+                    "source": source or "unknown",
+                    "confidence": _to_float(meta.get("confidence")) if isinstance(meta, dict) else 0.0,
+                }
+                continue
+
+            if t.action not in close_actions:
+                continue
+            opening = active_open_by_symbol.pop(t.symbol, None)
+            if opening is None:
+                unmatched_close_count += 1
+                continue
+
+            directional_total += 1
+            pnl = float(t.pnl)
+            if pnl > 0:
+                directional_correct += 1
+            elif pnl == 0:
+                directional_flats += 1
+
+            source = str(opening.get("source", "unknown") or "unknown")
+            row = source_stats.setdefault(
+                source,
+                {
+                    "closed_trades": 0.0,
+                    "wins": 0.0,
+                    "losses": 0.0,
+                    "flats": 0.0,
+                    "total_pnl": 0.0,
+                    "confidence_sum": 0.0,
+                },
+            )
+            row["closed_trades"] += 1.0
+            row["total_pnl"] += pnl
+            row["confidence_sum"] += _to_float(opening.get("confidence"))
+            if pnl > 0:
+                row["wins"] += 1.0
+            elif pnl < 0:
+                row["losses"] += 1.0
+            else:
+                row["flats"] += 1.0
+
+        source_accuracy: list[dict[str, object]] = []
+        for source, row in source_stats.items():
+            closed_count = int(row["closed_trades"])
+            wins_count = int(row["wins"])
+            losses_count = int(row["losses"])
+            flats_count = int(row["flats"])
+            source_accuracy.append(
+                {
+                    "source": source,
+                    "closed_trades": closed_count,
+                    "wins": wins_count,
+                    "losses": losses_count,
+                    "flats": flats_count,
+                    "accuracy_pct": (wins_count / closed_count * 100.0) if closed_count else 0.0,
+                    "total_pnl": row["total_pnl"],
+                    "avg_pnl": (row["total_pnl"] / closed_count) if closed_count else 0.0,
+                    "avg_confidence": (row["confidence_sum"] / closed_count) if closed_count else 0.0,
+                }
+            )
+        source_accuracy.sort(
+            key=lambda x: (
+                int(_to_float(x.get("closed_trades"))),
+                _to_float(x.get("accuracy_pct")),
+                str(x.get("source", "")),
+            ),
+            reverse=True,
+        )
+
+        return {
+            "execution_attempts": len(execution_records),
+            "execution_successes": execution_successes,
+            "execution_success_rate": (execution_successes / len(execution_records) * 100.0) if execution_records else 0.0,
+            "open_trades": open_trades,
+            "open_source_match_rate_pct": (matched_open_trades / open_trades * 100.0) if open_trades else 0.0,
+            "directional_total": directional_total,
+            "directional_correct": directional_correct,
+            "directional_flats": directional_flats,
+            "directional_accuracy_pct": (directional_correct / directional_total * 100.0) if directional_total else 0.0,
+            "unmatched_close_count": unmatched_close_count,
+            "source_accuracy": source_accuracy,
+        }
+
     def _run_once(
         self,
         *,
@@ -830,6 +1030,8 @@ class BacktestRunner:
             equity_curve[-1]["equity"] = self._mark_to_market_equity(state=bot.state, cycle=bot.state.cycle)
 
         closed = [t for t in bot.state.trades if t.action in {"close_long", "close_short"}]
+        execution_records = self._collect_execution_records(cycle_results)
+        decision_accuracy = self._compute_decision_accuracy(trades=bot.state.trades, execution_records=execution_records)
         wins = len([t for t in closed if t.pnl > 0])
         losses = len([t for t in closed if t.pnl < 0])
         final_cash = bot.state.cash
@@ -928,6 +1130,20 @@ class BacktestRunner:
             retried_open_count=exec_provider.retried_open_count,
             rejected_open_count=exec_provider.rejected_open_count,
             cycle_status_counts=status_counts,
+            execution_attempts=int(_to_float(decision_accuracy.get("execution_attempts"))),
+            execution_successes=int(_to_float(decision_accuracy.get("execution_successes"))),
+            execution_success_rate=_to_float(decision_accuracy.get("execution_success_rate")),
+            directional_total=int(_to_float(decision_accuracy.get("directional_total"))),
+            directional_correct=int(_to_float(decision_accuracy.get("directional_correct"))),
+            directional_flats=int(_to_float(decision_accuracy.get("directional_flats"))),
+            directional_accuracy_pct=_to_float(decision_accuracy.get("directional_accuracy_pct")),
+            open_source_match_rate_pct=_to_float(decision_accuracy.get("open_source_match_rate_pct")),
+            unmatched_close_count=int(_to_float(decision_accuracy.get("unmatched_close_count"))),
+            source_accuracy=(
+                decision_accuracy.get("source_accuracy")
+                if isinstance(decision_accuracy.get("source_accuracy"), list)
+                else []
+            ),
         )
 
         payload: dict[str, object] = {
