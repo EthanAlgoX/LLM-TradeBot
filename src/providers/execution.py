@@ -36,31 +36,43 @@ class SimExecutionProvider(ExecutionProvider):
             return ExecutionResult(SCHEMA_V2, trace_id, symbol, action, "skipped", "passive action")
 
         if action == "open_long":
-            fee = abs(price * qty) * 3.0 / 10_000.0  # standard taker fee
+            margin_required = abs(price * qty) / lev if lev > 0 else abs(price * qty)
+            fee = abs(price * qty) * 3.0 / 10_000.0
+            total_required = margin_required + fee
+            if total_required > state.cash:
+                return ExecutionResult(SCHEMA_V2, trace_id, symbol, action, "failed", f"insufficient margin: need {total_required:.2f}, have {state.cash:.2f}", price)
+            state.cash -= margin_required
             state.positions[symbol] = Position(symbol=symbol, side="long", qty=qty, entry_price=price, leverage=lev, opened_cycle=state.cycle)
             state.cash -= fee
             state.trades.append(TradeRecord(state.cycle, symbol, action, qty, price, -fee))
-            return ExecutionResult(SCHEMA_V2, trace_id, symbol, action, "success", "long opened", price)
+            return ExecutionResult(SCHEMA_V2, trace_id, symbol, action, "success", f"long opened margin={margin_required:.2f}", price)
 
         if action == "open_short":
-            fee = abs(price * qty) * 3.0 / 10_000.0  # standard taker fee
+            margin_required = abs(price * qty) / lev if lev > 0 else abs(price * qty)
+            fee = abs(price * qty) * 3.0 / 10_000.0
+            total_required = margin_required + fee
+            if total_required > state.cash:
+                return ExecutionResult(SCHEMA_V2, trace_id, symbol, action, "failed", f"insufficient margin: need {total_required:.2f}, have {state.cash:.2f}", price)
+            state.cash -= margin_required
             state.positions[symbol] = Position(symbol=symbol, side="short", qty=qty, entry_price=price, leverage=lev, opened_cycle=state.cycle)
             state.cash -= fee
             state.trades.append(TradeRecord(state.cycle, symbol, action, qty, price, -fee))
-            return ExecutionResult(SCHEMA_V2, trace_id, symbol, action, "success", "short opened", price)
+            return ExecutionResult(SCHEMA_V2, trace_id, symbol, action, "success", f"short opened margin={margin_required:.2f}", price)
 
         if action in {"close_long", "close_short"}:
             pos = state.positions.get(symbol)
             if not pos:
                 return ExecutionResult(SCHEMA_V2, trace_id, symbol, action, "failed", "no position", price)
+            marginReleased = abs(pos.entry_price * pos.qty) / pos.leverage if pos.leverage > 0 else abs(pos.entry_price * pos.qty)
             sign = 1.0 if pos.side == "long" else -1.0
             gross_pnl = (price - pos.entry_price) * pos.qty * sign * pos.leverage
             close_fee = abs(price * pos.qty) * 3.0 / 10_000.0
             net_pnl = gross_pnl - close_fee
+            state.cash += marginReleased
             state.cash += net_pnl
             state.trades.append(TradeRecord(state.cycle, symbol, action, pos.qty, price, net_pnl))
             del state.positions[symbol]
-            return ExecutionResult(SCHEMA_V2, trace_id, symbol, action, "success", f"position closed pnl={net_pnl:.2f}", price)
+            return ExecutionResult(SCHEMA_V2, trace_id, symbol, action, "success", f"position closed pnl={net_pnl:.2f} margin_released={marginReleased:.2f}", price)
 
         return ExecutionResult(SCHEMA_V2, trace_id, symbol, action, "failed", "unknown action", price)
 
@@ -192,24 +204,30 @@ class BinanceFuturesExecutionProvider(ExecutionProvider):
         lev = float(planned.order_params.get("leverage", 1.0) or 1.0)
 
         if action == "open_long":
+            margin_required = abs(avg_price * qty) / lev if lev > 0 else abs(avg_price * qty)
+            state.cash -= margin_required
             state.positions[symbol] = Position(symbol=symbol, side="long", qty=qty, entry_price=avg_price, leverage=lev, opened_cycle=state.cycle)
             state.trades.append(TradeRecord(state.cycle, symbol, action, qty, avg_price, 0.0))
-            return ExecutionResult(SCHEMA_V2, trace_id, symbol, action, "success", "live long opened", avg_price)
+            return ExecutionResult(SCHEMA_V2, trace_id, symbol, action, "success", f"live long opened margin={margin_required:.2f}", avg_price)
 
         if action == "open_short":
+            margin_required = abs(avg_price * qty) / lev if lev > 0 else abs(avg_price * qty)
+            state.cash -= margin_required
             state.positions[symbol] = Position(symbol=symbol, side="short", qty=qty, entry_price=avg_price, leverage=lev, opened_cycle=state.cycle)
             state.trades.append(TradeRecord(state.cycle, symbol, action, qty, avg_price, 0.0))
-            return ExecutionResult(SCHEMA_V2, trace_id, symbol, action, "success", "live short opened", avg_price)
+            return ExecutionResult(SCHEMA_V2, trace_id, symbol, action, "success", f"live short opened margin={margin_required:.2f}", avg_price)
 
         if action in {"close_long", "close_short"}:
             pos = state.positions.get(symbol)
             if not pos:
                 return ExecutionResult(SCHEMA_V2, trace_id, symbol, action, "failed", "no local position")
+            marginReleased = abs(pos.entry_price * pos.qty) / pos.leverage if pos.leverage > 0 else abs(pos.entry_price * pos.qty)
             sign = 1.0 if pos.side == "long" else -1.0
             pnl = (avg_price - pos.entry_price) * pos.qty * sign * pos.leverage
+            state.cash += marginReleased
             state.cash += pnl
             state.trades.append(TradeRecord(state.cycle, symbol, action, pos.qty, avg_price, pnl))
             del state.positions[symbol]
-            return ExecutionResult(SCHEMA_V2, trace_id, symbol, action, "success", f"live position closed pnl={pnl:.2f}", avg_price)
+            return ExecutionResult(SCHEMA_V2, trace_id, symbol, action, "success", f"live position closed pnl={pnl:.2f} margin_released={marginReleased:.2f}", avg_price)
 
         return ExecutionResult(SCHEMA_V2, trace_id, symbol, action, "failed", "unknown action")

@@ -10,15 +10,29 @@ from state import RuntimeState
 class ExecutionPlannerAgent(BaseAgent):
     name = "execution_planner_agent"
 
+    def _calculate_position_size(self, notional: float, entry_price: float, leverage: float, available_cash: float) -> float:
+        if entry_price <= 0 or leverage <= 0:
+            return 0.0
+        max_notional = min(notional, available_cash * leverage)
+        return max_notional / entry_price
+
     def plan(self, proposal: ProposedAction, risk: RiskDecision, cfg: RuntimeConfig, state: RuntimeState) -> ProposedAction:
         planned = proposal
         if risk.corrections:
             planned.order_params.update(risk.corrections)
+
+        leverage = float(planned.order_params.get("leverage", 1.0) or 1.0)
+
         if planned.action in {"close_long", "close_short"} and planned.symbol in state.positions:
             qty = state.positions[planned.symbol].qty
-        else:
+        elif planned.action in {"open_long", "open_short"}:
             entry = float(planned.order_params.get("entry_price", 0) or 0)
-            qty = cfg.per_trade_notional / entry if entry > 0 else 0.0
+            notional = float(cfg.per_trade_notional)
+            available_margin = state.cash
+            qty = self._calculate_position_size(notional, entry, leverage, available_margin)
+        else:
+            qty = 0.0
+
         planned.order_params["quantity"] = qty
         return planned
 

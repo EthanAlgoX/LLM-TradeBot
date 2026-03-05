@@ -491,7 +491,7 @@ class BacktestExecutionProvider(ExecutionProvider):
         avg_fill = weighted_notional / max(1e-12, filled_qty)
         fee_total = sum(self._fee(px, q) for q, px in fills)
 
-        required_margin = abs(avg_fill * filled_qty) / max(1.0, lev)
+        required_margin = abs(avg_fill * filled_qty) / lev if lev > 0 else abs(avg_fill * filled_qty)
         if required_margin + fee_total > state.cash:
             self.rejected_open_count += 1
             return ExecutionResult(SCHEMA_V2, trace_id, symbol, action, "failed", "insufficient cash for margin")
@@ -500,6 +500,7 @@ class BacktestExecutionProvider(ExecutionProvider):
         state.positions[symbol] = Position(symbol=symbol, side=side, qty=filled_qty, entry_price=avg_fill, leverage=lev, opened_cycle=state.cycle)
         self._store_risk_levels(symbol=symbol, planned=planned)
         self.total_fees_paid += fee_total
+        state.cash -= required_margin
         state.cash -= fee_total
         state.trades.append(TradeRecord(state.cycle, symbol, action, filled_qty, avg_fill, -fee_total))
 
@@ -559,14 +560,16 @@ class BacktestExecutionProvider(ExecutionProvider):
         fill = self._fill_price(mark_price, action)
         fee = self._fee(fill, pos.qty)
         self.total_fees_paid += fee
+        margin_released = abs(pos.entry_price * pos.qty) / pos.leverage if pos.leverage > 0 else abs(pos.entry_price * pos.qty)
         sign = 1.0 if pos.side == "long" else -1.0
         gross_pnl = (fill - pos.entry_price) * pos.qty * sign * pos.leverage
         net_pnl = gross_pnl - fee
+        state.cash += margin_released
         state.cash += net_pnl
         state.trades.append(TradeRecord(state.cycle, symbol, action, pos.qty, fill, net_pnl))
         del state.positions[symbol]
         self._clear_risk_levels(symbol)
-        return ExecutionResult(SCHEMA_V2, trace_id, symbol, action, "success", f"{message_prefix} net_pnl={net_pnl:.6f}", fill)
+        return ExecutionResult(SCHEMA_V2, trace_id, symbol, action, "success", f"{message_prefix} net_pnl={net_pnl:.6f} margin_released={margin_released:.6f}", fill)
 
     def auto_close_triggered_positions(self, *, state: RuntimeState, cycle: int) -> list[dict[str, object]]:
         if not self.dataset:

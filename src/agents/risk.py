@@ -12,6 +12,17 @@ class RiskAuditAgent(BaseAgent):
     def __init__(self, cfg: RuntimeConfig) -> None:
         self.cfg = cfg
 
+    def _compute_equity(self, state: RuntimeState) -> float:
+        unrealized = 0.0
+        for symbol, pos in state.positions.items():
+            current_price = state.prices.get(symbol, pos.entry_price)
+            sign = 1.0 if pos.side == "long" else -1.0
+            unrealized += (current_price - pos.entry_price) * pos.qty * sign * pos.leverage
+        return state.cash + unrealized
+
+    def _get_position_notional(self, symbol: str, entry: float, qty: float, leverage: float) -> float:
+        return abs(entry * qty * leverage)
+
     def audit(self, *, trace_id: str, proposal: ProposedAction, state: RuntimeState) -> RiskDecision:
         action = proposal.action
         params = proposal.order_params
@@ -34,8 +45,9 @@ class RiskAuditAgent(BaseAgent):
                 f"concurrent positions {len(state.positions)} >= {self.cfg.risk.max_concurrent_positions}",
             )
 
-        # Account-level drawdown circuit breaker
-        drawdown_pct = (self.cfg.initial_cash - state.cash) / self.cfg.initial_cash * 100.0 if self.cfg.initial_cash > 0 else 0.0
+        # Account-level drawdown circuit breaker (based on equity, not cash)
+        equity = self._compute_equity(state)
+        drawdown_pct = (self.cfg.initial_cash - equity) / self.cfg.initial_cash * 100.0 if self.cfg.initial_cash > 0 else 0.0
         if drawdown_pct >= self.cfg.risk.max_drawdown_pct:
             return RiskDecision(
                 SCHEMA_V2, trace_id, symbol, False, "fatal",
@@ -51,8 +63,39 @@ class RiskAuditAgent(BaseAgent):
         take = float(params.get("take_profit", 0) or 0)
         notional = float(self.cfg.per_trade_notional)
 
+        # Check margin requirement for new position
+        position_notional = self._get_position_notional(symbol, entry, notional / entry if entry > 0 else 0, lev)
+        required_margin = position_notional / lev if lev > 0 else position_notional
+
+        # Calculate existing margin used
+        existing_margin = 0.0
+        for sym, pos in state.positions.items():
+            pos_notional = pos.entry_price * pos.qty * pos.leverage
+            existing_margin += pos_notional / pos.leverage if pos.leverage > 0 else pos_notional
+
+        total_required_margin = required_margin + existing_margin
+        if total_required_margin > state.cash:
+            return RiskDecision(
+                SCHEMA_V2, trace_id, symbol, False, "fatal",
+                f"insufficient margin: required {total_required_margin:.2f}, available {state.cash:.2f}",
+            )
+
         if notional > self.cfg.risk.max_position_notional:
             return RiskDecision(SCHEMA_V2, trace_id, symbol, False, "fatal", "position notional exceeds cap")
+
+        # Check individual position notional limit
+        if position_notional > self.cfg.risk.max_position_notional:
+            return RiskDecision(
+                SCHEMA_V2, trace_id, symbol, False, "fatal",
+                f"position notional {position_notional:.2f} exceeds max {self.cfg.risk.max_position_notional}",
+            )
+
+        # Check total portfolio notional exposure
+        total_notional = sum(pos.entry_price * pos.qty * pos.leverage for pos in state.positions.values())
+        total_notional += position_notional
+        max_total_notional = self.cfg.risk.max_concurrent_positions * self.cfg.risk.max_position_notional
+        if total_notional > max_total_notional:
+            warnings.append(f"total notional {total_notional:.2f} approaching limit {max_total_notional}")
 
         corrections: dict[str, float] = {}
         warnings: list[str] = []
