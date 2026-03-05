@@ -45,7 +45,29 @@
     "cycle_status_counts": {
       "wait": 45,
       "success": 27
-    }
+    },
+    "execution_attempts": 30,
+    "execution_successes": 30,
+    "execution_success_rate": 100.0,
+    "directional_total": 20,
+    "directional_correct": 8,
+    "directional_flats": 0,
+    "directional_accuracy_pct": 40.0,
+    "open_source_match_rate_pct": 100.0,
+    "unmatched_close_count": 0,
+    "source_accuracy": [
+      {
+        "source": "fast_trend",
+        "closed_trades": 20,
+        "wins": 8,
+        "losses": 12,
+        "flats": 0,
+        "accuracy_pct": 40.0,
+        "total_pnl": -6.175639,
+        "avg_pnl": -0.308782,
+        "avg_confidence": 86.38862
+      }
+    ]
   },
   "equity_curve": [
     {
@@ -637,7 +659,7 @@
   ],
   "last_cycle": {
     "cycle": 72,
-    "trace_id": "cycle:72:20260305T144856Z",
+    "trace_id": "cycle:72:20260305T150500Z",
     "status": "success",
     "action": "close_long"
   },
