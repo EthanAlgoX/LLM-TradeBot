@@ -65,7 +65,7 @@ class SimExecutionProvider(ExecutionProvider):
                 return ExecutionResult(SCHEMA_V2, trace_id, symbol, action, "failed", "no position", price)
             marginReleased = abs(pos.entry_price * pos.qty) / pos.leverage if pos.leverage > 0 else abs(pos.entry_price * pos.qty)
             sign = 1.0 if pos.side == "long" else -1.0
-            gross_pnl = (price - pos.entry_price) * pos.qty * sign * pos.leverage
+            gross_pnl = (price - pos.entry_price) * pos.qty * sign
             close_fee = abs(price * pos.qty) * 3.0 / 10_000.0
             net_pnl = gross_pnl - close_fee
             state.cash += marginReleased
@@ -223,7 +223,7 @@ class BinanceFuturesExecutionProvider(ExecutionProvider):
                 return ExecutionResult(SCHEMA_V2, trace_id, symbol, action, "failed", "no local position")
             marginReleased = abs(pos.entry_price * pos.qty) / pos.leverage if pos.leverage > 0 else abs(pos.entry_price * pos.qty)
             sign = 1.0 if pos.side == "long" else -1.0
-            pnl = (avg_price - pos.entry_price) * pos.qty * sign * pos.leverage
+            pnl = (avg_price - pos.entry_price) * pos.qty * sign
             state.cash += marginReleased
             state.cash += pnl
             state.trades.append(TradeRecord(state.cycle, symbol, action, pos.qty, avg_price, pnl))

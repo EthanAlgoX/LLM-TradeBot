@@ -166,7 +166,7 @@ def test_backtest_execution_provider_applies_fee_and_slippage():
 
     r1 = provider.execute(trace_id="t1", planned=open_long, state=state)
     assert r1.status == "success"
-    assert state.cash == pytest.approx(9_999.9, rel=0, abs=1e-9)
+    assert state.cash == pytest.approx(9_899.9, rel=0, abs=1e-9)
 
     state.cycle = 2
     r2 = provider.execute(trace_id="t2", planned=close_long, state=state)

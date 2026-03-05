@@ -562,7 +562,7 @@ class BacktestExecutionProvider(ExecutionProvider):
         self.total_fees_paid += fee
         margin_released = abs(pos.entry_price * pos.qty) / pos.leverage if pos.leverage > 0 else abs(pos.entry_price * pos.qty)
         sign = 1.0 if pos.side == "long" else -1.0
-        gross_pnl = (fill - pos.entry_price) * pos.qty * sign * pos.leverage
+        gross_pnl = (fill - pos.entry_price) * pos.qty * sign
         net_pnl = gross_pnl - fee
         state.cash += margin_released
         state.cash += net_pnl
@@ -755,7 +755,9 @@ class BacktestRunner:
             if px <= 0:
                 px = float(pos.entry_price)
             sign = 1.0 if pos.side == "long" else -1.0
-            equity += (px - float(pos.entry_price)) * float(pos.qty) * sign * float(pos.leverage)
+            margin = abs(float(pos.entry_price) * float(pos.qty)) / float(pos.leverage) if float(pos.leverage) > 0 else abs(float(pos.entry_price) * float(pos.qty))
+            unrealized_pnl = (px - float(pos.entry_price)) * float(pos.qty) * sign
+            equity += margin + unrealized_pnl
         return equity
 
     def _apply_funding(
