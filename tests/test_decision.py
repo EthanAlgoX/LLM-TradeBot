@@ -47,28 +47,32 @@ def test_decision_fast_trend_short_requires_strict_confirmation():
     cfg = RuntimeConfig()
     agent = DecisionRouterAgent(cfg)
     state = RuntimeState(cycle=1, cash=100_000.0)
+    # Weak signal: trend_score / 12 = -2.67 doesn't meet -3.5 threshold
     weak = _consensus(trend_score=-32.0, sentiment_score=10.0, predict_up_prob=0.45, trigger_stance="WAITING")
     out = agent.route(trace_id="t1", consensus=weak, price=100.0, state=state)
     assert out.action == "wait"
 
+    # Strong signal: trend_score / 12 = -4.0 >= -3.5 threshold
     strong = _consensus(trend_score=-48.0, sentiment_score=-12.0, predict_up_prob=0.30, trigger_stance="CONFIRMED")
     out2 = agent.route(trace_id="t2", consensus=strong, price=100.0, state=state)
     assert out2.action == "open_short"
     assert out2.source == "fast_trend"
-    assert out2.order_params["leverage"] == 2.5
-    assert out2.order_params["stop_loss"] == pytest.approx(101.2, rel=0, abs=1e-9)
-    assert out2.order_params["take_profit"] == pytest.approx(97.6, rel=0, abs=1e-9)
+    # Confidence = min(90, 70 + 4.0*4) = 86.0 → dynamic leverage: ≥85 → 3.0
+    assert out2.order_params["leverage"] == 3.0
+    # Volatility-adaptive stops: default vol=1.0, vol_stop=1.0/100*1.5=0.015, max(0.02, 0.015)=0.02
+    assert out2.order_params["stop_loss"] == pytest.approx(100.0 * 1.02, rel=1e-9)
+    assert out2.order_params["take_profit"] == pytest.approx(100.0 * (1.0 - 0.02 * 2.0), rel=1e-9)
 
 
 def test_decision_close_action_has_zero_stop_take():
     """Close actions should set stop_loss and take_profit to 0 to avoid R:R checks."""
     cfg = RuntimeConfig()
     agent = DecisionRouterAgent(cfg)
-    state = RuntimeState(cycle=12, cash=100_000.0)
+    # max_holding_cycles defaults to 15, so cycle 16 - opened 1 = 15 >= 15 → forced exit
+    state = RuntimeState(cycle=16, cash=100_000.0)
     state.positions["BTCUSDT"] = Position(symbol="BTCUSDT", side="long", qty=1.0, entry_price=100.0, leverage=3.0, opened_cycle=1)
     c = _consensus(symbol="BTCUSDT", trend_score=0.0, predict_up_prob=0.5)
     out = agent.route(trace_id="t1", consensus=c, price=100.0, state=state)
-    # Stale position (12 - 1 >= 10) → forced exit
     assert out.action == "close_long"
     assert out.order_params["stop_loss"] == 0.0
     assert out.order_params["take_profit"] == 0.0
@@ -77,13 +81,41 @@ def test_decision_close_action_has_zero_stop_take():
 def test_decision_loss_cooldown_raises_threshold():
     """When reflection_hint indicates negative PnL, the open threshold should be boosted."""
     cfg = RuntimeConfig()
-    cfg.decision.loss_cooldown_threshold_boost = 25.0
     agent = DecisionRouterAgent(cfg)
     state = RuntimeState(cycle=5, cash=100_000.0)
     state.reflection_hint = "recent pnl negative: reduce leverage and require stronger confirmation"
 
-    # A score that would normally clear the default threshold (60) but not 60+25=85
     c = _consensus(trend_score=0.0, osc_score=0.0, sentiment_score=0.0, predict_up_prob=0.5)
-    score = 0.0 * 0.45 + 0.0 * 0.15 + 0.0 * 0.20 + 0.0 * 0.20  # = 0
     out = agent.route(trace_id="t1", consensus=c, price=100.0, state=state)
     assert out.action == "wait"
+
+
+def test_decision_symbol_cooldown_skips_reentry():
+    """When a symbol is on cooldown, new opens should be skipped."""
+    cfg = RuntimeConfig()
+    agent = DecisionRouterAgent(cfg)
+    state = RuntimeState(cycle=5, cash=100_000.0)
+    state.set_cooldown("SOLUSDT", 8)  # cooldown until cycle 8
+
+    c = _consensus(symbol="SOLUSDT", trend_score=30.0, predict_up_prob=0.68, alignment_ok=True)
+    out = agent.route(trace_id="t1", consensus=c, price=100.0, state=state)
+    assert out.action == "wait"
+    assert out.source == "cooldown"
+
+    # After cooldown expires
+    state.cycle = 9
+    out2 = agent.route(trace_id="t2", consensus=c, price=100.0, state=state)
+    assert out2.action == "open_long"
+
+
+def test_decision_volatility_adaptive_stops():
+    """High volatility should widen stops beyond config defaults."""
+    cfg = RuntimeConfig()
+    agent = DecisionRouterAgent(cfg)
+    state = RuntimeState(cycle=1, cash=100_000.0)
+    c = _consensus(trend_score=30.0, predict_up_prob=0.68, alignment_ok=True)
+    # High volatility: 5% — vol_stop = 5/100 * 1.5 = 0.075 > config 0.025
+    out = agent.route(trace_id="t1", consensus=c, price=100.0, state=state, volatility_pct=5.0)
+    assert out.action == "open_long"
+    assert out.order_params["stop_loss"] == pytest.approx(100.0 * (1.0 - 0.075), rel=1e-9)
+    assert out.order_params["take_profit"] == pytest.approx(100.0 * (1.0 + 0.075 * 2.0), rel=1e-9)

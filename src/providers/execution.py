@@ -36,13 +36,17 @@ class SimExecutionProvider(ExecutionProvider):
             return ExecutionResult(SCHEMA_V2, trace_id, symbol, action, "skipped", "passive action")
 
         if action == "open_long":
+            fee = abs(price * qty) * 3.0 / 10_000.0  # standard taker fee
             state.positions[symbol] = Position(symbol=symbol, side="long", qty=qty, entry_price=price, leverage=lev, opened_cycle=state.cycle)
-            state.trades.append(TradeRecord(state.cycle, symbol, action, qty, price, 0.0))
+            state.cash -= fee
+            state.trades.append(TradeRecord(state.cycle, symbol, action, qty, price, -fee))
             return ExecutionResult(SCHEMA_V2, trace_id, symbol, action, "success", "long opened", price)
 
         if action == "open_short":
+            fee = abs(price * qty) * 3.0 / 10_000.0  # standard taker fee
             state.positions[symbol] = Position(symbol=symbol, side="short", qty=qty, entry_price=price, leverage=lev, opened_cycle=state.cycle)
-            state.trades.append(TradeRecord(state.cycle, symbol, action, qty, price, 0.0))
+            state.cash -= fee
+            state.trades.append(TradeRecord(state.cycle, symbol, action, qty, price, -fee))
             return ExecutionResult(SCHEMA_V2, trace_id, symbol, action, "success", "short opened", price)
 
         if action in {"close_long", "close_short"}:
@@ -50,11 +54,13 @@ class SimExecutionProvider(ExecutionProvider):
             if not pos:
                 return ExecutionResult(SCHEMA_V2, trace_id, symbol, action, "failed", "no position", price)
             sign = 1.0 if pos.side == "long" else -1.0
-            pnl = (price - pos.entry_price) * pos.qty * sign * pos.leverage
-            state.cash += pnl
-            state.trades.append(TradeRecord(state.cycle, symbol, action, pos.qty, price, pnl))
+            gross_pnl = (price - pos.entry_price) * pos.qty * sign * pos.leverage
+            close_fee = abs(price * pos.qty) * 3.0 / 10_000.0
+            net_pnl = gross_pnl - close_fee
+            state.cash += net_pnl
+            state.trades.append(TradeRecord(state.cycle, symbol, action, pos.qty, price, net_pnl))
             del state.positions[symbol]
-            return ExecutionResult(SCHEMA_V2, trace_id, symbol, action, "success", f"position closed pnl={pnl:.2f}", price)
+            return ExecutionResult(SCHEMA_V2, trace_id, symbol, action, "success", f"position closed pnl={net_pnl:.2f}", price)
 
         return ExecutionResult(SCHEMA_V2, trace_id, symbol, action, "failed", "unknown action", price)
 

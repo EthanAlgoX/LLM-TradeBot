@@ -75,7 +75,7 @@ class MultiAgentTradeBot:
         self.risk_agent = RiskAuditAgent(self.cfg)
         self.exec_planner = ExecutionPlannerAgent()
         self.exec_agent = ExecutionAgent(provider=exec_provider)
-        self.post_trade_agent = PostTradeAgent()
+        self.post_trade_agent = PostTradeAgent(cfg=self.cfg)
 
     @staticmethod
     def _to_payload(obj: Any) -> dict[str, Any]:
@@ -106,7 +106,7 @@ class MultiAgentTradeBot:
             asyncio.to_thread(self.semantic_agent.summarize, trace_id=trace_id, snapshot=snapshot, signal=signal),
         )
         consensus = self.fusion_agent.fuse(trace_id=trace_id, symbol=symbol, signal=signal, prediction=pred, context=ctx, semantic=sem)
-        proposal = self.decision_agent.route(trace_id=trace_id, consensus=consensus, price=snapshot.price, state=self.state)
+        proposal = self.decision_agent.route(trace_id=trace_id, consensus=consensus, price=snapshot.price, state=self.state, volatility_pct=snapshot.volatility_pct)
         self.bus.emit(
             trace_id=trace_id,
             stage="analysis",

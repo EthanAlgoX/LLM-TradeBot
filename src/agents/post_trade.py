@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from agents.base import BaseAgent
+from config import RuntimeConfig
 from contracts import PostTradeResult, SCHEMA_V2
 from state import RuntimeState
 
@@ -41,7 +42,8 @@ class ReflectionWriterAgent(BaseAgent):
 class PostTradeAgent(BaseAgent):
     name = "post_trade_agent"
 
-    def __init__(self) -> None:
+    def __init__(self, cfg: RuntimeConfig | None = None) -> None:
+        self.cfg = cfg
         self.monitor = PositionMonitorAgent()
         self.reflector = ReflectionWriterAgent()
 
@@ -49,4 +51,15 @@ class PostTradeAgent(BaseAgent):
         notes = self.monitor.evaluate(state)
         state.reflection_hint = self.reflector.reflect(state)
         notes.append(f"reflection: {state.reflection_hint}")
+
+        # Per-symbol cooldown: set cooldown on symbols that just had a losing close
+        cooldown_cycles = 3
+        if self.cfg is not None:
+            cooldown_cycles = self.cfg.decision.symbol_cooldown_cycles
+        close_actions = {"close_long", "close_short"}
+        for t in state.trades:
+            if t.cycle == state.cycle and t.action in close_actions and t.pnl < 0:
+                state.set_cooldown(t.symbol, state.cycle + cooldown_cycles)
+                notes.append(f"cooldown set: {t.symbol} for {cooldown_cycles} cycles after loss")
+
         return PostTradeResult(schema_version=SCHEMA_V2, trace_id=trace_id, symbol=symbol, notes=notes)
