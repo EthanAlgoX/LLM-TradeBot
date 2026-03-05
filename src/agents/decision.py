@@ -12,6 +12,14 @@ class DecisionRouterAgent(BaseAgent):
     def __init__(self, cfg: RuntimeConfig) -> None:
         self.cfg = cfg
 
+    def _effective_open_threshold(self, state: RuntimeState) -> float:
+        """Raise the open threshold when recent reflection indicates losses."""
+        base = self.cfg.decision.open_threshold
+        hint = (state.reflection_hint or "").lower()
+        if "negative" in hint or "reduce" in hint:
+            return base + self.cfg.decision.loss_cooldown_threshold_boost
+        return base
+
     def route(self, *, trace_id: str, consensus: ConsensusSignal, price: float, state: RuntimeState) -> ProposedAction:
         symbol = consensus.symbol
         has_position = state.has_position(symbol)
@@ -19,11 +27,12 @@ class DecisionRouterAgent(BaseAgent):
         # forced exit: stale holding
         if has_position:
             pos = state.positions[symbol]
-            if state.cycle - pos.opened_cycle >= 10:
+            if state.cycle - pos.opened_cycle >= self.cfg.decision.max_holding_cycles:
                 return self._build(trace_id, symbol, "forced_exit", "close_long" if pos.side == "long" else "close_short", 90.0, "max holding cycles reached", price)
 
         # fast trend
         momentum = consensus.trend_score / 12.0
+        effective_threshold = self._effective_open_threshold(state)
         if not has_position:
             open_long = (
                 momentum >= self.cfg.decision.fast_trend_threshold
@@ -53,9 +62,9 @@ class DecisionRouterAgent(BaseAgent):
         )
 
         if not has_position:
-            if score >= self.cfg.decision.open_threshold:
+            if score >= effective_threshold:
                 return self._build(trace_id, symbol, "rule", "open_long", min(88.0, 60.0 + score * 0.3), f"composite score {score:.2f}", price)
-            if score <= -self.cfg.decision.open_threshold:
+            if score <= -effective_threshold:
                 return self._build(trace_id, symbol, "rule", "open_short", min(88.0, 60.0 + abs(score) * 0.3), f"composite score {score:.2f}", price)
             return self._build(trace_id, symbol, "rule", "wait", 0.0, f"no edge score={score:.2f}", price)
 
@@ -68,18 +77,25 @@ class DecisionRouterAgent(BaseAgent):
         return self._build(trace_id, symbol, "rule", "hold", 0.0, f"hold score={score:.2f}", price)
 
     def _build(self, trace_id: str, symbol: str, source: str, action: str, confidence: float, reason: str, price: float) -> ProposedAction:
-        if action in {"open_long", "close_short"}:
-            stop_loss = price * 0.985
-            take_profit = price * 1.03
+        cfg_d = self.cfg.decision
+
+        if action == "open_long":
+            stop_loss = price * (1.0 - cfg_d.long_stop_loss_pct)
+            take_profit = price * (1.0 + cfg_d.long_take_profit_pct)
             leverage = 3.0
-        elif action in {"open_short", "close_long"}:
-            stop_loss = price * 1.012
-            take_profit = price * 0.976
+        elif action == "open_short":
+            stop_loss = price * (1.0 + cfg_d.short_stop_loss_pct)
+            take_profit = price * (1.0 - cfg_d.short_take_profit_pct)
             leverage = 2.5
+        elif action in {"close_long", "close_short"}:
+            # Close actions do not need stop/take; set to 0 to skip R:R checks.
+            stop_loss = 0.0
+            take_profit = 0.0
+            leverage = 1.0
         else:
-            stop_loss = price * 0.985
-            take_profit = price * 1.03
-            leverage = 2.0
+            stop_loss = 0.0
+            take_profit = 0.0
+            leverage = 1.0
 
         return ProposedAction(
             schema_version=SCHEMA_V2,

@@ -25,6 +25,14 @@ class ReflectionWriterAgent(BaseAgent):
         if not recent:
             return "no reflection yet"
         avg = sum(recent) / len(recent)
+        consecutive_losses = 0
+        for pnl in reversed(recent):
+            if pnl < 0:
+                consecutive_losses += 1
+            else:
+                break
+        if consecutive_losses >= 3:
+            return f"recent pnl negative: {consecutive_losses} consecutive losses, reduce leverage and require stronger confirmation"
         if avg < 0:
             return "recent pnl negative: reduce leverage and require stronger confirmation"
         return "recent pnl positive: keep discipline, avoid overtrading"

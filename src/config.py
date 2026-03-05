@@ -26,6 +26,7 @@ class DecisionConfig:
     long_reversal_close_score: float = -35.0
     short_reversal_close_score: float = 20.0
     llm_enabled: bool = False
+    loss_cooldown_threshold_boost: float = 20.0
 
 
 @dataclass
@@ -33,6 +34,8 @@ class RiskConfig:
     max_leverage: float = 5.0
     min_rr: float = 1.2
     max_position_notional: float = 10_000.0
+    max_concurrent_positions: int = 3
+    max_drawdown_pct: float = 5.0
 
 
 @dataclass

@@ -50,7 +50,7 @@ class SimExecutionProvider(ExecutionProvider):
             if not pos:
                 return ExecutionResult(SCHEMA_V2, trace_id, symbol, action, "failed", "no position", price)
             sign = 1.0 if pos.side == "long" else -1.0
-            pnl = (price - pos.entry_price) * pos.qty * sign
+            pnl = (price - pos.entry_price) * pos.qty * sign * pos.leverage
             state.cash += pnl
             state.trades.append(TradeRecord(state.cycle, symbol, action, pos.qty, price, pnl))
             del state.positions[symbol]
@@ -200,7 +200,7 @@ class BinanceFuturesExecutionProvider(ExecutionProvider):
             if not pos:
                 return ExecutionResult(SCHEMA_V2, trace_id, symbol, action, "failed", "no local position")
             sign = 1.0 if pos.side == "long" else -1.0
-            pnl = (avg_price - pos.entry_price) * pos.qty * sign
+            pnl = (avg_price - pos.entry_price) * pos.qty * sign * pos.leverage
             state.cash += pnl
             state.trades.append(TradeRecord(state.cycle, symbol, action, pos.qty, avg_price, pnl))
             del state.positions[symbol]

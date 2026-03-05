@@ -560,7 +560,7 @@ class BacktestExecutionProvider(ExecutionProvider):
         fee = self._fee(fill, pos.qty)
         self.total_fees_paid += fee
         sign = 1.0 if pos.side == "long" else -1.0
-        gross_pnl = (fill - pos.entry_price) * pos.qty * sign
+        gross_pnl = (fill - pos.entry_price) * pos.qty * sign * pos.leverage
         net_pnl = gross_pnl - fee
         state.cash += net_pnl
         state.trades.append(TradeRecord(state.cycle, symbol, action, pos.qty, fill, net_pnl))
@@ -752,7 +752,7 @@ class BacktestRunner:
             if px <= 0:
                 px = float(pos.entry_price)
             sign = 1.0 if pos.side == "long" else -1.0
-            equity += (px - float(pos.entry_price)) * float(pos.qty) * sign
+            equity += (px - float(pos.entry_price)) * float(pos.qty) * sign * float(pos.leverage)
         return equity
 
     def _apply_funding(

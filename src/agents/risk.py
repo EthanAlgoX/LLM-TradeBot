@@ -25,6 +25,23 @@ class RiskAuditAgent(BaseAgent):
                 return RiskDecision(SCHEMA_V2, trace_id, symbol, False, "fatal", "close requested but no position")
             return RiskDecision(SCHEMA_V2, trace_id, symbol, True, "safe", None)
 
+        # --- Open action checks below ---
+
+        # Max concurrent positions check
+        if len(state.positions) >= self.cfg.risk.max_concurrent_positions:
+            return RiskDecision(
+                SCHEMA_V2, trace_id, symbol, False, "fatal",
+                f"concurrent positions {len(state.positions)} >= {self.cfg.risk.max_concurrent_positions}",
+            )
+
+        # Account-level drawdown circuit breaker
+        drawdown_pct = (self.cfg.initial_cash - state.cash) / self.cfg.initial_cash * 100.0 if self.cfg.initial_cash > 0 else 0.0
+        if drawdown_pct >= self.cfg.risk.max_drawdown_pct:
+            return RiskDecision(
+                SCHEMA_V2, trace_id, symbol, False, "fatal",
+                f"account drawdown {drawdown_pct:.2f}% >= {self.cfg.risk.max_drawdown_pct}% circuit breaker",
+            )
+
         lev = float(params.get("leverage", 1.0) or 1.0)
         if lev > self.cfg.risk.max_leverage:
             return RiskDecision(SCHEMA_V2, trace_id, symbol, False, "fatal", f"leverage {lev} > {self.cfg.risk.max_leverage}")
