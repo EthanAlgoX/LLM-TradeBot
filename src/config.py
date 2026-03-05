@@ -17,6 +17,11 @@ class DecisionConfig:
     fast_trend_long_min_predict_up_prob: float = 0.55
     fast_trend_short_max_predict_up_prob: float = 0.40
     fast_trend_short_max_sentiment: float = 0.0
+    max_holding_cycles: int = 10
+    long_stop_loss_pct: float = 0.015
+    long_take_profit_pct: float = 0.03
+    short_stop_loss_pct: float = 0.012
+    short_take_profit_pct: float = 0.024
     open_threshold: float = 60.0
     long_reversal_close_score: float = -35.0
     short_reversal_close_score: float = 20.0
@@ -120,6 +125,21 @@ class RuntimeConfig:
                 "TRADEBOT_DECISION_FAST_TREND_SHORT_MAX_SENTIMENT",
                 str(cfg.decision.fast_trend_short_max_sentiment),
             )
+        )
+        cfg.decision.max_holding_cycles = int(
+            os.getenv("TRADEBOT_DECISION_MAX_HOLDING_CYCLES", str(cfg.decision.max_holding_cycles))
+        )
+        cfg.decision.long_stop_loss_pct = float(
+            os.getenv("TRADEBOT_DECISION_LONG_STOP_LOSS_PCT", str(cfg.decision.long_stop_loss_pct))
+        )
+        cfg.decision.long_take_profit_pct = float(
+            os.getenv("TRADEBOT_DECISION_LONG_TAKE_PROFIT_PCT", str(cfg.decision.long_take_profit_pct))
+        )
+        cfg.decision.short_stop_loss_pct = float(
+            os.getenv("TRADEBOT_DECISION_SHORT_STOP_LOSS_PCT", str(cfg.decision.short_stop_loss_pct))
+        )
+        cfg.decision.short_take_profit_pct = float(
+            os.getenv("TRADEBOT_DECISION_SHORT_TAKE_PROFIT_PCT", str(cfg.decision.short_take_profit_pct))
         )
         cfg.decision.open_threshold = float(os.getenv("TRADEBOT_DECISION_OPEN_THRESHOLD", str(cfg.decision.open_threshold)))
         cfg.decision.long_reversal_close_score = float(
