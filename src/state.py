@@ -31,6 +31,15 @@ class RuntimeState:
     trades: list[TradeRecord] = field(default_factory=list)
     prices: dict[str, float] = field(default_factory=dict)
     reflection_hint: str = ""
+    symbol_cooldowns: dict[str, int] = field(default_factory=dict)
 
     def has_position(self, symbol: str) -> bool:
         return symbol in self.positions
+
+    def is_on_cooldown(self, symbol: str) -> bool:
+        """Check if a symbol is on cooldown after a recent loss."""
+        return self.symbol_cooldowns.get(symbol, 0) > self.cycle
+
+    def set_cooldown(self, symbol: str, until_cycle: int) -> None:
+        """Set a cooldown for a symbol until a specific cycle."""
+        self.symbol_cooldowns[symbol] = until_cycle

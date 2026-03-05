@@ -12,21 +12,24 @@ class SelectorConfig:
 
 @dataclass
 class DecisionConfig:
-    fast_trend_threshold: float = 2.0
-    fast_trend_short_threshold: float = 3.2
+    fast_trend_threshold: float = 2.5
+    fast_trend_short_threshold: float = 3.5
     fast_trend_long_min_predict_up_prob: float = 0.55
     fast_trend_short_max_predict_up_prob: float = 0.40
     fast_trend_short_max_sentiment: float = 0.0
-    max_holding_cycles: int = 10
-    long_stop_loss_pct: float = 0.015
-    long_take_profit_pct: float = 0.03
-    short_stop_loss_pct: float = 0.012
-    short_take_profit_pct: float = 0.024
-    open_threshold: float = 60.0
-    long_reversal_close_score: float = -35.0
-    short_reversal_close_score: float = 20.0
+    max_holding_cycles: int = 15
+    long_stop_loss_pct: float = 0.025
+    long_take_profit_pct: float = 0.05
+    short_stop_loss_pct: float = 0.020
+    short_take_profit_pct: float = 0.04
+    open_threshold: float = 40.0
+    long_reversal_close_score: float = -50.0
+    short_reversal_close_score: float = 35.0
     llm_enabled: bool = False
-    loss_cooldown_threshold_boost: float = 20.0
+    loss_cooldown_threshold_boost: float = 15.0
+    stop_volatility_multiplier: float = 1.5
+    take_profit_rr_ratio: float = 2.0
+    symbol_cooldown_cycles: int = 3
 
 
 @dataclass
@@ -35,7 +38,7 @@ class RiskConfig:
     min_rr: float = 1.2
     max_position_notional: float = 10_000.0
     max_concurrent_positions: int = 3
-    max_drawdown_pct: float = 5.0
+    max_drawdown_pct: float = 8.0
 
 
 @dataclass

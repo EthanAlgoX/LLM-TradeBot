@@ -20,7 +20,52 @@ class DecisionRouterAgent(BaseAgent):
             return base + self.cfg.decision.loss_cooldown_threshold_boost
         return base
 
-    def route(self, *, trace_id: str, consensus: ConsensusSignal, price: float, state: RuntimeState) -> ProposedAction:
+    def _adaptive_stop_take(
+        self, *, action: str, price: float, volatility_pct: float
+    ) -> tuple[float, float]:
+        """Compute volatility-adaptive stop-loss and take-profit distances.
+
+        The stop distance is the larger of:
+          - the configured pct (e.g. 2.5%)
+          - volatility × stop_multiplier (e.g. 3% vol × 1.5 = 4.5%)
+        Take-profit = stop_distance × RR ratio.
+        """
+        cfg_d = self.cfg.decision
+        vol_stop = volatility_pct / 100.0 * cfg_d.stop_volatility_multiplier
+
+        if action == "open_long":
+            stop_dist = max(cfg_d.long_stop_loss_pct, vol_stop)
+            take_dist = stop_dist * cfg_d.take_profit_rr_ratio
+            stop_loss = price * (1.0 - stop_dist)
+            take_profit = price * (1.0 + take_dist)
+        elif action == "open_short":
+            stop_dist = max(cfg_d.short_stop_loss_pct, vol_stop)
+            take_dist = stop_dist * cfg_d.take_profit_rr_ratio
+            stop_loss = price * (1.0 + stop_dist)
+            take_profit = price * (1.0 - take_dist)
+        else:
+            stop_loss = 0.0
+            take_profit = 0.0
+
+        return stop_loss, take_profit
+
+    def _confidence_leverage(self, confidence: float) -> float:
+        """Scale leverage based on signal confidence."""
+        if confidence >= 85.0:
+            return 3.0
+        if confidence >= 72.0:
+            return 2.0
+        return 1.5
+
+    def route(
+        self,
+        *,
+        trace_id: str,
+        consensus: ConsensusSignal,
+        price: float,
+        state: RuntimeState,
+        volatility_pct: float = 1.0,
+    ) -> ProposedAction:
         symbol = consensus.symbol
         has_position = state.has_position(symbol)
 
@@ -28,7 +73,19 @@ class DecisionRouterAgent(BaseAgent):
         if has_position:
             pos = state.positions[symbol]
             if state.cycle - pos.opened_cycle >= self.cfg.decision.max_holding_cycles:
-                return self._build(trace_id, symbol, "forced_exit", "close_long" if pos.side == "long" else "close_short", 90.0, "max holding cycles reached", price)
+                return self._build(
+                    trace_id, symbol, "forced_exit",
+                    "close_long" if pos.side == "long" else "close_short",
+                    90.0, "max holding cycles reached", price, volatility_pct,
+                )
+
+        # Per-symbol cooldown: skip new opens on recently-lost symbols
+        if not has_position and state.is_on_cooldown(symbol):
+            return self._build(
+                trace_id, symbol, "cooldown", "wait", 0.0,
+                f"symbol cooldown until cycle {state.symbol_cooldowns.get(symbol, 0)}",
+                price, volatility_pct,
+            )
 
         # fast trend
         momentum = consensus.trend_score / 12.0
@@ -48,10 +105,16 @@ class DecisionRouterAgent(BaseAgent):
             )
             if open_long:
                 conf = min(92.0, 72.0 + abs(momentum) * 4.0)
-                return self._build(trace_id, symbol, "fast_trend", "open_long", conf, f"fast momentum {momentum:+.2f}", price)
+                return self._build(
+                    trace_id, symbol, "fast_trend", "open_long", conf,
+                    f"fast momentum {momentum:+.2f}", price, volatility_pct,
+                )
             if open_short:
                 conf = min(90.0, 70.0 + abs(momentum) * 4.0)
-                return self._build(trace_id, symbol, "fast_trend", "open_short", conf, f"fast momentum {momentum:+.2f}", price)
+                return self._build(
+                    trace_id, symbol, "fast_trend", "open_short", conf,
+                    f"fast momentum {momentum:+.2f}", price, volatility_pct,
+                )
 
         # rule / llm (llm placeholder)
         score = (
@@ -63,32 +126,56 @@ class DecisionRouterAgent(BaseAgent):
 
         if not has_position:
             if score >= effective_threshold:
-                return self._build(trace_id, symbol, "rule", "open_long", min(88.0, 60.0 + score * 0.3), f"composite score {score:.2f}", price)
+                return self._build(
+                    trace_id, symbol, "rule", "open_long",
+                    min(88.0, 60.0 + score * 0.3),
+                    f"composite score {score:.2f}", price, volatility_pct,
+                )
             if score <= -effective_threshold:
-                return self._build(trace_id, symbol, "rule", "open_short", min(88.0, 60.0 + abs(score) * 0.3), f"composite score {score:.2f}", price)
-            return self._build(trace_id, symbol, "rule", "wait", 0.0, f"no edge score={score:.2f}", price)
+                return self._build(
+                    trace_id, symbol, "rule", "open_short",
+                    min(88.0, 60.0 + abs(score) * 0.3),
+                    f"composite score {score:.2f}", price, volatility_pct,
+                )
+            return self._build(
+                trace_id, symbol, "rule", "wait", 0.0,
+                f"no edge score={score:.2f}", price, volatility_pct,
+            )
 
         # has position: optional close on hard reversal
         pos = state.positions[symbol]
         if pos.side == "long" and score < self.cfg.decision.long_reversal_close_score:
-            return self._build(trace_id, symbol, "rule", "close_long", 72.0, f"reversal score={score:.2f}", price)
+            return self._build(
+                trace_id, symbol, "rule", "close_long", 72.0,
+                f"reversal score={score:.2f}", price, volatility_pct,
+            )
         if pos.side == "short" and score > self.cfg.decision.short_reversal_close_score:
-            return self._build(trace_id, symbol, "rule", "close_short", 72.0, f"reversal score={score:.2f}", price)
-        return self._build(trace_id, symbol, "rule", "hold", 0.0, f"hold score={score:.2f}", price)
+            return self._build(
+                trace_id, symbol, "rule", "close_short", 72.0,
+                f"reversal score={score:.2f}", price, volatility_pct,
+            )
+        return self._build(
+            trace_id, symbol, "rule", "hold", 0.0,
+            f"hold score={score:.2f}", price, volatility_pct,
+        )
 
-    def _build(self, trace_id: str, symbol: str, source: str, action: str, confidence: float, reason: str, price: float) -> ProposedAction:
-        cfg_d = self.cfg.decision
-
-        if action == "open_long":
-            stop_loss = price * (1.0 - cfg_d.long_stop_loss_pct)
-            take_profit = price * (1.0 + cfg_d.long_take_profit_pct)
-            leverage = 3.0
-        elif action == "open_short":
-            stop_loss = price * (1.0 + cfg_d.short_stop_loss_pct)
-            take_profit = price * (1.0 - cfg_d.short_take_profit_pct)
-            leverage = 2.5
+    def _build(
+        self,
+        trace_id: str,
+        symbol: str,
+        source: str,
+        action: str,
+        confidence: float,
+        reason: str,
+        price: float,
+        volatility_pct: float = 1.0,
+    ) -> ProposedAction:
+        if action in {"open_long", "open_short"}:
+            stop_loss, take_profit = self._adaptive_stop_take(
+                action=action, price=price, volatility_pct=volatility_pct,
+            )
+            leverage = self._confidence_leverage(confidence)
         elif action in {"close_long", "close_short"}:
-            # Close actions do not need stop/take; set to 0 to skip R:R checks.
             stop_loss = 0.0
             take_profit = 0.0
             leverage = 1.0
