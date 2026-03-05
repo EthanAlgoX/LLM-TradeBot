@@ -13,7 +13,13 @@ class SelectorConfig:
 @dataclass
 class DecisionConfig:
     fast_trend_threshold: float = 2.0
+    fast_trend_short_threshold: float = 3.2
+    fast_trend_long_min_predict_up_prob: float = 0.55
+    fast_trend_short_max_predict_up_prob: float = 0.40
+    fast_trend_short_max_sentiment: float = 0.0
     open_threshold: float = 60.0
+    long_reversal_close_score: float = -35.0
+    short_reversal_close_score: float = 20.0
     llm_enabled: bool = False
 
 
@@ -90,5 +96,36 @@ class RuntimeConfig:
                 "TRADEBOT_BACKTEST_FUNDING_RATE_BPS_PER_CYCLE",
                 str(cfg.backtest_funding_rate_bps_per_cycle),
             )
+        )
+        cfg.decision.fast_trend_threshold = float(
+            os.getenv("TRADEBOT_DECISION_FAST_TREND_THRESHOLD", str(cfg.decision.fast_trend_threshold))
+        )
+        cfg.decision.fast_trend_short_threshold = float(
+            os.getenv("TRADEBOT_DECISION_FAST_TREND_SHORT_THRESHOLD", str(cfg.decision.fast_trend_short_threshold))
+        )
+        cfg.decision.fast_trend_long_min_predict_up_prob = float(
+            os.getenv(
+                "TRADEBOT_DECISION_FAST_TREND_LONG_MIN_PUP",
+                str(cfg.decision.fast_trend_long_min_predict_up_prob),
+            )
+        )
+        cfg.decision.fast_trend_short_max_predict_up_prob = float(
+            os.getenv(
+                "TRADEBOT_DECISION_FAST_TREND_SHORT_MAX_PUP",
+                str(cfg.decision.fast_trend_short_max_predict_up_prob),
+            )
+        )
+        cfg.decision.fast_trend_short_max_sentiment = float(
+            os.getenv(
+                "TRADEBOT_DECISION_FAST_TREND_SHORT_MAX_SENTIMENT",
+                str(cfg.decision.fast_trend_short_max_sentiment),
+            )
+        )
+        cfg.decision.open_threshold = float(os.getenv("TRADEBOT_DECISION_OPEN_THRESHOLD", str(cfg.decision.open_threshold)))
+        cfg.decision.long_reversal_close_score = float(
+            os.getenv("TRADEBOT_DECISION_LONG_REVERSAL_CLOSE", str(cfg.decision.long_reversal_close_score))
+        )
+        cfg.decision.short_reversal_close_score = float(
+            os.getenv("TRADEBOT_DECISION_SHORT_REVERSAL_CLOSE", str(cfg.decision.short_reversal_close_score))
         )
         return cfg
