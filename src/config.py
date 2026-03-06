@@ -17,12 +17,12 @@ class DecisionConfig:
     fast_trend_long_min_predict_up_prob: float = 0.50
     fast_trend_short_max_predict_up_prob: float = 0.10
     fast_trend_short_max_sentiment: float = -50.0
-    max_holding_cycles: int = 15
+    max_holding_cycles: int = 36  # Extended to 36 hours to ride the massive multi-day rallies
     long_stop_loss_pct: float = 0.04  # Let longs breathe
     long_take_profit_pct: float = 0.08  # Run winners higher
     short_stop_loss_pct: float = 0.02
     short_take_profit_pct: float = 0.02
-    open_threshold: float = 15.0  # Very aggressive for rule longs
+    open_threshold: float = 10.0  # Hyper-aggressive for rule longs
     long_reversal_close_score: float = -60.0  # Lowered so we don't close longs prematurely
     short_reversal_close_score: float = 100.0  # Disable short reversal closes
     llm_enabled: bool = False
@@ -51,7 +51,7 @@ class BacktestConfig:
     # OPT-1: trailing stop parameters
     trailing_stop_enabled: bool = True
     trailing_stop_activation_pct: float = 0.8  # Activate trail sooner (was 1.0%)
-    trailing_stop_distance_pct: float = 2.5  # Tighter trail: 2.5% below HWM (was 5.0%)
+    trailing_stop_distance_pct: float = 3.0  # Wider trail (3%) to avoid getting stopped out on noise
     # OPT-8: time-decay stop tightening
     time_decay_stop_enabled: bool = True
     time_decay_tightening_factor: float = 0.12  # Faster stop tightening as position ages (was 0.05)
