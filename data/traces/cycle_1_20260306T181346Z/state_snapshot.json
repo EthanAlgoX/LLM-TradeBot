@@ -1,0 +1,37 @@
+{
+  "cycle": 1,
+  "cash": 66651.66666666666,
+  "reflection_hint": "recent pnl negative: reduce leverage and require stronger confirmation",
+  "positions": [
+    {
+      "symbol": "VETUSDT",
+      "side": "long",
+      "qty": 7082152.974504249,
+      "entry_price": 0.00706,
+      "leverage": 1.5,
+      "opened_cycle": 1
+    }
+  ],
+  "prices": {
+    "RENDERUSDT": 1.358,
+    "GOATUSDT": 48.5243,
+    "WLDUSDT": 0.3856,
+    "FETUSDT": 0.1458,
+    "VETUSDT": 0.00706,
+    "ACTUSDT": 0.0132,
+    "NEARUSDT": 1.232,
+    "THETAUSDT": 0.188,
+    "XAIUSDT": 0.00933,
+    "RLCUSDT": 0.376
+  },
+  "trades": [
+    {
+      "cycle": 1,
+      "symbol": "VETUSDT",
+      "action": "open_long",
+      "qty": 7082152.974504249,
+      "price": 0.00706,
+      "pnl": -15.0
+    }
+  ]
+}

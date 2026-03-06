@@ -1,0 +1,31 @@
+{
+  "schema_version": "v2",
+  "cycle": 5,
+  "trace_id": "cycle:5:20260306T181405Z",
+  "selected_symbols": [
+    "NEARUSDT",
+    "GOATUSDT",
+    "NMRUSDT",
+    "LINKUSDT",
+    "GLMUSDT",
+    "PHBUSDT",
+    "RENDERUSDT",
+    "CTXCUSDT",
+    "ROSEUSDT",
+    "FILUSDT"
+  ],
+  "action": "wait",
+  "status": "wait",
+  "details": {
+    "executed": [],
+    "blocked": [],
+    "open_positions": [
+      "VETUSDT",
+      "NEARUSDT"
+    ],
+    "cash": 33303.33333333332,
+    "post_trade_notes": [
+      "reflection: recent pnl negative: reduce leverage and require stronger confirmation"
+    ]
+  }
+}

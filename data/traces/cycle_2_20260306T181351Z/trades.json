@@ -1,0 +1,51 @@
+{
+  "trace_id": "cycle:2:20260306T181351Z",
+  "cycle": 2,
+  "cash": 33303.33333333332,
+  "cycle_trades": [
+    {
+      "cycle": 2,
+      "symbol": "NEARUSDT",
+      "action": "open_long",
+      "qty": 40551.500405515,
+      "price": 1.233,
+      "pnl": -15.0
+    }
+  ],
+  "all_trades": [
+    {
+      "cycle": 1,
+      "symbol": "VETUSDT",
+      "action": "open_long",
+      "qty": 7082152.974504249,
+      "price": 0.00706,
+      "pnl": -15.0
+    },
+    {
+      "cycle": 2,
+      "symbol": "NEARUSDT",
+      "action": "open_long",
+      "qty": 40551.500405515,
+      "price": 1.233,
+      "pnl": -15.0
+    }
+  ],
+  "open_positions": [
+    {
+      "symbol": "VETUSDT",
+      "side": "long",
+      "qty": 7082152.974504249,
+      "entry_price": 0.00706,
+      "leverage": 1.5,
+      "opened_cycle": 1
+    },
+    {
+      "symbol": "NEARUSDT",
+      "side": "long",
+      "qty": 40551.500405515,
+      "entry_price": 1.233,
+      "leverage": 1.5,
+      "opened_cycle": 2
+    }
+  ]
+}

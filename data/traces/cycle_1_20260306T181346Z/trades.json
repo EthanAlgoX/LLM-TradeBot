@@ -1,0 +1,35 @@
+{
+  "trace_id": "cycle:1:20260306T181346Z",
+  "cycle": 1,
+  "cash": 66651.66666666666,
+  "cycle_trades": [
+    {
+      "cycle": 1,
+      "symbol": "VETUSDT",
+      "action": "open_long",
+      "qty": 7082152.974504249,
+      "price": 0.00706,
+      "pnl": -15.0
+    }
+  ],
+  "all_trades": [
+    {
+      "cycle": 1,
+      "symbol": "VETUSDT",
+      "action": "open_long",
+      "qty": 7082152.974504249,
+      "price": 0.00706,
+      "pnl": -15.0
+    }
+  ],
+  "open_positions": [
+    {
+      "symbol": "VETUSDT",
+      "side": "long",
+      "qty": 7082152.974504249,
+      "entry_price": 0.00706,
+      "leverage": 1.5,
+      "opened_cycle": 1
+    }
+  ]
+}
