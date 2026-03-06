@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import copy
+
 from agents.base import BaseAgent
 from config import RuntimeConfig
 from contracts import ExecutionResult, ProposedAction, RiskDecision
@@ -17,7 +19,8 @@ class ExecutionPlannerAgent(BaseAgent):
         return max_notional / entry_price
 
     def plan(self, proposal: ProposedAction, risk: RiskDecision, cfg: RuntimeConfig, state: RuntimeState) -> ProposedAction:
-        planned = proposal
+        # Deep copy to avoid mutating the original proposal that may be referenced upstream
+        planned = copy.deepcopy(proposal)
         if risk.corrections:
             planned.order_params.update(risk.corrections)
 
@@ -44,4 +47,14 @@ class ExecutionAgent(BaseAgent):
         self.provider = provider or SimExecutionProvider()
 
     def execute(self, *, trace_id: str, planned: ProposedAction, state: RuntimeState) -> ExecutionResult:
+        # Pre-execution cash guard: reject if cash is already depleted
+        if state.cash <= 0 and planned.action in {"open_long", "open_short"}:
+            return ExecutionResult(
+                schema_version="v2",
+                trace_id=trace_id,
+                symbol=planned.symbol,
+                action=planned.action,
+                status="failed",
+                message="cash depleted, cannot open new position",
+            )
         return self.provider.execute(trace_id=trace_id, planned=planned, state=state)

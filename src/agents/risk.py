@@ -13,12 +13,15 @@ class RiskAuditAgent(BaseAgent):
         self.cfg = cfg
 
     def _compute_equity(self, state: RuntimeState) -> float:
-        unrealized = 0.0
+        """Compute mark-to-market equity: cash + locked margin + leveraged unrealized PnL."""
+        equity = state.cash
         for symbol, pos in state.positions.items():
             current_price = state.prices.get(symbol, pos.entry_price)
             sign = 1.0 if pos.side == "long" else -1.0
-            unrealized += (current_price - pos.entry_price) * pos.qty * sign * pos.leverage
-        return state.cash + unrealized
+            margin = abs(pos.entry_price * pos.qty) / pos.leverage if pos.leverage > 0 else abs(pos.entry_price * pos.qty)
+            unrealized_pnl = (current_price - pos.entry_price) * pos.qty * sign * pos.leverage
+            equity += margin + unrealized_pnl
+        return equity
 
     def _get_position_notional(self, symbol: str, entry: float, qty: float, leverage: float) -> float:
         return abs(entry * qty * leverage)
@@ -54,6 +57,9 @@ class RiskAuditAgent(BaseAgent):
                 f"account drawdown {drawdown_pct:.2f}% >= {self.cfg.risk.max_drawdown_pct}% circuit breaker",
             )
 
+        corrections: dict[str, float] = {}
+        warnings: list[str] = []
+
         lev = float(params.get("leverage", 1.0) or 1.0)
         if lev > self.cfg.risk.max_leverage:
             return RiskDecision(SCHEMA_V2, trace_id, symbol, False, "fatal", f"leverage {lev} > {self.cfg.risk.max_leverage}")
@@ -63,14 +69,15 @@ class RiskAuditAgent(BaseAgent):
         take = float(params.get("take_profit", 0) or 0)
         notional = float(self.cfg.per_trade_notional)
 
-        # Check margin requirement for new position
-        position_notional = self._get_position_notional(symbol, entry, notional / entry if entry > 0 else 0, lev)
+        # Compute leveraged position notional for the new position
+        qty = notional / entry if entry > 0 else 0
+        position_notional = self._get_position_notional(symbol, entry, qty, lev)
         required_margin = position_notional / lev if lev > 0 else position_notional
 
-        # Calculate existing margin used
+        # Calculate existing margin used (margin = notional / leverage = entry * qty)
         existing_margin = 0.0
         for sym, pos in state.positions.items():
-            pos_notional = pos.entry_price * pos.qty * pos.leverage
+            pos_notional = abs(pos.entry_price * pos.qty * pos.leverage)
             existing_margin += pos_notional / pos.leverage if pos.leverage > 0 else pos_notional
 
         total_required_margin = required_margin + existing_margin
@@ -80,10 +87,7 @@ class RiskAuditAgent(BaseAgent):
                 f"insufficient margin: required {total_required_margin:.2f}, available {state.cash:.2f}",
             )
 
-        if notional > self.cfg.risk.max_position_notional:
-            return RiskDecision(SCHEMA_V2, trace_id, symbol, False, "fatal", "position notional exceeds cap")
-
-        # Check individual position notional limit
+        # Check individual position notional limit (leveraged notional)
         if position_notional > self.cfg.risk.max_position_notional:
             return RiskDecision(
                 SCHEMA_V2, trace_id, symbol, False, "fatal",
@@ -91,14 +95,11 @@ class RiskAuditAgent(BaseAgent):
             )
 
         # Check total portfolio notional exposure
-        total_notional = sum(pos.entry_price * pos.qty * pos.leverage for pos in state.positions.values())
+        total_notional = sum(abs(pos.entry_price * pos.qty * pos.leverage) for pos in state.positions.values())
         total_notional += position_notional
         max_total_notional = self.cfg.risk.max_concurrent_positions * self.cfg.risk.max_position_notional
         if total_notional > max_total_notional:
             warnings.append(f"total notional {total_notional:.2f} approaching limit {max_total_notional}")
-
-        corrections: dict[str, float] = {}
-        warnings: list[str] = []
 
         if action == "open_long" and stop >= entry:
             corrected = entry * 0.985
@@ -118,6 +119,14 @@ class RiskAuditAgent(BaseAgent):
         rr = reward / risk
         if rr < self.cfg.risk.min_rr:
             return RiskDecision(SCHEMA_V2, trace_id, symbol, False, "danger", f"rr {rr:.2f} < {self.cfg.risk.min_rr}")
+
+        # Per-trade max loss guard: worst-case loss at stop must not exceed max_loss_per_trade_pct of equity
+        worst_case_loss = risk * qty * lev
+        max_allowed_loss = equity * self.cfg.risk.max_loss_per_trade_pct / 100.0
+        if worst_case_loss > max_allowed_loss:
+            warnings.append(
+                f"worst-case loss {worst_case_loss:.2f} exceeds {self.cfg.risk.max_loss_per_trade_pct}% equity limit {max_allowed_loss:.2f}"
+            )
 
         return RiskDecision(
             schema_version=SCHEMA_V2,

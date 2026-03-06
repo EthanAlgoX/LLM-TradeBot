@@ -25,6 +25,8 @@ class ExecutionProvider:
 
 
 class SimExecutionProvider(ExecutionProvider):
+    FEE_BPS = 3.0
+
     def execute(self, *, trace_id: str, planned: ProposedAction, state: RuntimeState) -> ExecutionResult:
         symbol = planned.symbol
         action = planned.action
@@ -37,7 +39,7 @@ class SimExecutionProvider(ExecutionProvider):
 
         if action == "open_long":
             margin_required = abs(price * qty) / lev if lev > 0 else abs(price * qty)
-            fee = abs(price * qty) * 3.0 / 10_000.0
+            fee = abs(price * qty) * self.FEE_BPS / 10_000.0
             total_required = margin_required + fee
             if total_required > state.cash:
                 return ExecutionResult(SCHEMA_V2, trace_id, symbol, action, "failed", f"insufficient margin: need {total_required:.2f}, have {state.cash:.2f}", price)
@@ -49,7 +51,7 @@ class SimExecutionProvider(ExecutionProvider):
 
         if action == "open_short":
             margin_required = abs(price * qty) / lev if lev > 0 else abs(price * qty)
-            fee = abs(price * qty) * 3.0 / 10_000.0
+            fee = abs(price * qty) * self.FEE_BPS / 10_000.0
             total_required = margin_required + fee
             if total_required > state.cash:
                 return ExecutionResult(SCHEMA_V2, trace_id, symbol, action, "failed", f"insufficient margin: need {total_required:.2f}, have {state.cash:.2f}", price)
@@ -63,16 +65,21 @@ class SimExecutionProvider(ExecutionProvider):
             pos = state.positions.get(symbol)
             if not pos:
                 return ExecutionResult(SCHEMA_V2, trace_id, symbol, action, "failed", "no position", price)
-            marginReleased = abs(pos.entry_price * pos.qty) / pos.leverage if pos.leverage > 0 else abs(pos.entry_price * pos.qty)
+            margin_released = abs(pos.entry_price * pos.qty) / pos.leverage if pos.leverage > 0 else abs(pos.entry_price * pos.qty)
             sign = 1.0 if pos.side == "long" else -1.0
-            gross_pnl = (price - pos.entry_price) * pos.qty * sign
-            close_fee = abs(price * pos.qty) * 3.0 / 10_000.0
+            # PnL must include leverage: leveraged PnL = price_delta * qty * direction * leverage
+            gross_pnl = (price - pos.entry_price) * pos.qty * sign * pos.leverage
+            close_fee = abs(price * pos.qty) * self.FEE_BPS / 10_000.0
             net_pnl = gross_pnl - close_fee
-            state.cash += marginReleased
-            state.cash += net_pnl
+            # Ensure cash never goes negative from a catastrophic loss
+            new_cash = state.cash + margin_released + net_pnl
+            if new_cash < 0:
+                net_pnl = -(state.cash + margin_released)
+                new_cash = 0.0
+            state.cash = new_cash
             state.trades.append(TradeRecord(state.cycle, symbol, action, pos.qty, price, net_pnl))
             del state.positions[symbol]
-            return ExecutionResult(SCHEMA_V2, trace_id, symbol, action, "success", f"position closed pnl={net_pnl:.2f} margin_released={marginReleased:.2f}", price)
+            return ExecutionResult(SCHEMA_V2, trace_id, symbol, action, "success", f"position closed pnl={net_pnl:.2f} margin_released={margin_released:.2f}", price)
 
         return ExecutionResult(SCHEMA_V2, trace_id, symbol, action, "failed", "unknown action", price)
 
@@ -221,13 +228,18 @@ class BinanceFuturesExecutionProvider(ExecutionProvider):
             pos = state.positions.get(symbol)
             if not pos:
                 return ExecutionResult(SCHEMA_V2, trace_id, symbol, action, "failed", "no local position")
-            marginReleased = abs(pos.entry_price * pos.qty) / pos.leverage if pos.leverage > 0 else abs(pos.entry_price * pos.qty)
+            margin_released = abs(pos.entry_price * pos.qty) / pos.leverage if pos.leverage > 0 else abs(pos.entry_price * pos.qty)
             sign = 1.0 if pos.side == "long" else -1.0
-            pnl = (avg_price - pos.entry_price) * pos.qty * sign
-            state.cash += marginReleased
-            state.cash += pnl
+            # PnL must include leverage: leveraged PnL = price_delta * qty * direction * leverage
+            pnl = (avg_price - pos.entry_price) * pos.qty * sign * pos.leverage
+            # Ensure cash never goes negative
+            new_cash = state.cash + margin_released + pnl
+            if new_cash < 0:
+                pnl = -(state.cash + margin_released)
+                new_cash = 0.0
+            state.cash = new_cash
             state.trades.append(TradeRecord(state.cycle, symbol, action, pos.qty, avg_price, pnl))
             del state.positions[symbol]
-            return ExecutionResult(SCHEMA_V2, trace_id, symbol, action, "success", f"live position closed pnl={pnl:.2f} margin_released={marginReleased:.2f}", avg_price)
+            return ExecutionResult(SCHEMA_V2, trace_id, symbol, action, "success", f"live position closed pnl={pnl:.2f} margin_released={margin_released:.2f}", avg_price)
 
         return ExecutionResult(SCHEMA_V2, trace_id, symbol, action, "failed", "unknown action")

@@ -39,6 +39,7 @@ class RiskConfig:
     max_position_notional: float = 10_000.0
     max_concurrent_positions: int = 3
     max_drawdown_pct: float = 8.0
+    max_loss_per_trade_pct: float = 2.0  # max loss per trade as % of equity
 
 
 @dataclass
