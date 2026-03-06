@@ -67,8 +67,8 @@ class SimExecutionProvider(ExecutionProvider):
                 return ExecutionResult(SCHEMA_V2, trace_id, symbol, action, "failed", "no position", price)
             margin_released = abs(pos.entry_price * pos.qty) / pos.leverage if pos.leverage > 0 else abs(pos.entry_price * pos.qty)
             sign = 1.0 if pos.side == "long" else -1.0
-            # PnL must include leverage: leveraged PnL = price_delta * qty * direction * leverage
-            gross_pnl = (price - pos.entry_price) * pos.qty * sign * pos.leverage
+            # PnL derivation: price_delta * qty * direction
+            gross_pnl = (price - pos.entry_price) * pos.qty * sign
             close_fee = abs(price * pos.qty) * self.FEE_BPS / 10_000.0
             net_pnl = gross_pnl - close_fee
             # Ensure cash never goes negative from a catastrophic loss
@@ -230,8 +230,8 @@ class BinanceFuturesExecutionProvider(ExecutionProvider):
                 return ExecutionResult(SCHEMA_V2, trace_id, symbol, action, "failed", "no local position")
             margin_released = abs(pos.entry_price * pos.qty) / pos.leverage if pos.leverage > 0 else abs(pos.entry_price * pos.qty)
             sign = 1.0 if pos.side == "long" else -1.0
-            # PnL must include leverage: leveraged PnL = price_delta * qty * direction * leverage
-            pnl = (avg_price - pos.entry_price) * pos.qty * sign * pos.leverage
+            # PnL derivation: price_delta * qty * direction
+            pnl = (avg_price - pos.entry_price) * pos.qty * sign
             # Ensure cash never goes negative
             new_cash = state.cash + margin_released + pnl
             if new_cash < 0:

@@ -576,8 +576,8 @@ class BacktestExecutionProvider(ExecutionProvider):
         self.total_fees_paid += fee
         margin_released = abs(pos.entry_price * pos.qty) / pos.leverage if pos.leverage > 0 else abs(pos.entry_price * pos.qty)
         sign = 1.0 if pos.side == "long" else -1.0
-        # PnL must include leverage: leveraged PnL = price_delta * qty * direction * leverage
-        gross_pnl = (fill - pos.entry_price) * pos.qty * sign * pos.leverage
+        # PnL derivation: price_delta * qty * direction
+        gross_pnl = (fill - pos.entry_price) * pos.qty * sign
         net_pnl = gross_pnl - fee
         # Ensure cash never goes negative from a catastrophic loss
         new_cash = state.cash + margin_released + net_pnl
@@ -844,8 +844,8 @@ class BacktestRunner:
                 px = float(pos.entry_price)
             sign = 1.0 if pos.side == "long" else -1.0
             margin = abs(float(pos.entry_price) * float(pos.qty)) / float(pos.leverage) if float(pos.leverage) > 0 else abs(float(pos.entry_price) * float(pos.qty))
-            # Unrealized PnL must include leverage for correct equity mark-to-market
-            unrealized_pnl = (px - float(pos.entry_price)) * float(pos.qty) * sign * float(pos.leverage)
+            # Unrealized PnL derivation: price_delta * qty * direction
+            unrealized_pnl = (px - float(pos.entry_price)) * float(pos.qty) * sign
             equity += margin + unrealized_pnl
         return equity
 

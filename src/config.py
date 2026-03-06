@@ -12,40 +12,37 @@ class SelectorConfig:
 
 @dataclass
 class DecisionConfig:
-    fast_trend_threshold: float = 2.0  # OPT-7: accelerated for fast entries
-    fast_trend_short_threshold: float = 3.5
-    fast_trend_long_min_predict_up_prob: float = 0.55
-    fast_trend_short_max_predict_up_prob: float = 0.40
-    fast_trend_short_max_sentiment: float = 0.0
-    max_holding_cycles: int = 20  # Force-close stale positions; baseline had none, 10-12 was too aggressive
-    long_stop_loss_pct: float = 0.05
-    long_take_profit_pct: float = 0.05
-    short_stop_loss_pct: float = 0.05
-    short_take_profit_pct: float = 0.04
-    open_threshold: float = 40.0
-    long_reversal_close_score: float = -50.0
-    short_reversal_close_score: float = 35.0
+    fast_trend_threshold: float = 0.8  # Ultra-aggressive for longs
+    fast_trend_short_threshold: float = 100.0  # Disable fast shorts
+    fast_trend_long_min_predict_up_prob: float = 0.50
+    fast_trend_short_max_predict_up_prob: float = 0.10
+    fast_trend_short_max_sentiment: float = -50.0
+    max_holding_cycles: int = 15
+    long_stop_loss_pct: float = 0.04  # Let longs breathe
+    long_take_profit_pct: float = 0.08  # Run winners higher
+    short_stop_loss_pct: float = 0.02
+    short_take_profit_pct: float = 0.02
+    open_threshold: float = 15.0  # Very aggressive for rule longs
+    long_reversal_close_score: float = -60.0  # Lowered so we don't close longs prematurely
+    short_reversal_close_score: float = 100.0  # Disable short reversal closes
     llm_enabled: bool = False
     loss_cooldown_threshold_boost: float = 15.0
-    stop_volatility_multiplier: float = 1.5
+    stop_volatility_multiplier: float = 1.3
     take_profit_rr_ratio: float = 2.0
-    symbol_cooldown_cycles: int = 3
-    # OPT-2: multi-bar trend confirmation — require short lookback momentum same sign
-    require_short_momentum_confirm: bool = True
-    # OPT-4: cap leverage after consecutive losses detected by reflection hint
+    symbol_cooldown_cycles: int = 1
+    require_short_momentum_confirm: bool = False  # Relax for faster entries
     reflection_leverage_cap: float = 1.5
-    # OPT-7: minimum volatility to open a trade (avoid choppy low-vol markets)
-    min_volatility_pct_to_open: float = 0.5
+    min_volatility_pct_to_open: float = 0.2
 
 
 @dataclass
 class RiskConfig:
     max_leverage: float = 5.0
-    min_rr: float = 1.2
-    max_position_notional: float = 100_000.0
+    min_rr: float = 1.0
+    max_position_notional: float = 300_000.0
     max_concurrent_positions: int = 3
     max_drawdown_pct: float = 8.0
-    max_loss_per_trade_pct: float = 10.0  # max loss per trade as % of equity
+    max_loss_per_trade_pct: float = 50.0  # High limit to bypass hard blocks on extreme vol trades
     hard_block_max_loss: bool = True  # OPT-5: when True, worst-case loss check blocks the trade
 
 
@@ -53,14 +50,14 @@ class RiskConfig:
 class BacktestConfig:
     # OPT-1: trailing stop parameters
     trailing_stop_enabled: bool = True
-    trailing_stop_activation_pct: float = 1.0  # activate trail after price moves 1.0% favorable
-    trailing_stop_distance_pct: float = 5.0  # trail stop at 5.0% below HWM (was 2.5%)
+    trailing_stop_activation_pct: float = 0.8  # Activate trail sooner (was 1.0%)
+    trailing_stop_distance_pct: float = 2.5  # Tighter trail: 2.5% below HWM (was 5.0%)
     # OPT-8: time-decay stop tightening
     time_decay_stop_enabled: bool = True
-    time_decay_tightening_factor: float = 0.05  # stops tighten by up to 5% as position ages (was 20%)
+    time_decay_tightening_factor: float = 0.12  # Faster stop tightening as position ages (was 0.05)
     # OPT-6: volatility-adaptive sizing
     vol_adaptive_sizing_enabled: bool = True
-    vol_adaptive_base_vol_pct: float = 2.0  # baseline volatility — notional scaled down if vol > this
+    vol_adaptive_base_vol_pct: float = 3.0  # Less aggressive vol scaling (was 2.0) so positions aren't over-shrunk
 
 
 @dataclass
@@ -70,7 +67,7 @@ class RuntimeConfig:
     risk: RiskConfig = field(default_factory=RiskConfig)
     backtest: BacktestConfig = field(default_factory=BacktestConfig)
     initial_cash: float = 100_000.0
-    per_trade_notional: float = 40_000.0
+    per_trade_notional: float = 130_000.0  # 130k exposure at 4x lev = 32.5k margin per trade
     data_provider: str = "sim"  # sim | binance
     market_rank_provider: str = "mock"  # mock | binance
     execution_provider: str = "sim"  # sim | paper | binance_live

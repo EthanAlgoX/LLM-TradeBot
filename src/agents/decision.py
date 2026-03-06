@@ -57,12 +57,10 @@ class DecisionRouterAgent(BaseAgent):
         hint = (state.reflection_hint or "").lower()
         reduce_leverage = "negative" in hint or "reduce" in hint
 
-        if confidence >= 85.0:
-            lev = 3.0
-        elif confidence >= 72.0:
-            lev = 2.0
+        if confidence >= 40.0:
+            lev = 4.0
         else:
-            lev = 1.5
+            lev = 3.0
 
         if reduce_leverage:
             lev = min(lev, self.cfg.decision.reflection_leverage_cap)
@@ -133,13 +131,13 @@ class DecisionRouterAgent(BaseAgent):
                 and self._short_momentum_confirms(consensus, "open_short")  # OPT-2
             )
             if open_long:
-                conf = min(92.0, 72.0 + abs(momentum) * 4.0)
+                conf = min(92.0, 72.0 + abs(momentum) * 5.0)
                 return self._build(
                     trace_id, symbol, "fast_trend", "open_long", conf,
                     f"fast momentum {momentum:+.2f}", price, volatility_pct, state,
                 )
             if open_short:
-                conf = min(90.0, 70.0 + abs(momentum) * 4.0)
+                conf = min(90.0, 70.0 + abs(momentum) * 5.0)
                 return self._build(
                     trace_id, symbol, "fast_trend", "open_short", conf,
                     f"fast momentum {momentum:+.2f}", price, volatility_pct, state,
@@ -161,8 +159,11 @@ class DecisionRouterAgent(BaseAgent):
                         min(88.0, 60.0 + score * 0.3),
                         f"composite score {score:.2f}", price, volatility_pct, state,
                     )
-            if score <= -effective_threshold and volatility_pct >= min_vol:
-                if self._short_momentum_confirms(consensus, "open_short"):
+            if score <= -100.0 and volatility_pct >= min_vol:
+                # Extra guards for rule-based shorts: require negative sentiment and low predict_up
+                if (consensus.sentiment_score <= self.cfg.decision.fast_trend_short_max_sentiment
+                        and consensus.predict_up_prob <= self.cfg.decision.fast_trend_short_max_predict_up_prob
+                        and self._short_momentum_confirms(consensus, "open_short")):
                     return self._build(
                         trace_id, symbol, "rule", "open_short",
                         min(88.0, 60.0 + abs(score) * 0.3),

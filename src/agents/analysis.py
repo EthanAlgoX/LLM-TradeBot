@@ -78,7 +78,7 @@ class SemanticAgent(BaseAgent):
     def summarize(self, *, trace_id: str, snapshot: MarketSnapshot, signal: SignalOutput) -> SemanticOutput:
         trend_stance = "UPTREND" if signal.trend_score > 15 else "DOWNTREND" if signal.trend_score < -15 else "NEUTRAL"
         setup_stance = "PULLBACK_ZONE" if signal.oscillator_score > 20 else "RALLY_ZONE" if signal.oscillator_score < -20 else "MONITOR"
-        trigger_stance = "CONFIRMED" if snapshot.volume_ratio > 1.2 and abs(snapshot.momentum_30m_pct) > 1.0 else "WAITING"
+        trigger_stance = "CONFIRMED" if snapshot.volume_ratio > 1.1 and abs(snapshot.momentum_30m_pct) > 0.8 else "WAITING"  # Lower thresholds for more confirmed triggers
         return SemanticOutput(
             schema_version=SCHEMA_V2,
             trace_id=trace_id,

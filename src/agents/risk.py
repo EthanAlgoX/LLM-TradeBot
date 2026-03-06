@@ -19,12 +19,12 @@ class RiskAuditAgent(BaseAgent):
             current_price = state.prices.get(symbol, pos.entry_price)
             sign = 1.0 if pos.side == "long" else -1.0
             margin = abs(pos.entry_price * pos.qty) / pos.leverage if pos.leverage > 0 else abs(pos.entry_price * pos.qty)
-            unrealized_pnl = (current_price - pos.entry_price) * pos.qty * sign * pos.leverage
+            unrealized_pnl = (current_price - pos.entry_price) * pos.qty * sign
             equity += margin + unrealized_pnl
         return equity
 
     def _get_position_notional(self, symbol: str, entry: float, qty: float, leverage: float) -> float:
-        return abs(entry * qty * leverage)
+        return abs(entry * qty)  # Position notional is simply asset value; leverage dictates margin requirement
 
     def audit(self, *, trace_id: str, proposal: ProposedAction, state: RuntimeState) -> RiskDecision:
         action = proposal.action
@@ -77,7 +77,7 @@ class RiskAuditAgent(BaseAgent):
         # Calculate existing margin used (margin = notional / leverage = entry * qty)
         existing_margin = 0.0
         for sym, pos in state.positions.items():
-            pos_notional = abs(pos.entry_price * pos.qty * pos.leverage)
+            pos_notional = abs(pos.entry_price * pos.qty)
             existing_margin += pos_notional / pos.leverage if pos.leverage > 0 else pos_notional
 
         total_required_margin = required_margin + existing_margin
@@ -95,7 +95,7 @@ class RiskAuditAgent(BaseAgent):
             )
 
         # Check total portfolio notional exposure
-        total_notional = sum(abs(pos.entry_price * pos.qty * pos.leverage) for pos in state.positions.values())
+        total_notional = sum(abs(pos.entry_price * pos.qty) for pos in state.positions.values())
         total_notional += position_notional
         max_total_notional = self.cfg.risk.max_concurrent_positions * self.cfg.risk.max_position_notional
         if total_notional > max_total_notional:
@@ -121,7 +121,7 @@ class RiskAuditAgent(BaseAgent):
             return RiskDecision(SCHEMA_V2, trace_id, symbol, False, "danger", f"rr {rr:.2f} < {self.cfg.risk.min_rr}")
 
         # Per-trade max loss guard: worst-case loss at stop must not exceed max_loss_per_trade_pct of equity
-        worst_case_loss = risk * qty * lev
+        worst_case_loss = risk * qty
         max_allowed_loss = equity * self.cfg.risk.max_loss_per_trade_pct / 100.0
         if worst_case_loss > max_allowed_loss:
             if self.cfg.risk.hard_block_max_loss:
