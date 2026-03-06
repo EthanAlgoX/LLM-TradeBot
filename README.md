@@ -14,9 +14,10 @@ pytest
 
 ## Recent Updates & Optimizations
 
-- **Mathematical Precision**: Fixed critical leverage inflation and margin double-counting bugs. Leverage now correctly scales required margin without artificially multiplying absolute dollar PnL, and the risk engine allows true 100% capital utilization.
-- **Aggressive V11 Strategy**: Parameter sweeps optimized holding periods (36 cycles), trailing stops (3.0%), and dynamic leverage (up to 4.0x) for a long-only alignment to maximize capture of volatile trends, achieving a highly optimized yield curve in recent historical sweeps.
-- **Full Pipeline Observability**: Verified the `SQLiteStateStore` and robust dual-persistence architecture. Enabling persistence dumps granular JSON/JSONL trace outputs to `data/traces/`, capturing the exact input/output payloads of every agent per cycle for perfect backtracking, debugging, and transparent ML pipeline evaluation.
+- **Mathematical Integrity (Audit Final)**: Resolved critical leverage-inflated PnL and margin double-counting logic in `risk.py` and `backtest.py`. Current calculations precisely match exchange-level realized/unrealized equity models.
+- **30-Day Reliability Sweep**: Validated pipeline robustness over a 720-hour (30-day) Binance Futures dataset. Transitioned from hyper-aggressive bull-market biases to a robust, balanced bi-directional risk profile (1.5x max leverage, 1.5% trailing stops) to prevent large drawdowns in non-trending markets.
+- **Pipeline & Architecture Recovery**: Fixed a major bottleneck where decision-layer leverage hardcoding tripped the global risk filter. The orchestrator now correctly scales leverage dynamically and executes a clean Fan-out analysis pattern across the asset universe.
+- **Full Observability**: Verified `SQLiteStateStore` dual-persistence for total traceability. Cycles generate exhaustive JSON/JSONL traces in `data/traces/` for auditing perception vs. execution.
 
 ## Architecture Map (Important Files)
 
