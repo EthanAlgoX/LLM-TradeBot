@@ -31,6 +31,15 @@ class ExecutionPlannerAgent(BaseAgent):
         elif planned.action in {"open_long", "open_short"}:
             entry = float(planned.order_params.get("entry_price", 0) or 0)
             notional = float(cfg.per_trade_notional)
+
+            # OPT-6: volatility-adaptive sizing — scale notional down when vol is high
+            if cfg.backtest.vol_adaptive_sizing_enabled:
+                vol_pct = float(planned.order_params.get("volatility_pct", 0) or 0)
+                base_vol = cfg.backtest.vol_adaptive_base_vol_pct
+                if vol_pct > base_vol and base_vol > 0:
+                    scale = base_vol / vol_pct  # e.g. 2% / 4% = 0.5x
+                    notional *= max(0.3, scale)  # floor at 30% of normal notional
+
             available_margin = state.cash
             qty = self._calculate_position_size(notional, entry, leverage, available_margin)
         else:

@@ -24,4 +24,5 @@ class DataAgent(BaseAgent):
             momentum_30m_pct=provider_snapshot.momentum_30m_pct,
             volatility_pct=provider_snapshot.volatility_pct,
             volume_ratio=provider_snapshot.volume_ratio,
+            momentum_short_pct=provider_snapshot.momentum_short_pct,  # OPT-2
         )

@@ -17,6 +17,7 @@ class ProviderSnapshot:
     momentum_30m_pct: float
     volatility_pct: float
     volume_ratio: float
+    momentum_short_pct: float = 0.0  # OPT-2: short-lookback momentum
 
 
 class MarketDataProvider:
@@ -41,6 +42,7 @@ class SimMarketDataProvider(MarketDataProvider):
             momentum_30m_pct=round(drift_pct * 2.8, 4),
             volatility_pct=round(volatility, 4),
             volume_ratio=round(volume_ratio, 4),
+            momentum_short_pct=round(drift_pct * 1.2, 4),  # OPT-2: short lookback proxy for sim
         )
 
 
@@ -83,6 +85,9 @@ class BinanceSpotMarketDataProvider(MarketDataProvider):
 
         price = closes[-1]
         momentum = (closes[-1] / closes[0] - 1.0) * 100.0
+        # OPT-2: short-lookback momentum (last 3 bars)
+        short_base = closes[-min(4, len(closes))]
+        momentum_short = (closes[-1] / short_base - 1.0) * 100.0 if short_base > 0 else 0.0
 
         # Intraday volatility in percent.
         high_30m = max(highs)
@@ -107,6 +112,7 @@ class BinanceSpotMarketDataProvider(MarketDataProvider):
             momentum_30m_pct=round(momentum, 4),
             volatility_pct=round(max(0.01, volatility), 4),
             volume_ratio=round(max(0.01, volume_ratio), 4),
+            momentum_short_pct=round(momentum_short, 4),  # OPT-2
         )
 
 

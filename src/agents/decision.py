@@ -49,13 +49,35 @@ class DecisionRouterAgent(BaseAgent):
 
         return stop_loss, take_profit
 
-    def _confidence_leverage(self, confidence: float) -> float:
-        """Scale leverage based on signal confidence."""
+    def _confidence_leverage(self, confidence: float, state: RuntimeState) -> float:
+        """Scale leverage based on signal confidence.
+
+        OPT-4: If reflection hint indicates losses, cap leverage at reflection_leverage_cap.
+        """
+        hint = (state.reflection_hint or "").lower()
+        reduce_leverage = "negative" in hint or "reduce" in hint
+
         if confidence >= 85.0:
-            return 3.0
-        if confidence >= 72.0:
-            return 2.0
-        return 1.5
+            lev = 3.0
+        elif confidence >= 72.0:
+            lev = 2.0
+        else:
+            lev = 1.5
+
+        if reduce_leverage:
+            lev = min(lev, self.cfg.decision.reflection_leverage_cap)
+
+        return lev
+
+    def _short_momentum_confirms(self, consensus: ConsensusSignal, action: str) -> bool:
+        """OPT-2: Check that short-lookback momentum agrees with trade direction."""
+        if not self.cfg.decision.require_short_momentum_confirm:
+            return True
+        if action == "open_long":
+            return consensus.momentum_short_pct > 0.0
+        if action == "open_short":
+            return consensus.momentum_short_pct < 0.0
+        return True
 
     def route(
         self,
@@ -76,7 +98,7 @@ class DecisionRouterAgent(BaseAgent):
                 return self._build(
                     trace_id, symbol, "forced_exit",
                     "close_long" if pos.side == "long" else "close_short",
-                    90.0, "max holding cycles reached", price, volatility_pct,
+                    90.0, "max holding cycles reached", price, volatility_pct, state,
                 )
 
         # Per-symbol cooldown: skip new opens on recently-lost symbols
@@ -84,8 +106,11 @@ class DecisionRouterAgent(BaseAgent):
             return self._build(
                 trace_id, symbol, "cooldown", "wait", 0.0,
                 f"symbol cooldown until cycle {state.symbol_cooldowns.get(symbol, 0)}",
-                price, volatility_pct,
+                price, volatility_pct, state,
             )
+
+        # OPT-7: minimum volatility filter — skip opens in choppy low-vol markets
+        min_vol = self.cfg.decision.min_volatility_pct_to_open
 
         # fast trend
         momentum = consensus.trend_score / 12.0
@@ -95,6 +120,8 @@ class DecisionRouterAgent(BaseAgent):
                 momentum >= self.cfg.decision.fast_trend_threshold
                 and consensus.predict_up_prob >= self.cfg.decision.fast_trend_long_min_predict_up_prob
                 and consensus.alignment_ok
+                and volatility_pct >= min_vol  # OPT-7: vol filter
+                and self._short_momentum_confirms(consensus, "open_long")  # OPT-2
             )
             open_short = (
                 momentum <= -self.cfg.decision.fast_trend_short_threshold
@@ -102,18 +129,20 @@ class DecisionRouterAgent(BaseAgent):
                 and consensus.sentiment_score <= self.cfg.decision.fast_trend_short_max_sentiment
                 and consensus.alignment_ok
                 and consensus.semantic.get("trigger_stance") == "CONFIRMED"
+                and volatility_pct >= min_vol  # OPT-7: vol filter
+                and self._short_momentum_confirms(consensus, "open_short")  # OPT-2
             )
             if open_long:
                 conf = min(92.0, 72.0 + abs(momentum) * 4.0)
                 return self._build(
                     trace_id, symbol, "fast_trend", "open_long", conf,
-                    f"fast momentum {momentum:+.2f}", price, volatility_pct,
+                    f"fast momentum {momentum:+.2f}", price, volatility_pct, state,
                 )
             if open_short:
                 conf = min(90.0, 70.0 + abs(momentum) * 4.0)
                 return self._build(
                     trace_id, symbol, "fast_trend", "open_short", conf,
-                    f"fast momentum {momentum:+.2f}", price, volatility_pct,
+                    f"fast momentum {momentum:+.2f}", price, volatility_pct, state,
                 )
 
         # rule / llm (llm placeholder)
@@ -125,21 +154,23 @@ class DecisionRouterAgent(BaseAgent):
         )
 
         if not has_position:
-            if score >= effective_threshold:
-                return self._build(
-                    trace_id, symbol, "rule", "open_long",
-                    min(88.0, 60.0 + score * 0.3),
-                    f"composite score {score:.2f}", price, volatility_pct,
-                )
-            if score <= -effective_threshold:
-                return self._build(
-                    trace_id, symbol, "rule", "open_short",
-                    min(88.0, 60.0 + abs(score) * 0.3),
-                    f"composite score {score:.2f}", price, volatility_pct,
-                )
+            if score >= effective_threshold and volatility_pct >= min_vol:
+                if self._short_momentum_confirms(consensus, "open_long"):
+                    return self._build(
+                        trace_id, symbol, "rule", "open_long",
+                        min(88.0, 60.0 + score * 0.3),
+                        f"composite score {score:.2f}", price, volatility_pct, state,
+                    )
+            if score <= -effective_threshold and volatility_pct >= min_vol:
+                if self._short_momentum_confirms(consensus, "open_short"):
+                    return self._build(
+                        trace_id, symbol, "rule", "open_short",
+                        min(88.0, 60.0 + abs(score) * 0.3),
+                        f"composite score {score:.2f}", price, volatility_pct, state,
+                    )
             return self._build(
                 trace_id, symbol, "rule", "wait", 0.0,
-                f"no edge score={score:.2f}", price, volatility_pct,
+                f"no edge score={score:.2f}", price, volatility_pct, state,
             )
 
         # has position: optional close on hard reversal
@@ -147,16 +178,16 @@ class DecisionRouterAgent(BaseAgent):
         if pos.side == "long" and score < self.cfg.decision.long_reversal_close_score:
             return self._build(
                 trace_id, symbol, "rule", "close_long", 72.0,
-                f"reversal score={score:.2f}", price, volatility_pct,
+                f"reversal score={score:.2f}", price, volatility_pct, state,
             )
         if pos.side == "short" and score > self.cfg.decision.short_reversal_close_score:
             return self._build(
                 trace_id, symbol, "rule", "close_short", 72.0,
-                f"reversal score={score:.2f}", price, volatility_pct,
+                f"reversal score={score:.2f}", price, volatility_pct, state,
             )
         return self._build(
             trace_id, symbol, "rule", "hold", 0.0,
-            f"hold score={score:.2f}", price, volatility_pct,
+            f"hold score={score:.2f}", price, volatility_pct, state,
         )
 
     def _build(
@@ -169,12 +200,13 @@ class DecisionRouterAgent(BaseAgent):
         reason: str,
         price: float,
         volatility_pct: float = 1.0,
+        state: RuntimeState | None = None,
     ) -> ProposedAction:
         if action in {"open_long", "open_short"}:
             stop_loss, take_profit = self._adaptive_stop_take(
                 action=action, price=price, volatility_pct=volatility_pct,
             )
-            leverage = self._confidence_leverage(confidence)
+            leverage = self._confidence_leverage(confidence, state) if state else self._confidence_leverage(confidence, RuntimeState())
         elif action in {"close_long", "close_short"}:
             stop_loss = 0.0
             take_profit = 0.0
@@ -198,5 +230,6 @@ class DecisionRouterAgent(BaseAgent):
                 "take_profit": take_profit,
                 "leverage": leverage,
                 "quantity": 0.0,
+                "volatility_pct": volatility_pct,  # OPT-6: pass vol for adaptive sizing
             },
         )

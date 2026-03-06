@@ -105,7 +105,7 @@ class MultiAgentTradeBot:
             asyncio.to_thread(self.ctx_agent.build, trace_id=trace_id, symbol=symbol, rank=rank, state=self.state),
             asyncio.to_thread(self.semantic_agent.summarize, trace_id=trace_id, snapshot=snapshot, signal=signal),
         )
-        consensus = self.fusion_agent.fuse(trace_id=trace_id, symbol=symbol, signal=signal, prediction=pred, context=ctx, semantic=sem)
+        consensus = self.fusion_agent.fuse(trace_id=trace_id, symbol=symbol, signal=signal, prediction=pred, context=ctx, semantic=sem, momentum_short_pct=snapshot.momentum_short_pct)
         proposal = self.decision_agent.route(trace_id=trace_id, consensus=consensus, price=snapshot.price, state=self.state, volatility_pct=snapshot.volatility_pct)
         self.bus.emit(
             trace_id=trace_id,

@@ -36,6 +36,7 @@ class MarketSnapshot:
     momentum_30m_pct: float
     volatility_pct: float
     volume_ratio: float
+    momentum_short_pct: float = 0.0  # OPT-2: short-lookback (e.g. 3-bar) momentum for confirmation
 
 
 @dataclass
@@ -89,6 +90,7 @@ class ConsensusSignal:
     alignment_ok: bool
     semantic: dict[str, str]
     context: dict[str, Any]
+    momentum_short_pct: float = 0.0  # OPT-2: short-lookback momentum for trend confirmation
 
 
 @dataclass

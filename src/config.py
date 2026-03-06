@@ -12,12 +12,12 @@ class SelectorConfig:
 
 @dataclass
 class DecisionConfig:
-    fast_trend_threshold: float = 2.5
+    fast_trend_threshold: float = 2.5  # OPT-7: restored to 2.5 — 3.0 over-filtered profitable entries
     fast_trend_short_threshold: float = 3.5
     fast_trend_long_min_predict_up_prob: float = 0.55
     fast_trend_short_max_predict_up_prob: float = 0.40
     fast_trend_short_max_sentiment: float = 0.0
-    max_holding_cycles: int = 15
+    max_holding_cycles: int = 20  # Force-close stale positions; baseline had none, 10-12 was too aggressive
     long_stop_loss_pct: float = 0.025
     long_take_profit_pct: float = 0.05
     short_stop_loss_pct: float = 0.020
@@ -30,6 +30,12 @@ class DecisionConfig:
     stop_volatility_multiplier: float = 1.5
     take_profit_rr_ratio: float = 2.0
     symbol_cooldown_cycles: int = 3
+    # OPT-2: multi-bar trend confirmation — require short lookback momentum same sign
+    require_short_momentum_confirm: bool = True
+    # OPT-4: cap leverage after consecutive losses detected by reflection hint
+    reflection_leverage_cap: float = 1.5
+    # OPT-7: minimum volatility to open a trade (avoid choppy low-vol markets)
+    min_volatility_pct_to_open: float = 0.5
 
 
 @dataclass
@@ -40,6 +46,21 @@ class RiskConfig:
     max_concurrent_positions: int = 3
     max_drawdown_pct: float = 8.0
     max_loss_per_trade_pct: float = 2.0  # max loss per trade as % of equity
+    hard_block_max_loss: bool = True  # OPT-5: when True, worst-case loss check blocks the trade
+
+
+@dataclass
+class BacktestConfig:
+    # OPT-1: trailing stop parameters
+    trailing_stop_enabled: bool = True
+    trailing_stop_activation_pct: float = 1.0  # activate trail after price moves 1.0% favorable
+    trailing_stop_distance_pct: float = 2.5  # trail stop at 2.5% below HWM (1.0% was too tight for crypto)
+    # OPT-8: time-decay stop tightening
+    time_decay_stop_enabled: bool = True
+    time_decay_tightening_factor: float = 0.2  # stops tighten by up to 20% as position ages (40% was too aggressive)
+    # OPT-6: volatility-adaptive sizing
+    vol_adaptive_sizing_enabled: bool = True
+    vol_adaptive_base_vol_pct: float = 2.0  # baseline volatility — notional scaled down if vol > this
 
 
 @dataclass
@@ -47,6 +68,7 @@ class RuntimeConfig:
     selector: SelectorConfig = field(default_factory=SelectorConfig)
     decision: DecisionConfig = field(default_factory=DecisionConfig)
     risk: RiskConfig = field(default_factory=RiskConfig)
+    backtest: BacktestConfig = field(default_factory=BacktestConfig)
     initial_cash: float = 100_000.0
     per_trade_notional: float = 2_000.0
     data_provider: str = "sim"  # sim | binance

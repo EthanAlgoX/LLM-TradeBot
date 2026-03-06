@@ -293,20 +293,44 @@ class TestComputeEquity:
 
 
 class TestPerTradeMaxLossWarning:
-    """RiskAuditAgent should emit warning when worst-case loss exceeds max_loss_per_trade_pct."""
+    """RiskAuditAgent should block or warn when worst-case loss exceeds max_loss_per_trade_pct."""
 
-    def test_warning_emitted_when_loss_exceeds_limit(self):
+    def test_hard_block_when_loss_exceeds_limit(self):
+        """OPT-5: With hard_block_max_loss=True (default), the trade is rejected outright."""
         cfg = RuntimeConfig()
         cfg.risk.max_loss_per_trade_pct = 2.0  # 2% of equity
         cfg.risk.max_leverage = 10.0
         cfg.risk.max_position_notional = 500_000.0
+        cfg.risk.hard_block_max_loss = True
         cfg.per_trade_notional = 20_000.0
         agent = RiskAuditAgent(cfg)
 
         state = RuntimeState(cash=100_000.0)
 
         # entry=100, stop=90, leverage=5 → risk=10, qty=notional/entry=200, worst_case=10*200*5=10_000
-        # equity=100_000, 2% = 2_000 → 10_000 > 2_000 → warning
+        # equity=100_000, 2% = 2_000 → 10_000 > 2_000 → BLOCKED
+        proposal = _make_proposal(
+            "open_long", price=100.0, leverage=5.0,
+            stop=90.0, take=120.0,
+        )
+
+        result = agent.audit(trace_id="t1", proposal=proposal, state=state)
+        assert result.passed is False
+        assert result.risk_level == "danger"
+        assert "worst-case loss" in result.blocked_reason
+
+    def test_warning_when_loss_exceeds_limit_soft_mode(self):
+        """With hard_block_max_loss=False, the trade passes with a warning (pre-OPT-5 behavior)."""
+        cfg = RuntimeConfig()
+        cfg.risk.max_loss_per_trade_pct = 2.0  # 2% of equity
+        cfg.risk.max_leverage = 10.0
+        cfg.risk.max_position_notional = 500_000.0
+        cfg.risk.hard_block_max_loss = False
+        cfg.per_trade_notional = 20_000.0
+        agent = RiskAuditAgent(cfg)
+
+        state = RuntimeState(cash=100_000.0)
+
         proposal = _make_proposal(
             "open_long", price=100.0, leverage=5.0,
             stop=90.0, take=120.0,

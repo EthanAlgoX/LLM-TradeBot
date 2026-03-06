@@ -336,6 +336,11 @@ class BacktestMarketDataProvider(MarketDataProvider):
         price = row.close
         momentum = (price / first - 1.0) * 100.0 if first > 0 else 0.0
 
+        # OPT-2: short-lookback momentum (last 3 bars)
+        short_lookback = rows[max(0, idx - 3) : idx + 1]
+        short_first = short_lookback[0].close
+        momentum_short = (price / short_first - 1.0) * 100.0 if short_first > 0 else 0.0
+
         highs = [x.close for x in lookback]
         low = min(highs)
         high = max(highs)
@@ -350,6 +355,7 @@ class BacktestMarketDataProvider(MarketDataProvider):
             momentum_30m_pct=round(momentum, 4),
             volatility_pct=round(max(0.01, volatility), 4),
             volume_ratio=round(max(0.01, volume_ratio), 4),
+            momentum_short_pct=round(momentum_short, 4),  # OPT-2
         )
 
 
@@ -395,6 +401,7 @@ class BacktestExecutionProvider(ExecutionProvider):
         dataset: CSVBacktestDataset | None = None,
         max_open_notional_share_of_bar: float = 0.0,
         max_open_retries: int = 2,
+        cfg: RuntimeConfig | None = None,
     ) -> None:
         self.fee_bps = max(0.0, fee_bps)
         self.slippage_bps = max(0.0, slippage_bps)
@@ -406,6 +413,11 @@ class BacktestExecutionProvider(ExecutionProvider):
         self.partial_open_count = 0
         self.retried_open_count = 0
         self.rejected_open_count = 0
+        self.cfg = cfg
+        # OPT-1: track high-water-mark for trailing stop per symbol
+        self._hwm: dict[str, float] = {}
+        # OPT-1: track whether trailing stop has been activated (price moved beyond activation threshold)
+        self._trail_activated: dict[str, bool] = {}
 
     def _fill_price(self, mark_price: float, action: str) -> float:
         slip = self.slippage_bps / 10_000.0
@@ -543,6 +555,8 @@ class BacktestExecutionProvider(ExecutionProvider):
 
     def _clear_risk_levels(self, symbol: str) -> None:
         self.position_risk_levels.pop(symbol, None)
+        self._hwm.pop(symbol, None)
+        self._trail_activated.pop(symbol, None)
 
     def _close_position(
         self,
@@ -598,6 +612,75 @@ class BacktestExecutionProvider(ExecutionProvider):
             idx = max(0, min(cycle - 1, self.dataset.steps - 1))
             mark = float(rows[idx].close)
 
+            # ------------------------------------------------------------------
+            # OPT-1: Trailing stop logic
+            # ------------------------------------------------------------------
+            if self.cfg and self.cfg.backtest.trailing_stop_enabled and stop is not None:
+                entry = float(pos.entry_price)
+                activation_pct = self.cfg.backtest.trailing_stop_activation_pct / 100.0
+                trail_dist_pct = self.cfg.backtest.trailing_stop_distance_pct / 100.0
+
+                if pos.side == "long":
+                    # Update high-water-mark
+                    prev_hwm = self._hwm.get(symbol, entry)
+                    hwm = max(prev_hwm, mark)
+                    self._hwm[symbol] = hwm
+
+                    # Check activation: price must have moved activation_pct above entry
+                    if not self._trail_activated.get(symbol, False):
+                        if (hwm - entry) / entry >= activation_pct:
+                            self._trail_activated[symbol] = True
+
+                    if self._trail_activated.get(symbol, False):
+                        # Trail stop = HWM * (1 - trail_dist_pct), but never below original stop
+                        trail_stop = hwm * (1.0 - trail_dist_pct)
+                        new_stop = max(float(stop), trail_stop)
+                        levels["stop_loss"] = new_stop
+                        stop = new_stop
+
+                else:  # short
+                    # For shorts, high-water-mark is actually LOW-water-mark
+                    prev_lwm = self._hwm.get(symbol, entry)
+                    lwm = min(prev_lwm, mark)
+                    self._hwm[symbol] = lwm
+
+                    if not self._trail_activated.get(symbol, False):
+                        if (entry - lwm) / entry >= activation_pct:
+                            self._trail_activated[symbol] = True
+
+                    if self._trail_activated.get(symbol, False):
+                        trail_stop = lwm * (1.0 + trail_dist_pct)
+                        new_stop = min(float(stop), trail_stop)
+                        levels["stop_loss"] = new_stop
+                        stop = new_stop
+
+            # ------------------------------------------------------------------
+            # OPT-8: Time-decay stop tightening
+            # ------------------------------------------------------------------
+            if self.cfg and self.cfg.backtest.time_decay_stop_enabled and stop is not None:
+                held_cycles = cycle - pos.opened_cycle
+                max_hold = self.cfg.decision.max_holding_cycles
+                if max_hold > 0 and held_cycles > 0:
+                    decay_factor = self.cfg.backtest.time_decay_tightening_factor
+                    # tighten_ratio goes from 0 at open to decay_factor at max_hold
+                    tighten_ratio = min(decay_factor, decay_factor * held_cycles / max_hold)
+                    entry = float(pos.entry_price)
+                    if pos.side == "long":
+                        original_stop_dist = entry - float(stop)
+                        if original_stop_dist > 0:
+                            new_stop = float(stop) + original_stop_dist * tighten_ratio
+                            levels["stop_loss"] = new_stop
+                            stop = new_stop
+                    else:
+                        original_stop_dist = float(stop) - entry
+                        if original_stop_dist > 0:
+                            new_stop = float(stop) - original_stop_dist * tighten_ratio
+                            levels["stop_loss"] = new_stop
+                            stop = new_stop
+
+            # ------------------------------------------------------------------
+            # Standard trigger check
+            # ------------------------------------------------------------------
             trigger: str | None = None
             if pos.side == "long":
                 if stop is not None and mark <= float(stop):
@@ -999,6 +1082,7 @@ class BacktestRunner:
             dataset=self.dataset,
             max_open_notional_share_of_bar=self.max_open_notional_share_of_bar,
             max_open_retries=self.max_open_retries,
+            cfg=cfg,
         )
 
         bot = MultiAgentTradeBot(

@@ -124,6 +124,12 @@ class RiskAuditAgent(BaseAgent):
         worst_case_loss = risk * qty * lev
         max_allowed_loss = equity * self.cfg.risk.max_loss_per_trade_pct / 100.0
         if worst_case_loss > max_allowed_loss:
+            if self.cfg.risk.hard_block_max_loss:
+                # OPT-5: hard block — reject the trade outright
+                return RiskDecision(
+                    SCHEMA_V2, trace_id, symbol, False, "danger",
+                    f"worst-case loss {worst_case_loss:.2f} exceeds {self.cfg.risk.max_loss_per_trade_pct}% equity limit {max_allowed_loss:.2f}",
+                )
             warnings.append(
                 f"worst-case loss {worst_case_loss:.2f} exceeds {self.cfg.risk.max_loss_per_trade_pct}% equity limit {max_allowed_loss:.2f}"
             )

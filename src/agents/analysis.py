@@ -24,7 +24,13 @@ class SignalAgent(BaseAgent):
 
     def analyze(self, *, trace_id: str, snapshot: MarketSnapshot) -> SignalOutput:
         trend = max(-100.0, min(100.0, snapshot.momentum_30m_pct * 12.0))
-        oscillator = max(-100.0, min(100.0, -snapshot.momentum_30m_pct * 6.0))
+        # OPT-3: Replace self-canceling oscillator (-momentum*6) with RSI-style score.
+        # RSI approximation from momentum: map momentum_short_pct into [-100, 100]
+        # using a sigmoid-like scaling. Positive = overbought, negative = oversold.
+        # This provides genuinely independent information from the 30-bar trend.
+        short_mom = snapshot.momentum_short_pct
+        rsi_raw = _sigmoid(short_mom * 1.5) * 200.0 - 100.0  # maps to [-100, 100]
+        oscillator = max(-100.0, min(100.0, rsi_raw))
         sentiment = max(-100.0, min(100.0, (snapshot.volume_ratio - 1.0) * 55.0))
         return SignalOutput(
             schema_version=SCHEMA_V2,
@@ -95,6 +101,7 @@ class FusionAgent(BaseAgent):
         prediction: PredictionOutput,
         context: ContextOutput,
         semantic: SemanticOutput,
+        momentum_short_pct: float = 0.0,
     ) -> ConsensusSignal:
         align = (signal.trend_score > 0 and prediction.probability_up >= 0.5) or (
             signal.trend_score < 0 and prediction.probability_up < 0.5
@@ -119,4 +126,5 @@ class FusionAgent(BaseAgent):
                 "market_rank": context.market_rank,
                 "reflection_hint": context.reflection_hint,
             },
+            momentum_short_pct=momentum_short_pct,
         )
