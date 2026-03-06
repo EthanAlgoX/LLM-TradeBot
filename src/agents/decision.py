@@ -58,9 +58,9 @@ class DecisionRouterAgent(BaseAgent):
         reduce_leverage = "negative" in hint or "reduce" in hint
 
         if confidence >= 40.0:
-            lev = 4.0
+            lev = min(4.0, self.cfg.risk.max_leverage)
         else:
-            lev = 3.0
+            lev = min(3.0, self.cfg.risk.max_leverage)
 
         if reduce_leverage:
             lev = min(lev, self.cfg.decision.reflection_leverage_cap)
