@@ -12,6 +12,12 @@ tradebot --cycles 3
 pytest
 ```
 
+## Recent Updates & Optimizations
+
+- **Mathematical Precision**: Fixed critical leverage inflation and margin double-counting bugs. Leverage now correctly scales required margin without artificially multiplying absolute dollar PnL, and the risk engine allows true 100% capital utilization.
+- **Aggressive V11 Strategy**: Parameter sweeps optimized holding periods (36 cycles), trailing stops (3.0%), and dynamic leverage (up to 4.0x) for a long-only alignment to maximize capture of volatile trends, achieving a highly optimized yield curve in recent historical sweeps.
+- **Full Pipeline Observability**: Verified the `SQLiteStateStore` and robust dual-persistence architecture. Enabling persistence dumps granular JSON/JSONL trace outputs to `data/traces/`, capturing the exact input/output payloads of every agent per cycle for perfect backtracking, debugging, and transparent ML pipeline evaluation.
+
 ## Architecture Map (Important Files)
 
 ### 1) Entry / Runtime
