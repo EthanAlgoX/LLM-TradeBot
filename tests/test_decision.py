@@ -48,6 +48,9 @@ def test_decision_fast_trend_long_requires_prob_alignment():
 
 def test_decision_fast_trend_short_requires_strict_confirmation():
     cfg = RuntimeConfig()
+    cfg.decision.fast_trend_short_threshold = 3.5
+    cfg.decision.fast_trend_short_max_sentiment = 0.0
+    cfg.decision.fast_trend_short_max_predict_up_prob = 0.40
     agent = DecisionRouterAgent(cfg)
     state = RuntimeState(cycle=1, cash=100_000.0)
     # Weak signal: trend_score / 12 = -2.67 doesn't meet -3.5 threshold
@@ -60,8 +63,8 @@ def test_decision_fast_trend_short_requires_strict_confirmation():
     out2 = agent.route(trace_id="t2", consensus=strong, price=100.0, state=state)
     assert out2.action == "open_short"
     assert out2.source == "fast_trend"
-    # Confidence = min(90, 70 + 4.0*4) = 86.0 → dynamic leverage: ≥85 → 3.0
-    assert out2.order_params["leverage"] == 3.0
+    # Confidence = min(90, 70 + abs(-4.0)*5) = 90.0 → dynamic leverage: 4.0
+    assert out2.order_params["leverage"] == 4.0
     # Volatility-adaptive stops: default vol=1.0, vol_stop=1.0/100*1.5=0.015, max(0.02, 0.015)=0.02
     assert out2.order_params["stop_loss"] == pytest.approx(100.0 * 1.02, rel=1e-9)
     assert out2.order_params["take_profit"] == pytest.approx(100.0 * (1.0 - 0.02 * 2.0), rel=1e-9)
@@ -70,8 +73,9 @@ def test_decision_fast_trend_short_requires_strict_confirmation():
 def test_decision_close_action_has_zero_stop_take():
     """Close actions should set stop_loss and take_profit to 0 to avoid R:R checks."""
     cfg = RuntimeConfig()
+    cfg.decision.max_holding_cycles = 20
     agent = DecisionRouterAgent(cfg)
-    # max_holding_cycles defaults to 20, so cycle 16 - opened 1 = 15 < 20 → no forced exit yet
+    # max_holding_cycles is mocked to 20, so cycle 16 - opened 1 = 15 < 20 → no forced exit yet
     # Need cycle 21 for forced exit: 21 - 1 = 20 >= 20
     state = RuntimeState(cycle=21, cash=100_000.0)
     state.positions["BTCUSDT"] = Position(symbol="BTCUSDT", side="long", qty=1.0, entry_price=100.0, leverage=3.0, opened_cycle=1)
@@ -118,8 +122,8 @@ def test_decision_volatility_adaptive_stops():
     agent = DecisionRouterAgent(cfg)
     state = RuntimeState(cycle=1, cash=100_000.0)
     c = _consensus(trend_score=36.0, predict_up_prob=0.68, alignment_ok=True, momentum_short_pct=1.0)
-    # High volatility: 5% — vol_stop = 5/100 * 1.5 = 0.075 > config 0.025
+    # High volatility: 5% — vol_stop = 5/100 * 1.3 = 0.065 > config 0.04
     out = agent.route(trace_id="t1", consensus=c, price=100.0, state=state, volatility_pct=5.0)
     assert out.action == "open_long"
-    assert out.order_params["stop_loss"] == pytest.approx(100.0 * (1.0 - 0.075), rel=1e-9)
-    assert out.order_params["take_profit"] == pytest.approx(100.0 * (1.0 + 0.075 * 2.0), rel=1e-9)
+    assert out.order_params["stop_loss"] == pytest.approx(100.0 * (1.0 - 0.065), rel=1e-9)
+    assert out.order_params["take_profit"] == pytest.approx(100.0 * (1.0 + 0.065 * 2.0), rel=1e-9)

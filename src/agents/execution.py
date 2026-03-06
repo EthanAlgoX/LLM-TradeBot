@@ -15,8 +15,11 @@ class ExecutionPlannerAgent(BaseAgent):
     def _calculate_position_size(self, notional: float, entry_price: float, leverage: float, available_cash: float) -> float:
         if entry_price <= 0 or leverage <= 0:
             return 0.0
-        max_notional = min(notional, available_cash * leverage)
-        return max_notional / entry_price
+        # The target position nominal value is simply 'notional'.
+        # We must ensure we have enough margin to support this notional at the given leverage.
+        max_possible_notional_from_cash = available_cash * leverage
+        actual_notional = min(notional, max_possible_notional_from_cash)
+        return actual_notional / entry_price
 
     def plan(self, proposal: ProposedAction, risk: RiskDecision, cfg: RuntimeConfig, state: RuntimeState) -> ProposedAction:
         # Deep copy to avoid mutating the original proposal that may be referenced upstream

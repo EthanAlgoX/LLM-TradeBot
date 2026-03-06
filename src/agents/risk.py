@@ -74,17 +74,12 @@ class RiskAuditAgent(BaseAgent):
         position_notional = self._get_position_notional(symbol, entry, qty, lev)
         required_margin = position_notional / lev if lev > 0 else position_notional
 
-        # Calculate existing margin used (margin = notional / leverage = entry * qty)
-        existing_margin = 0.0
-        for sym, pos in state.positions.items():
-            pos_notional = abs(pos.entry_price * pos.qty)
-            existing_margin += pos_notional / pos.leverage if pos.leverage > 0 else pos_notional
-
-        total_required_margin = required_margin + existing_margin
-        if total_required_margin > state.cash:
+        # state.cash is the *unlocked* free cash (margin has already been deducted for existing trades).
+        # We only need to check if the newly required margin exceeds the remaining unlocked cash.
+        if required_margin > state.cash:
             return RiskDecision(
                 SCHEMA_V2, trace_id, symbol, False, "fatal",
-                f"insufficient margin: required {total_required_margin:.2f}, available {state.cash:.2f}",
+                f"insufficient margin: required {required_margin:.2f}, available {state.cash:.2f}",
             )
 
         # Check individual position notional limit (leveraged notional)

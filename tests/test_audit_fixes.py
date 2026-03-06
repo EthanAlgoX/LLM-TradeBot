@@ -87,8 +87,8 @@ class _DummyLiveProvider(BinanceFuturesExecutionProvider):
 class TestLeveragePnlSim:
     """SimExecutionProvider must multiply PnL by leverage."""
 
-    def test_long_close_pnl_includes_leverage(self):
-        """Open at 100, close at 105, leverage 3x, qty 10 → gross PnL = 5*10*1*3 = 150."""
+    def test_long_close_pnl_excludes_leverage(self):
+        """Open at 100, close at 105, leverage 3x, qty 10 → gross PnL = 5*10*1 = 50.0."""
         provider = SimExecutionProvider()
         state = RuntimeState(cycle=1, cash=100_000.0)
 
@@ -105,14 +105,14 @@ class TestLeveragePnlSim:
         assert result.status == "success"
         # The close trade record has the net PnL (gross - fee).
         close_trade = [t for t in state.trades if t.action == "close_long"][0]
-        # gross_pnl = (105 - 100) * 10 * 1.0 * 3.0 = 150.0
+        # gross_pnl = (105 - 100) * 10 * 1.0 = 50.0
         # fee = 105 * 10 * 3.0 / 10_000 = 0.315  (FEE_BPS=3.0 applied to price*qty)
         fee = 105 * 10 * 3.0 / 10_000.0
-        expected_net = 150.0 - fee
+        expected_net = 50.0 - fee
         assert abs(close_trade.pnl - expected_net) < 0.01, f"got {close_trade.pnl}, expected ~{expected_net}"
 
-    def test_short_close_pnl_includes_leverage(self):
-        """Open short at 100, close at 95, leverage 2x, qty 5 → gross PnL = (95-100)*5*(-1)*2 = 50."""
+    def test_short_close_pnl_excludes_leverage(self):
+        """Open short at 100, close at 95, leverage 2x, qty 5 → gross PnL = (95-100)*5*(-1) = 25.0."""
         provider = SimExecutionProvider()
         state = RuntimeState(cycle=1, cash=100_000.0)
 
@@ -124,16 +124,16 @@ class TestLeveragePnlSim:
 
         assert result.status == "success"
         close_trade = [t for t in state.trades if t.action == "close_short"][0]
-        # gross_pnl = (95 - 100) * 5 * (-1) * 2 = 50.0
+        # gross_pnl = (95 - 100) * 5 * (-1) = 25.0
         fee = 95 * 5 * 3.0 / 10_000.0
-        expected_net = 50.0 - fee
+        expected_net = 25.0 - fee
         assert abs(close_trade.pnl - expected_net) < 0.01, f"got {close_trade.pnl}, expected ~{expected_net}"
 
 
 class TestLeveragePnlBacktest:
     """BacktestExecutionProvider._close_position must multiply PnL by leverage."""
 
-    def test_close_pnl_includes_leverage(self):
+    def test_close_pnl_excludes_leverage(self):
         from backtest import BacktestExecutionProvider
 
         provider = BacktestExecutionProvider(fee_bps=0.0, slippage_bps=0.0)
@@ -152,14 +152,14 @@ class TestLeveragePnlBacktest:
 
         assert result.status == "success"
         close_trade = [t for t in state.trades if t.action == "close_long"][0]
-        # gross = (105 - 100) * 10 * 1 * 3 = 150, fee=0
-        assert abs(close_trade.pnl - 150.0) < 0.01
+        # gross = (105 - 100) * 10 * 1 = 50, fee=0
+        assert abs(close_trade.pnl - 50.0) < 0.01
 
 
 class TestLeveragePnlBinance:
     """BinanceFuturesExecutionProvider must multiply PnL by leverage."""
 
-    def test_close_long_pnl_includes_leverage(self):
+    def test_close_long_pnl_excludes_leverage(self):
         provider = _DummyLiveProvider(avg_price=105.0)
         state = RuntimeState(cycle=2, cash=100_000.0)
         state.positions["BTCUSDT"] = Position(
@@ -171,8 +171,8 @@ class TestLeveragePnlBinance:
 
         assert result.status == "success"
         close_trade = [t for t in state.trades if t.action == "close_long"][0]
-        # gross = (105 - 100) * 10 * 1 * 3 = 150, no fee subtraction in Binance provider
-        assert abs(close_trade.pnl - 150.0) < 0.01
+        # gross = (105 - 100) * 10 * 1 = 50, no fee subtraction in Binance provider
+        assert abs(close_trade.pnl - 50.0) < 0.01
 
 
 # ===========================================================================
@@ -198,7 +198,7 @@ class TestNegativeCashFloor:
         margin = 100.0 * 1000.0 / 3.0  # ~33333.33
         state.cash = 100_000.0 - margin  # ~66666.67
 
-        # Close at 200 → gross loss = (200-100)*1000*(-1)*3 = -300_000
+        # Close at 200 → gross loss = (200-100)*1000*(-1) = -100_000
         close_proposal = _make_proposal("close_short", price=200.0, qty=1000.0, leverage=3.0)
         result = provider.execute(trace_id="t1", planned=close_proposal, state=state)
 
@@ -214,15 +214,18 @@ class TestNegativeCashFloor:
             symbol="BTCUSDT", side="long", qty=100.0, entry_price=100.0, leverage=3.0, opened_cycle=1,
         )
         # entry notional = 100*100 = 10k, margin = 10k/3 = 3333.33
-        # gross loss at price 50 = (50 - 100) * 100 * 1 * 3 = -15_000
-        # cash + margin + net_pnl = 5000 + 3333.33 + (-15_000) = -6666.67 → should floor to 0
+        # gross loss at price 50 = (50 - 100) * 100 * 1 = -5_000
+        # cash + margin + net_pnl = 5000 + 3333.33 + (-5_000) = 3333.33 -> Cash doesn't reach floor!
+        # wait! need closing price 16.66667 for -8333.33 loss to hit floor! Let's close at 10.0
+        # gross loss at price 10 = (10 - 100) * 100 * 1 = -9_000
+        # cash + margin + net_pnl = 5000 + 3333.33 + (-9_000) = -666.67 → should floor to 0
 
         result = provider._close_position(
             trace_id="t1",
             symbol="BTCUSDT",
             action="close_long",
             state=state,
-            mark_price=50.0,
+            mark_price=10.0,
         )
 
         assert result.status == "success"
@@ -251,10 +254,10 @@ class TestComputeEquity:
         equity = agent._compute_equity(state)
 
         # margin = 100 * 10 / 3 = 333.33
-        # unrealized_pnl = (105 - 100) * 10 * 1 * 3 = 150
-        # equity = 90_000 + 333.33 + 150 = 90_483.33
+        # unrealized_pnl = (105 - 100) * 10 * 1 = 50
+        # equity = 90_000 + 333.33 + 50 = 90_383.33
         margin = 100.0 * 10.0 / 3.0
-        unrealized = (105.0 - 100.0) * 10.0 * 1.0 * 3.0
+        unrealized = (105.0 - 100.0) * 10.0 * 1.0
         expected = 90_000.0 + margin + unrealized
         assert abs(equity - expected) < 0.01, f"got {equity}, expected {expected}"
 
@@ -271,10 +274,10 @@ class TestComputeEquity:
         equity = agent._compute_equity(state)
 
         # margin = 2000 * 5 / 2 = 5000
-        # unrealized = (2100 - 2000) * 5 * (-1) * 2 = -1000
-        # equity = 80_000 + 5000 + (-1000) = 84_000
+        # unrealized = (2100 - 2000) * 5 * (-1) = -500
+        # equity = 80_000 + 5000 + (-500) = 84_500
         margin = 2000.0 * 5.0 / 2.0
-        unrealized = (2100.0 - 2000.0) * 5.0 * (-1.0) * 2.0
+        unrealized = (2100.0 - 2000.0) * 5.0 * (-1.0)
         expected = 80_000.0 + margin + unrealized
         assert abs(equity - expected) < 0.01, f"got {equity}, expected {expected}"
 
@@ -307,11 +310,11 @@ class TestPerTradeMaxLossWarning:
 
         state = RuntimeState(cash=100_000.0)
 
-        # entry=100, stop=90, leverage=5 → risk=10, qty=notional/entry=200, worst_case=10*200*5=10_000
-        # equity=100_000, 2% = 2_000 → 10_000 > 2_000 → BLOCKED
+        # entry=100, stop=88, leverage=5 → risk=12, qty=notional/entry=200, worst_case=12*200 = 2400
+        # equity=100_000, 2% = 2_000 → 2400 > 2_000 → BLOCKED
         proposal = _make_proposal(
             "open_long", price=100.0, leverage=5.0,
-            stop=90.0, take=120.0,
+            stop=88.0, take=120.0,
         )
 
         result = agent.audit(trace_id="t1", proposal=proposal, state=state)
@@ -333,7 +336,7 @@ class TestPerTradeMaxLossWarning:
 
         proposal = _make_proposal(
             "open_long", price=100.0, leverage=5.0,
-            stop=90.0, take=120.0,
+            stop=88.0, take=120.0,
         )
 
         result = agent.audit(trace_id="t1", proposal=proposal, state=state)
@@ -421,7 +424,7 @@ class TestProviderConsistency:
         close_price = 110.0
         qty = 5.0
         leverage = 3.0
-        expected_gross = (close_price - entry) * qty * 1.0 * leverage  # = 150.0
+        expected_gross = (close_price - entry) * qty * 1.0  # = 50.0
 
         # --- Sim ---
         sim = SimExecutionProvider()
