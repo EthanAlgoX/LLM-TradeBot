@@ -1,9 +1,24 @@
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
 .pytest_cache/
+
+# MacOS
 .DS_Store
-data/*.db
-reports/*.md
-reports/*.json
+
+# === Sensitive & Runtime Data (NEVER commit) ===
+
+# Environment / secrets
+.env
+.env.*
+*.pem
+*.key
+
+# Trading data, logs, traces
+data/
+reports/
+
+# Temporary files
 /tmp/
+test_output.txt
