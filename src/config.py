@@ -18,15 +18,15 @@ class DecisionConfig:
     fast_trend_short_max_predict_up_prob: float = 0.50
     fast_trend_short_max_sentiment: float = -20.0
     max_holding_cycles: int = 24
-    long_stop_loss_pct: float = 0.02
+    long_stop_loss_pct: float = 0.04
     long_take_profit_pct: float = 0.04
-    short_stop_loss_pct: float = 0.02
+    short_stop_loss_pct: float = 0.04
     short_take_profit_pct: float = 0.04
     open_threshold: float = 8.0
-    long_reversal_close_score: float = -40.0
-    short_reversal_close_score: float = 40.0
+    long_reversal_close_score: float = -80.0
+    short_reversal_close_score: float = 80.0
     llm_enabled: bool = False
-    loss_cooldown_threshold_boost: float = 15.0
+    loss_cooldown_threshold_boost: float = 5.0
     stop_volatility_multiplier: float = 1.0
     take_profit_rr_ratio: float = 1.2
     symbol_cooldown_cycles: int = 1
@@ -41,7 +41,7 @@ class RiskConfig:
     min_rr: float = 1.0
     max_position_notional: float = 300_000.0
     max_concurrent_positions: int = 3
-    max_drawdown_pct: float = 5.0
+    max_drawdown_pct: float = 15.0
     max_loss_per_trade_pct: float = 15.0
     hard_block_max_loss: bool = True
 
@@ -66,8 +66,8 @@ class RuntimeConfig:
     decision: DecisionConfig = field(default_factory=DecisionConfig)
     risk: RiskConfig = field(default_factory=RiskConfig)
     backtest: BacktestConfig = field(default_factory=BacktestConfig)
-    initial_cash: float = 100_000.0
-    per_trade_notional: float = 50_000.0
+    initial_cash: float = 10_000.0
+    per_trade_notional: float = 3_333.0
     data_provider: str = "sim"  # sim | binance
     market_rank_provider: str = "mock"  # mock | binance
     execution_provider: str = "sim"  # sim | paper | binance_live
@@ -105,6 +105,8 @@ class RuntimeConfig:
         cfg.market_rank_provider = os.getenv("TRADEBOT_MARKET_RANK_PROVIDER", cfg.market_rank_provider)
         cfg.execution_provider = os.getenv("TRADEBOT_EXECUTION_PROVIDER", cfg.execution_provider)
         cfg.fallback_to_sim = os.getenv("TRADEBOT_FALLBACK_TO_SIM", "1") not in {"0", "false", "False"}
+        cfg.initial_cash = float(os.getenv("TRADEBOT_INITIAL_CASH", str(cfg.initial_cash)))
+        cfg.per_trade_notional = float(os.getenv("TRADEBOT_PER_TRADE_NOTIONAL", str(cfg.per_trade_notional)))
         cfg.http_timeout_sec = float(os.getenv("TRADEBOT_HTTP_TIMEOUT_SEC", str(cfg.http_timeout_sec)))
         cfg.binance_spot_base_url = os.getenv("TRADEBOT_BINANCE_SPOT_BASE_URL", cfg.binance_spot_base_url)
         cfg.binance_futures_base_url = os.getenv("TRADEBOT_BINANCE_FUTURES_BASE_URL", cfg.binance_futures_base_url)

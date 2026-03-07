@@ -89,10 +89,51 @@ class DecisionRouterAgent(BaseAgent):
         symbol = consensus.symbol
         has_position = state.has_position(symbol)
 
-        # forced exit: stale holding
+        # --- Evaluate existing position exits (SL/TP/forced) ---
         if has_position:
             pos = state.positions[symbol]
-            if state.cycle - pos.opened_cycle >= self.cfg.decision.max_holding_cycles:
+            held_cycles = state.cycle - pos.opened_cycle
+
+            # Stop-loss / Take-profit check (price-based)
+            entry = pos.entry_price
+            cfg_d = self.cfg.decision
+            if pos.side == "long":
+                sl_dist = cfg_d.long_stop_loss_pct
+                tp_dist = sl_dist * cfg_d.take_profit_rr_ratio
+                sl_price = entry * (1.0 - sl_dist)
+                tp_price = entry * (1.0 + tp_dist)
+                if price <= sl_price:
+                    return self._build(
+                        trace_id, symbol, "stop_loss", "close_long", 95.0,
+                        f"stop loss hit: price {price:.4f} <= SL {sl_price:.4f}",
+                        price, volatility_pct, state,
+                    )
+                if price >= tp_price:
+                    return self._build(
+                        trace_id, symbol, "take_profit", "close_long", 95.0,
+                        f"take profit hit: price {price:.4f} >= TP {tp_price:.4f}",
+                        price, volatility_pct, state,
+                    )
+            elif pos.side == "short":
+                sl_dist = cfg_d.short_stop_loss_pct
+                tp_dist = sl_dist * cfg_d.take_profit_rr_ratio
+                sl_price = entry * (1.0 + sl_dist)
+                tp_price = entry * (1.0 - tp_dist)
+                if price >= sl_price:
+                    return self._build(
+                        trace_id, symbol, "stop_loss", "close_short", 95.0,
+                        f"stop loss hit: price {price:.4f} >= SL {sl_price:.4f}",
+                        price, volatility_pct, state,
+                    )
+                if price <= tp_price:
+                    return self._build(
+                        trace_id, symbol, "take_profit", "close_short", 95.0,
+                        f"take profit hit: price {price:.4f} <= TP {tp_price:.4f}",
+                        price, volatility_pct, state,
+                    )
+
+            # Forced exit: stale holding
+            if held_cycles >= self.cfg.decision.max_holding_cycles:
                 return self._build(
                     trace_id, symbol, "forced_exit",
                     "close_long" if pos.side == "long" else "close_short",

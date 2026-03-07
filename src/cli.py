@@ -1,8 +1,7 @@
-from __future__ import annotations
-
 import argparse
 import asyncio
 import json
+import time
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -64,6 +63,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--replay-stage", help="Filter replay events by stage (e.g. selector, analysis, risk)")
     p.add_argument("--replay-max-events", type=int, help="Return at most N latest events after replay filter")
     p.add_argument("--replay-summary-only", action="store_true", help="Replay only stage summary instead of full events")
+    p.add_argument("--cycle-interval-sec", type=float, default=0.0, help="Sleep interval between cycles (seconds)")
+    p.add_argument("--initial-cash", type=float, help="Override initial cash in config")
+    p.add_argument("--per-trade-notional", type=float, help="Override per-trade notional in config")
     p.add_argument("--pretty", action="store_true", help="Pretty-print JSON output")
     return p
 
@@ -179,6 +181,10 @@ def main() -> None:
         cfg.market_rank_provider = args.market_rank_provider
     if args.execution_provider:
         cfg.execution_provider = args.execution_provider
+    if args.initial_cash is not None:
+        cfg.initial_cash = args.initial_cash
+    if args.per_trade_notional is not None:
+        cfg.per_trade_notional = args.per_trade_notional
     if args.live_confirm:
         cfg.live_confirm_token = args.live_confirm
     if args.persistence_path:
@@ -317,7 +323,8 @@ def main() -> None:
     except ValueError as exc:
         raise SystemExit(f"configuration error: {exc}") from exc
 
-    for _ in range(max(1, args.cycles)):
+    num_cycles = max(1, args.cycles)
+    for i in range(num_cycles):
         result = asyncio.run(bot.run_cycle())
         _dump(
             {
@@ -330,6 +337,8 @@ def main() -> None:
             },
             pretty=args.pretty,
         )
+        if args.cycle_interval_sec > 0 and i < num_cycles - 1:
+            time.sleep(args.cycle_interval_sec)
 
 
 if __name__ == "__main__":
