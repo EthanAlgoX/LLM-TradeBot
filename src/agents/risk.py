@@ -50,7 +50,9 @@ class RiskAuditAgent(BaseAgent):
 
         # Account-level drawdown circuit breaker (based on equity, not cash)
         equity = self._compute_equity(state)
-        drawdown_pct = (self.cfg.initial_cash - equity) / self.cfg.initial_cash * 100.0 if self.cfg.initial_cash > 0 else 0.0
+        state.update_peak_equity(equity)
+        peak_equity = float(state.peak_equity or max(self.cfg.initial_cash, equity, 0.0))
+        drawdown_pct = (peak_equity - equity) / peak_equity * 100.0 if peak_equity > 0 else 0.0
         if drawdown_pct >= self.cfg.risk.max_drawdown_pct:
             return RiskDecision(
                 SCHEMA_V2, trace_id, symbol, False, "fatal",

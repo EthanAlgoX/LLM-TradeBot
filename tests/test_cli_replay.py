@@ -1,4 +1,4 @@
-from cli import _build_stage_summary
+from cli import _build_stage_summary, _extract_execution_resolutions
 
 
 def test_build_stage_summary_counts_and_duration():
@@ -31,3 +31,39 @@ def test_build_stage_summary_handles_invalid_ts():
     out = _build_stage_summary(events)
     assert len(out) == 1
     assert out[0]["duration_ms"] is None
+
+
+def test_extract_execution_resolutions_flattens_resolution_events():
+    events = [
+        {
+            "seq": 7,
+            "ts": "2026-03-05T00:00:07+00:00",
+            "stage": "execution_resolution",
+            "phase": "end",
+            "agent": "execution_agent",
+            "data": {
+                "planned_action": {"symbol": "BTCUSDT", "action": "open_long"},
+                "resolutions": [
+                    {
+                        "kind": "cancel_conflicting_pending_order",
+                        "resolution_action": {"action": "cancel_order", "symbol": "BTCUSDT"},
+                        "resolution_result": {"status": "success", "message": "active order canceled"},
+                    }
+                ],
+            },
+        }
+    ]
+
+    out = _extract_execution_resolutions(events)
+
+    assert out == [
+        {
+            "seq": 7,
+            "ts": "2026-03-05T00:00:07+00:00",
+            "symbol": "BTCUSDT",
+            "planned_action": "open_long",
+            "kind": "cancel_conflicting_pending_order",
+            "resolution_action": {"action": "cancel_order", "symbol": "BTCUSDT"},
+            "resolution_result": {"status": "success", "message": "active order canceled"},
+        }
+    ]

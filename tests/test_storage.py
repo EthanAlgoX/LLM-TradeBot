@@ -9,7 +9,7 @@ from config import RuntimeConfig
 from contracts import CycleResult
 from events import RuntimeEvent
 from orchestrator import MultiAgentTradeBot
-from state import Position, RuntimeState, TradeRecord
+from state import ExchangeOrderRecord, ExecutionReportRecord, FillRecord, OrderIntentRecord, Position, ReconciliationReportRecord, RuntimeState, TradeRecord
 from storage import SQLiteStateStore
 
 
@@ -17,10 +17,123 @@ def test_sqlite_state_store_roundtrip(tmp_path):
     db = tmp_path / "tradebot.db"
     store = SQLiteStateStore(str(db))
 
-    state = RuntimeState(cycle=3, cash=12345.6, reflection_hint="keep risk low")
-    state.positions["BTCUSDT"] = Position(symbol="BTCUSDT", side="long", qty=0.12, entry_price=45000.0, leverage=2.0, opened_cycle=2)
+    state = RuntimeState(cycle=3, cash=12345.6, peak_equity=13000.0, reflection_hint="keep risk low")
+    state.positions["BTCUSDT"] = Position(
+        symbol="BTCUSDT",
+        side="long",
+        qty=0.12,
+        entry_price=45000.0,
+        leverage=2.0,
+        opened_cycle=2,
+        stop_loss=44000.0,
+        take_profit=47000.0,
+        entry_source="rule",
+        entry_confidence=82.5,
+        entry_reason="trend continuation",
+    )
     state.prices["BTCUSDT"] = 46000.0
-    state.trades.append(TradeRecord(cycle=2, symbol="BTCUSDT", action="open_long", qty=0.12, price=45000.0, pnl=0.0))
+    state.trades.append(
+        TradeRecord(
+            cycle=2,
+            symbol="BTCUSDT",
+            action="open_long",
+            qty=0.12,
+            price=45000.0,
+            pnl=0.0,
+            realized_pnl=0.0,
+            fee=12.5,
+            event_type="open",
+            source="rule",
+            confidence=82.5,
+            reason="trend continuation",
+        )
+    )
+    state.order_intents.append(
+        OrderIntentRecord(
+            trace_id="cycle:3:test",
+            cycle=3,
+            symbol="BTCUSDT",
+            action="open_long",
+            requested_qty=0.12,
+            requested_price=45000.0,
+            leverage=2.0,
+            provider="sim",
+            source="rule",
+            confidence=82.5,
+            reason="trend continuation",
+        )
+    )
+    state.exchange_orders.append(
+        ExchangeOrderRecord(
+            trace_id="cycle:3:test",
+            cycle=3,
+            symbol="BTCUSDT",
+            action="open_long",
+            requested_qty=0.12,
+            executed_qty=0.12,
+            requested_price=45000.0,
+            avg_price=45010.0,
+            status="FILLED",
+            provider="sim",
+            is_active=False,
+            exchange_order_id="sim:cycle:3:test:0",
+            side="BUY",
+            order_type="MARKET",
+            message="sim market order filled",
+            status_history=["SUBMITTED", "FILLED"],
+            source="rule",
+            confidence=82.5,
+            reason="trend continuation",
+        )
+    )
+    state.fills.append(
+        FillRecord(
+            trace_id="cycle:3:test",
+            cycle=3,
+            symbol="BTCUSDT",
+            action="open_long",
+            qty=0.12,
+            price=45010.0,
+            fee=12.5,
+            provider="sim",
+            liquidity="taker",
+            message="sim open fill",
+        )
+    )
+    state.execution_reports.append(
+        ExecutionReportRecord(
+            trace_id="cycle:3:test",
+            cycle=3,
+            symbol="BTCUSDT",
+            action="open_long",
+            requested_qty=0.12,
+            filled_qty=0.12,
+            requested_price=45000.0,
+            fill_price=45010.0,
+            status="success",
+            provider="sim",
+            message="long opened",
+            source="rule",
+            confidence=82.5,
+            reason="trend continuation",
+        )
+    )
+    state.reconciliation_reports.append(
+        ReconciliationReportRecord(
+            trace_id="cycle:3:test",
+            cycle=3,
+            provider="sim",
+            status="synced",
+            local_cash=12345.6,
+            remote_cash=12345.6,
+            local_positions={"BTCUSDT": 0.12},
+            remote_positions={"BTCUSDT": 0.12},
+            local_order_statuses={"sim:cycle:3:test:0": "FILLED"},
+            remote_order_statuses={"sim:cycle:3:test:0": "FILLED"},
+            message="local reconciliation",
+        )
+    )
+    state.set_cooldown("BTCUSDT", 6)
 
     cycle_result = CycleResult(
         schema_version="v2",
@@ -41,10 +154,31 @@ def test_sqlite_state_store_roundtrip(tmp_path):
 
     assert loaded.cycle == 3
     assert loaded.cash == 12345.6
+    assert loaded.peak_equity == 13000.0
     assert loaded.reflection_hint == "keep risk low"
     assert "BTCUSDT" in loaded.positions
+    assert loaded.positions["BTCUSDT"].entry_source == "rule"
+    assert loaded.positions["BTCUSDT"].stop_loss == 44000.0
     assert loaded.prices["BTCUSDT"] == 46000.0
     assert len(loaded.trades) == 1
+    assert loaded.trades[0].fee == 12.5
+    assert loaded.trades[0].event_type == "open"
+    assert len(loaded.order_intents) == 1
+    assert loaded.order_intents[0].provider == "sim"
+    assert len(loaded.exchange_orders) == 1
+    assert loaded.exchange_orders[0].status == "FILLED"
+    assert loaded.exchange_orders[0].is_active is False
+    assert loaded.exchange_orders[0].exchange_order_id == "sim:cycle:3:test:0"
+    assert loaded.exchange_orders[0].status_history == ["SUBMITTED", "FILLED"]
+    assert len(loaded.fills) == 1
+    assert loaded.fills[0].price == 45010.0
+    assert len(loaded.execution_reports) == 1
+    assert loaded.execution_reports[0].provider == "sim"
+    assert loaded.execution_reports[0].fill_price == 45010.0
+    assert len(loaded.reconciliation_reports) == 1
+    assert loaded.reconciliation_reports[0].status == "synced"
+    assert loaded.reconciliation_reports[0].local_order_statuses == {"sim:cycle:3:test:0": "FILLED"}
+    assert loaded.symbol_cooldowns["BTCUSDT"] == 6
 
     with sqlite3.connect(str(db)) as conn:
         row = conn.execute("SELECT count(*) FROM cycles").fetchone()
@@ -146,3 +280,23 @@ def test_persist_writes_trace_files(tmp_path):
     assert trades_data["cycle"] == result.cycle
     assert "all_trades" in trades_data
     assert "cycle_trades" in trades_data
+    assert "all_order_intents" in trades_data
+    assert "cycle_order_intents" in trades_data
+    assert "all_exchange_orders" in trades_data
+    assert "cycle_exchange_orders" in trades_data
+    assert "all_fills" in trades_data
+    assert "cycle_fills" in trades_data
+    assert "all_execution_reports" in trades_data
+    assert "cycle_execution_reports" in trades_data
+    assert "all_reconciliation_reports" in trades_data
+    assert "cycle_reconciliation_reports" in trades_data
+
+    state_snapshot_data = json.loads(state_snapshot.read_text(encoding="utf-8"))
+    assert "peak_equity" in state_snapshot_data
+    assert state_snapshot_data["peak_equity"] >= state_snapshot_data["cash"]
+    assert "order_intents" in state_snapshot_data
+    assert "exchange_orders" in state_snapshot_data
+    assert "fills" in state_snapshot_data
+    assert "execution_reports" in state_snapshot_data
+    assert "reconciliation_reports" in state_snapshot_data
+    assert "symbol_cooldowns" in state_snapshot_data

@@ -30,3 +30,6 @@ class EventBus:
                 ts=datetime.now(timezone.utc).isoformat(),
             )
         )
+
+    def reset(self) -> None:
+        self.events.clear()

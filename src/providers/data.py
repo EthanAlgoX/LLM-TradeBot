@@ -46,10 +46,13 @@ class SimMarketDataProvider(MarketDataProvider):
         )
 
 
-class BinanceSpotMarketDataProvider(MarketDataProvider):
-    """Public Binance spot data provider (no API key required)."""
+class _BaseBinanceMarketDataProvider(MarketDataProvider):
+    """Shared Binance market data implementation for spot/futures endpoints."""
 
-    def __init__(self, *, base_url: str = "https://api.binance.com", timeout_sec: float = 4.0) -> None:
+    kline_path: str
+    ticker_path: str
+
+    def __init__(self, *, base_url: str, timeout_sec: float = 4.0) -> None:
         self.base_url = base_url.rstrip("/")
         self.timeout_sec = timeout_sec
 
@@ -62,8 +65,8 @@ class BinanceSpotMarketDataProvider(MarketDataProvider):
 
     def fetch(self, *, symbol: str, state: RuntimeState) -> ProviderSnapshot:
         # Last 30 one-minute klines.
-        klines_obj = self._get_json("/api/v3/klines", {"symbol": symbol, "interval": "1m", "limit": "30"})
-        ticker_obj = self._get_json("/api/v3/ticker/24hr", {"symbol": symbol})
+        klines_obj = self._get_json(self.kline_path, {"symbol": symbol, "interval": "1m", "limit": "30"})
+        ticker_obj = self._get_json(self.ticker_path, {"symbol": symbol})
 
         if not isinstance(klines_obj, list) or len(klines_obj) < 2 or not isinstance(ticker_obj, dict):
             raise ValueError("invalid binance payload")
@@ -114,6 +117,26 @@ class BinanceSpotMarketDataProvider(MarketDataProvider):
             volume_ratio=round(max(0.01, volume_ratio), 4),
             momentum_short_pct=round(momentum_short, 4),  # OPT-2
         )
+
+
+class BinanceSpotMarketDataProvider(_BaseBinanceMarketDataProvider):
+    """Public Binance spot data provider (no API key required)."""
+
+    kline_path = "/api/v3/klines"
+    ticker_path = "/api/v3/ticker/24hr"
+
+    def __init__(self, *, base_url: str = "https://api.binance.com", timeout_sec: float = 4.0) -> None:
+        super().__init__(base_url=base_url, timeout_sec=timeout_sec)
+
+
+class BinanceFuturesMarketDataProvider(_BaseBinanceMarketDataProvider):
+    """Public Binance futures data provider aligned with live futures execution."""
+
+    kline_path = "/fapi/v1/klines"
+    ticker_path = "/fapi/v1/ticker/24hr"
+
+    def __init__(self, *, base_url: str = "https://fapi.binance.com", timeout_sec: float = 4.0) -> None:
+        super().__init__(base_url=base_url, timeout_sec=timeout_sec)
 
 
 class FallbackMarketDataProvider(MarketDataProvider):

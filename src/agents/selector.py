@@ -12,6 +12,7 @@ from providers.ranking import MarketRankProvider, MockMarketRankProvider
 
 class UnifiedSelectorAgent(BaseAgent):
     name = "unified_selector_agent"
+    _CLOSE_ACTIONS = {"close_long", "close_short"}
 
     def __init__(self, cfg: RuntimeConfig, provider: MarketRankProvider | None = None) -> None:
         self.cfg = cfg
@@ -23,7 +24,11 @@ class UnifiedSelectorAgent(BaseAgent):
         return 35.0 + rng.random() * 65.0
 
     def _feedback_score(self, symbol: str, state: RuntimeState) -> float:
-        recent = [t.pnl for t in state.trades[-20:] if t.symbol == symbol]
+        recent = [
+            t.pnl
+            for t in state.trades
+            if t.symbol == symbol and t.action in self._CLOSE_ACTIONS
+        ][-20:]
         if not recent:
             return 50.0
         avg = sum(recent) / len(recent)

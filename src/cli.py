@@ -126,6 +126,35 @@ def _build_stage_summary(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return out
 
 
+def _extract_execution_resolutions(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    for ev in events:
+        if str(ev.get("stage", "")) != "execution_resolution":
+            continue
+        data = ev.get("data", {})
+        if not isinstance(data, dict):
+            continue
+        planned_action = data.get("planned_action", {})
+        resolutions = data.get("resolutions", [])
+        if not isinstance(planned_action, dict) or not isinstance(resolutions, list):
+            continue
+        for resolution in resolutions:
+            if not isinstance(resolution, dict):
+                continue
+            out.append(
+                {
+                    "seq": int(ev.get("seq", 0)),
+                    "ts": str(ev.get("ts", "")),
+                    "symbol": str(planned_action.get("symbol", resolution.get("symbol", ""))),
+                    "planned_action": str(planned_action.get("action", resolution.get("planned_action", ""))),
+                    "kind": str(resolution.get("kind", "")),
+                    "resolution_action": resolution.get("resolution_action", {}),
+                    "resolution_result": resolution.get("resolution_result", {}),
+                }
+            )
+    return out
+
+
 def _parse_float_grid(raw: str) -> list[float]:
     out: list[float] = []
     for item in raw.split(","):
@@ -153,6 +182,7 @@ def _replay(args: argparse.Namespace, cfg: RuntimeConfig) -> None:
         raise SystemExit(f"replay error: trace_id not found: {trace_id}")
     all_events = store.load_events(trace_id)
     events = store.load_events(trace_id, stage=args.replay_stage, limit=args.replay_max_events)
+    resolution_events = store.load_events(trace_id, stage="execution_resolution")
 
     _dump(
         {
@@ -166,6 +196,7 @@ def _replay(args: argparse.Namespace, cfg: RuntimeConfig) -> None:
             "total_event_count": len(all_events),
             "event_count": len(events),
             "stage_summary": _build_stage_summary(events),
+            "execution_resolutions": _extract_execution_resolutions(resolution_events),
             "events": [] if args.replay_summary_only else events,
         },
         pretty=args.pretty,

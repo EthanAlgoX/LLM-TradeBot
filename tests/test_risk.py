@@ -70,7 +70,7 @@ def test_risk_blocks_on_drawdown_breaker():
     cfg.initial_cash = 100_000.0
     cfg.risk.max_drawdown_pct = 5.0
     agent = RiskAuditAgent(cfg)
-    state = RuntimeState(cash=94_000.0)  # 6% drawdown > 5%
+    state = RuntimeState(cash=94_000.0, peak_equity=100_000.0)  # 6% drawdown > 5%
 
     proposal = ProposedAction(
         schema_version="v2",

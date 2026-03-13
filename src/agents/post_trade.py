@@ -20,9 +20,14 @@ class PositionMonitorAgent(BaseAgent):
 
 class ReflectionWriterAgent(BaseAgent):
     name = "reflection_writer_agent"
+    _CLOSE_ACTIONS = {"close_long", "close_short"}
 
     def reflect(self, state: RuntimeState) -> str:
-        recent = [t.pnl for t in state.trades[-8:] if t.pnl != 0]
+        recent = [
+            t.pnl
+            for t in state.trades
+            if t.action in self._CLOSE_ACTIONS and t.pnl != 0
+        ][-8:]
         if not recent:
             return "no reflection yet"
         avg = sum(recent) / len(recent)

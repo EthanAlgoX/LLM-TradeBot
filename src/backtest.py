@@ -15,8 +15,9 @@ from contracts import ExecutionResult, ProposedAction, SCHEMA_V2
 from orchestrator import MultiAgentTradeBot
 from providers.data import MarketDataProvider, ProviderSnapshot
 from providers.execution import ExecutionProvider
+from providers.execution import _build_position_from_proposal, _find_active_exchange_order, _local_order_status_map, append_exchange_order, append_execution_report, append_fill, append_order_intent, update_exchange_order
 from providers.ranking import MarketRankProvider, MarketRankRow
-from state import Position, RuntimeState, TradeRecord
+from state import Position, ReconciliationReportRecord, RuntimeState, TradeRecord
 
 
 def render_backtest_markdown(payload: dict[str, object], *, top_n: int = 5) -> str:
@@ -393,6 +394,7 @@ class BacktestMarketRankProvider(MarketRankProvider):
 
 
 class BacktestExecutionProvider(ExecutionProvider):
+    PROVIDER_NAME = "backtest"
     def __init__(
         self,
         *,
@@ -473,7 +475,20 @@ class BacktestExecutionProvider(ExecutionProvider):
     ) -> ExecutionResult:
         if symbol in state.positions:
             self.rejected_open_count += 1
-            return ExecutionResult(SCHEMA_V2, trace_id, symbol, action, "failed", "position already open")
+            message = "position already open"
+            append_execution_report(
+                state=state,
+                trace_id=trace_id,
+                planned=planned,
+                status="failed",
+                provider=self.PROVIDER_NAME,
+                requested_qty=qty,
+                filled_qty=0.0,
+                requested_price=planned_price,
+                fill_price=None,
+                message=message,
+            )
+            return ExecutionResult(SCHEMA_V2, trace_id, symbol, action, "failed", message)
 
         remaining = qty
         fills: list[tuple[float, float]] = []
@@ -497,7 +512,20 @@ class BacktestExecutionProvider(ExecutionProvider):
         filled_qty = sum(x[0] for x in fills)
         if filled_qty <= 0:
             self.rejected_open_count += 1
-            return ExecutionResult(SCHEMA_V2, trace_id, symbol, action, "failed", "insufficient liquidity")
+            message = "insufficient liquidity"
+            append_execution_report(
+                state=state,
+                trace_id=trace_id,
+                planned=planned,
+                status="failed",
+                provider=self.PROVIDER_NAME,
+                requested_qty=qty,
+                filled_qty=0.0,
+                requested_price=planned_price,
+                fill_price=None,
+                message=message,
+            )
+            return ExecutionResult(SCHEMA_V2, trace_id, symbol, action, "failed", message)
 
         weighted_notional = sum(q * px for q, px in fills)
         avg_fill = weighted_notional / max(1e-12, filled_qty)
@@ -506,17 +534,90 @@ class BacktestExecutionProvider(ExecutionProvider):
         required_margin = abs(avg_fill * filled_qty) / lev if lev > 0 else abs(avg_fill * filled_qty)
         if required_margin + fee_total > state.cash:
             self.rejected_open_count += 1
-            return ExecutionResult(SCHEMA_V2, trace_id, symbol, action, "failed", "insufficient cash for margin")
+            message = "insufficient cash for margin"
+            append_execution_report(
+                state=state,
+                trace_id=trace_id,
+                planned=planned,
+                status="failed",
+                provider=self.PROVIDER_NAME,
+                requested_qty=qty,
+                filled_qty=0.0,
+                requested_price=planned_price,
+                fill_price=None,
+                message=message,
+            )
+            return ExecutionResult(SCHEMA_V2, trace_id, symbol, action, "failed", message)
 
         side = "long" if action == "open_long" else "short"
-        state.positions[symbol] = Position(symbol=symbol, side=side, qty=filled_qty, entry_price=avg_fill, leverage=lev, opened_cycle=state.cycle)
+        state.positions[symbol] = _build_position_from_proposal(
+            planned,
+            side=side,
+            qty=filled_qty,
+            entry_price=avg_fill,
+            leverage=lev,
+            opened_cycle=state.cycle,
+        )
         self._store_risk_levels(symbol=symbol, planned=planned)
         self.total_fees_paid += fee_total
         state.cash -= required_margin
         state.cash -= fee_total
-        state.trades.append(TradeRecord(state.cycle, symbol, action, filled_qty, avg_fill, -fee_total))
+        state.trades.append(
+            TradeRecord(
+                cycle=state.cycle,
+                symbol=symbol,
+                action=action,
+                qty=filled_qty,
+                price=avg_fill,
+                pnl=0.0,
+                realized_pnl=0.0,
+                fee=fee_total,
+                event_type="open",
+                source=planned.source,
+                confidence=planned.confidence,
+                reason=planned.reason,
+            )
+        )
+        exchange_order_id = append_exchange_order(
+            state=state,
+            trace_id=trace_id,
+            planned=planned,
+            status="SUBMITTED",
+            provider=self.PROVIDER_NAME,
+            requested_qty=qty,
+            executed_qty=0.0,
+            requested_price=planned_price,
+            avg_price=None,
+            side="BUY" if action == "open_long" else "SELL",
+            is_active=True,
+            message="backtest market order submitted",
+        )
+        for chunk_qty, chunk_price in fills:
+            fee = self._fee(chunk_price, chunk_qty)
+            append_fill(
+                state=state,
+                trace_id=trace_id,
+                symbol=symbol,
+                action=action,
+                qty=chunk_qty,
+                price=chunk_price,
+                fee=fee,
+                provider=self.PROVIDER_NAME,
+                exchange_order_id=exchange_order_id,
+                liquidity="taker",
+                message="backtest fill",
+            )
 
         partial = filled_qty + 1e-12 < qty
+        update_exchange_order(
+            state=state,
+            status="PARTIALLY_FILLED" if partial else "FILLED",
+            exchange_order_id=exchange_order_id,
+            executed_qty=filled_qty,
+            avg_price=avg_fill,
+            message="backtest market order simulated",
+            is_active=False,
+        )
         if partial:
             self.partial_open_count += 1
         if retries_used > 0:
@@ -524,26 +625,68 @@ class BacktestExecutionProvider(ExecutionProvider):
 
         side_name = "long" if action == "open_long" else "short"
         if partial:
+            message = f"backtest {side_name} opened partial qty={filled_qty:.6f}/{qty:.6f} retries={retries_used} fee={fee_total:.6f}"
+            append_execution_report(
+                state=state,
+                trace_id=trace_id,
+                planned=planned,
+                status="success",
+                provider=self.PROVIDER_NAME,
+                requested_qty=qty,
+                filled_qty=filled_qty,
+                requested_price=planned_price,
+                fill_price=avg_fill,
+                message=message,
+                exchange_order_id=exchange_order_id,
+            )
             return ExecutionResult(
                 SCHEMA_V2,
                 trace_id,
                 symbol,
                 action,
                 "success",
-                f"backtest {side_name} opened partial qty={filled_qty:.6f}/{qty:.6f} retries={retries_used} fee={fee_total:.6f}",
+                message,
                 avg_fill,
             )
         if retries_used > 0:
+            message = f"backtest {side_name} opened retries={retries_used} fee={fee_total:.6f}"
+            append_execution_report(
+                state=state,
+                trace_id=trace_id,
+                planned=planned,
+                status="success",
+                provider=self.PROVIDER_NAME,
+                requested_qty=qty,
+                filled_qty=filled_qty,
+                requested_price=planned_price,
+                fill_price=avg_fill,
+                message=message,
+                exchange_order_id=exchange_order_id,
+            )
             return ExecutionResult(
                 SCHEMA_V2,
                 trace_id,
                 symbol,
                 action,
                 "success",
-                f"backtest {side_name} opened retries={retries_used} fee={fee_total:.6f}",
+                message,
                 avg_fill,
             )
-        return ExecutionResult(SCHEMA_V2, trace_id, symbol, action, "success", f"backtest {side_name} opened fee={fee_total:.6f}", avg_fill)
+        message = f"backtest {side_name} opened fee={fee_total:.6f}"
+        append_execution_report(
+            state=state,
+            trace_id=trace_id,
+            planned=planned,
+            status="success",
+            provider=self.PROVIDER_NAME,
+            requested_qty=qty,
+            filled_qty=filled_qty,
+            requested_price=planned_price,
+            fill_price=avg_fill,
+            message=message,
+            exchange_order_id=exchange_order_id,
+        )
+        return ExecutionResult(SCHEMA_V2, trace_id, symbol, action, "success", message, avg_fill)
 
     def _store_risk_levels(self, *, symbol: str, planned: ProposedAction) -> None:
         stop = float(planned.order_params.get("stop_loss", 0.0) or 0.0)
@@ -570,7 +713,31 @@ class BacktestExecutionProvider(ExecutionProvider):
     ) -> ExecutionResult:
         pos = state.positions.get(symbol)
         if not pos:
-            return ExecutionResult(SCHEMA_V2, trace_id, symbol, action, "failed", "no position")
+            message = "no position"
+            planned_stub = ProposedAction(
+                schema_version=SCHEMA_V2,
+                trace_id=trace_id,
+                symbol=symbol,
+                source="backtest_close",
+                action=action,
+                confidence=0.0,
+                reason=message_prefix,
+                order_params={"entry_price": mark_price, "quantity": 0.0, "leverage": 1.0},
+            )
+            append_execution_report(
+                state=state,
+                trace_id=trace_id,
+                planned=planned_stub,
+                status="failed",
+                provider=self.PROVIDER_NAME,
+                requested_qty=0.0,
+                filled_qty=0.0,
+                requested_price=mark_price,
+                fill_price=None,
+                message=message,
+                reduce_only=True,
+            )
+            return ExecutionResult(SCHEMA_V2, trace_id, symbol, action, "failed", message)
         fill = self._fill_price(mark_price, action)
         fee = self._fee(fill, pos.qty)
         self.total_fees_paid += fee
@@ -585,10 +752,88 @@ class BacktestExecutionProvider(ExecutionProvider):
             net_pnl = -(state.cash + margin_released)
             new_cash = 0.0
         state.cash = new_cash
-        state.trades.append(TradeRecord(state.cycle, symbol, action, pos.qty, fill, net_pnl))
+        state.trades.append(
+            TradeRecord(
+                cycle=state.cycle,
+                symbol=symbol,
+                action=action,
+                qty=pos.qty,
+                price=fill,
+                pnl=net_pnl,
+                realized_pnl=gross_pnl,
+                fee=fee,
+                event_type="close",
+                source=pos.entry_source,
+                confidence=pos.entry_confidence,
+                reason=pos.entry_reason,
+            )
+        )
+        planned_stub = ProposedAction(
+            schema_version=SCHEMA_V2,
+            trace_id=trace_id,
+            symbol=symbol,
+            source=pos.entry_source or "backtest_close",
+            action=action,
+            confidence=pos.entry_confidence,
+            reason=pos.entry_reason or message_prefix,
+            order_params={"entry_price": mark_price, "quantity": pos.qty, "leverage": pos.leverage},
+        )
+        exchange_order_id = append_exchange_order(
+            state=state,
+            trace_id=trace_id,
+            planned=planned_stub,
+            status="SUBMITTED",
+            provider=self.PROVIDER_NAME,
+            requested_qty=pos.qty,
+            executed_qty=0.0,
+            requested_price=mark_price,
+            avg_price=None,
+            side="SELL" if pos.side == "long" else "BUY",
+            reduce_only=True,
+            is_active=True,
+            message="backtest reduce-only market order submitted",
+        )
+        update_exchange_order(
+            state=state,
+            exchange_order_id=exchange_order_id,
+            status="FILLED",
+            executed_qty=pos.qty,
+            avg_price=fill,
+            message="backtest reduce-only market order simulated",
+            is_active=False,
+        )
+        append_fill(
+            state=state,
+            trace_id=trace_id,
+            symbol=symbol,
+            action=action,
+            qty=pos.qty,
+            price=fill,
+            fee=fee,
+            provider=self.PROVIDER_NAME,
+            exchange_order_id=exchange_order_id,
+            liquidity="taker",
+            reduce_only=True,
+            message=message_prefix,
+        )
         del state.positions[symbol]
         self._clear_risk_levels(symbol)
-        return ExecutionResult(SCHEMA_V2, trace_id, symbol, action, "success", f"{message_prefix} net_pnl={net_pnl:.6f} margin_released={margin_released:.6f}", fill)
+        message = f"{message_prefix} net_pnl={net_pnl:.6f} margin_released={margin_released:.6f}"
+        append_execution_report(
+            state=state,
+            trace_id=trace_id,
+            planned=planned_stub,
+            status="success",
+            provider=self.PROVIDER_NAME,
+            requested_qty=pos.qty,
+            filled_qty=pos.qty,
+            requested_price=mark_price,
+            fill_price=fill,
+            message=message,
+            reduce_only=True,
+            exchange_order_id=exchange_order_id,
+        )
+        return ExecutionResult(SCHEMA_V2, trace_id, symbol, action, "success", message, fill)
 
     def auto_close_triggered_positions(self, *, state: RuntimeState, cycle: int) -> list[dict[str, object]]:
         if not self.dataset:
@@ -725,11 +970,96 @@ class BacktestExecutionProvider(ExecutionProvider):
         planned_price = float(planned.order_params.get("entry_price", 0) or 0)
         qty = float(planned.order_params.get("quantity", 0) or 0)
         lev = float(planned.order_params.get("leverage", 1.0) or 1.0)
+        append_order_intent(
+            state=state,
+            trace_id=trace_id,
+            planned=planned,
+            provider=self.PROVIDER_NAME,
+            requested_qty=qty,
+            requested_price=planned_price,
+            leverage=lev,
+            reduce_only=action in {"close_long", "close_short"},
+        )
+
+        if action == "cancel_order":
+            requested_order_id = str(planned.order_params.get("exchange_order_id", "") or "")
+            active_order = _find_active_exchange_order(
+                state,
+                symbol=symbol,
+                provider=self.PROVIDER_NAME,
+                exchange_order_id=requested_order_id,
+            )
+            if active_order is None:
+                message = "no active order"
+                append_execution_report(
+                    state=state,
+                    trace_id=trace_id,
+                    planned=planned,
+                    status="failed",
+                    provider=self.PROVIDER_NAME,
+                    requested_qty=0.0,
+                    filled_qty=0.0,
+                    requested_price=planned_price,
+                    fill_price=None,
+                    message=message,
+                    exchange_order_id=requested_order_id,
+                )
+                return ExecutionResult(SCHEMA_V2, trace_id, symbol, action, "failed", message)
+            update_exchange_order(
+                state=state,
+                exchange_order_id=active_order.exchange_order_id,
+                status="CANCELED",
+                message="backtest active order canceled",
+                is_active=False,
+            )
+            message = "active order canceled"
+            append_execution_report(
+                state=state,
+                trace_id=trace_id,
+                planned=planned,
+                status="success",
+                provider=self.PROVIDER_NAME,
+                requested_qty=active_order.requested_qty,
+                filled_qty=active_order.executed_qty,
+                requested_price=active_order.requested_price,
+                fill_price=active_order.avg_price,
+                message=message,
+                exchange_order_id=active_order.exchange_order_id,
+            )
+            return ExecutionResult(SCHEMA_V2, trace_id, symbol, action, "success", message, active_order.avg_price)
 
         if action in {"wait", "hold"}:
-            return ExecutionResult(SCHEMA_V2, trace_id, symbol, action, "skipped", "passive action")
+            message = "passive action"
+            append_execution_report(
+                state=state,
+                trace_id=trace_id,
+                planned=planned,
+                status="skipped",
+                provider=self.PROVIDER_NAME,
+                requested_qty=qty,
+                filled_qty=0.0,
+                requested_price=planned_price,
+                fill_price=None,
+                message=message,
+                reduce_only=action in {"close_long", "close_short"},
+            )
+            return ExecutionResult(SCHEMA_V2, trace_id, symbol, action, "skipped", message)
         if qty <= 0:
-            return ExecutionResult(SCHEMA_V2, trace_id, symbol, action, "failed", "invalid quantity")
+            message = "invalid quantity"
+            append_execution_report(
+                state=state,
+                trace_id=trace_id,
+                planned=planned,
+                status="failed",
+                provider=self.PROVIDER_NAME,
+                requested_qty=qty,
+                filled_qty=0.0,
+                requested_price=planned_price,
+                fill_price=None,
+                message=message,
+                reduce_only=action in {"close_long", "close_short"},
+            )
+            return ExecutionResult(SCHEMA_V2, trace_id, symbol, action, "failed", message)
 
         if action == "open_long":
             return self._execute_open(
@@ -761,7 +1091,60 @@ class BacktestExecutionProvider(ExecutionProvider):
 
         mark_price = self._resolve_mark_price(symbol=symbol, cycle=state.cycle, fallback_price=planned_price)
         fill = self._fill_price(mark_price, action)
-        return ExecutionResult(SCHEMA_V2, trace_id, symbol, action, "failed", "unknown action", fill)
+        message = "unknown action"
+        append_execution_report(
+            state=state,
+            trace_id=trace_id,
+            planned=planned,
+            status="failed",
+            provider=self.PROVIDER_NAME,
+            requested_qty=qty,
+            filled_qty=0.0,
+            requested_price=planned_price,
+            fill_price=None,
+            message=message,
+            reduce_only=action in {"close_long", "close_short"},
+        )
+        return ExecutionResult(SCHEMA_V2, trace_id, symbol, action, "failed", message, fill)
+
+    def reconcile(self, *, trace_id: str, state: RuntimeState) -> ReconciliationReportRecord:
+        local_positions: dict[str, float] = {}
+        for symbol, pos in state.positions.items():
+            local_positions[symbol] = float(pos.qty) if pos.side == "long" else -float(pos.qty)
+        report = ReconciliationReportRecord(
+            trace_id=trace_id,
+            cycle=state.cycle,
+            provider=self.PROVIDER_NAME,
+            status="synced",
+            local_cash=float(state.cash),
+            remote_cash=float(state.cash),
+            local_positions=local_positions,
+            remote_positions=dict(local_positions),
+            local_order_statuses=_local_order_status_map(state, provider=self.PROVIDER_NAME),
+            remote_order_statuses=_local_order_status_map(state, provider=self.PROVIDER_NAME),
+            message="backtest reconciliation uses local simulated state",
+        )
+        state.reconciliation_reports.append(report)
+        return report
+
+    def repair(self, *, trace_id: str, state: RuntimeState, reconciliation: ReconciliationReportRecord) -> ReconciliationReportRecord:
+        report = ReconciliationReportRecord(
+            trace_id=trace_id,
+            cycle=state.cycle,
+            provider=self.PROVIDER_NAME,
+            status="synced",
+            local_cash=float(state.cash),
+            remote_cash=float(state.cash),
+            local_positions=dict(reconciliation.local_positions),
+            remote_positions=dict(reconciliation.remote_positions),
+            local_order_statuses=_local_order_status_map(state, provider=self.PROVIDER_NAME),
+            remote_order_statuses=dict(reconciliation.remote_order_statuses),
+            message="backtest provider does not require repair",
+            repaired=False,
+            repair_actions=[],
+        )
+        state.reconciliation_reports.append(report)
+        return report
 
 
 class BacktestRunner:
@@ -1265,6 +1648,13 @@ class BacktestRunner:
                     "qty": t.qty,
                     "price": t.price,
                     "pnl": t.pnl,
+                    "realized_pnl": t.realized_pnl,
+                    "fee": t.fee,
+                    "funding": t.funding,
+                    "event_type": t.event_type,
+                    "source": t.source,
+                    "confidence": t.confidence,
+                    "reason": t.reason,
                 }
                 for t in bot.state.trades
             ]

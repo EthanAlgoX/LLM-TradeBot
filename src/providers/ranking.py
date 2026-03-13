@@ -33,13 +33,15 @@ class MockMarketRankProvider(MarketRankProvider):
         return out
 
 
-class BinanceMarketRankProvider(MarketRankProvider):
-    """Public spot ticker based rank provider.
+class _BaseBinanceMarketRankProvider(MarketRankProvider):
+    """Shared Binance rank provider for spot/futures ticker endpoints.
 
     Score combines trend, relative quote volume and relative trade count.
     """
 
-    def __init__(self, *, base_url: str = "https://api.binance.com", timeout_sec: float = 4.0) -> None:
+    ticker_path: str
+
+    def __init__(self, *, base_url: str, timeout_sec: float = 4.0) -> None:
         self.base_url = base_url.rstrip("/")
         self.timeout_sec = timeout_sec
         self._fallback = MockMarketRankProvider()
@@ -55,7 +57,7 @@ class BinanceMarketRankProvider(MarketRankProvider):
         if not symbols:
             return {}
         try:
-            payload = self._get_json("/api/v3/ticker/24hr")
+            payload = self._get_json(self.ticker_path)
         except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, ValueError):
             return self._fallback.snapshot(symbols, cycle)
 
@@ -102,3 +104,21 @@ class BinanceMarketRankProvider(MarketRankProvider):
             out[symbol] = MarketRankRow(symbol=symbol, score=score, reason=reason)
 
         return out
+
+
+class BinanceSpotMarketRankProvider(_BaseBinanceMarketRankProvider):
+    ticker_path = "/api/v3/ticker/24hr"
+
+    def __init__(self, *, base_url: str = "https://api.binance.com", timeout_sec: float = 4.0) -> None:
+        super().__init__(base_url=base_url, timeout_sec=timeout_sec)
+
+
+class BinanceFuturesMarketRankProvider(_BaseBinanceMarketRankProvider):
+    ticker_path = "/fapi/v1/ticker/24hr"
+
+    def __init__(self, *, base_url: str = "https://fapi.binance.com", timeout_sec: float = 4.0) -> None:
+        super().__init__(base_url=base_url, timeout_sec=timeout_sec)
+
+
+class BinanceMarketRankProvider(BinanceFuturesMarketRankProvider):
+    """Backwards-compatible alias for the default Binance futures rank provider."""

@@ -81,6 +81,16 @@ class MultiAgentTradeBot:
     def _to_payload(obj: Any) -> dict[str, Any]:
         return asdict(obj)
 
+    def _compute_equity(self) -> float:
+        equity = float(self.state.cash)
+        for symbol, pos in self.state.positions.items():
+            current_price = self.state.prices.get(symbol, pos.entry_price)
+            sign = 1.0 if pos.side == "long" else -1.0
+            margin = abs(pos.entry_price * pos.qty) / pos.leverage if pos.leverage > 0 else abs(pos.entry_price * pos.qty)
+            unrealized_pnl = (current_price - pos.entry_price) * pos.qty * sign
+            equity += margin + unrealized_pnl
+        return equity
+
     async def _analyze_symbol(self, *, trace_id: str, symbol: str, rank: int) -> ProposedAction:
         self.bus.emit(trace_id=trace_id, stage="data", phase="start", agent=self.data_agent.name, data={"symbol": symbol})
         snapshot = self.data_agent.fetch(trace_id=trace_id, symbol=symbol, state=self.state)
@@ -127,7 +137,7 @@ class MultiAgentTradeBot:
         return proposal
 
     async def run_cycle(self) -> CycleResult:
-        events_start = len(self.bus.events)
+        self.bus.reset()
         self.state.cycle += 1
         trace_id = f"cycle:{self.state.cycle}:{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}"
 
@@ -150,6 +160,7 @@ class MultiAgentTradeBot:
         proposals = await asyncio.gather(
             *[self._analyze_symbol(trace_id=trace_id, symbol=symbol, rank=rank_map.get(symbol, 999)) for symbol in selected_symbols]
         )
+        self.state.update_peak_equity(self._compute_equity())
 
         self.bus.emit(
             trace_id=trace_id,
@@ -169,6 +180,7 @@ class MultiAgentTradeBot:
 
         executed: list[dict[str, Any]] = []
         blocked: list[dict[str, Any]] = []
+        execution_resolutions: list[dict[str, Any]] = []
 
         for proposal in selected_actions:
             self.bus.emit(
@@ -199,13 +211,34 @@ class MultiAgentTradeBot:
                 agent=self.exec_agent.name,
                 data={"planned_action": self._to_payload(planned)},
             )
-            result = self.exec_agent.execute(trace_id=trace_id, planned=planned, state=self.state)
+            result = self.exec_agent.execute_with_pending_order_resolution(
+                trace_id=trace_id,
+                planned=planned,
+                state=self.state,
+                cfg=self.cfg,
+            )
+            resolution_records = self.exec_agent.consume_resolution_records()
+            if resolution_records:
+                execution_resolutions.extend(resolution_records)
+                self.bus.emit(
+                    trace_id=trace_id,
+                    stage="execution_resolution",
+                    phase="end",
+                    agent=self.exec_agent.name,
+                    data={
+                        "planned_action": self._to_payload(planned),
+                        "resolutions": resolution_records,
+                    },
+                )
             self.bus.emit(
                 trace_id=trace_id,
                 stage="execution",
                 phase="end",
                 agent=self.exec_agent.name,
-                data={"execution_result": self._to_payload(result)},
+                data={
+                    "execution_result": self._to_payload(result),
+                    "resolutions": resolution_records,
+                },
             )
             executed.append(
                 {
@@ -216,6 +249,7 @@ class MultiAgentTradeBot:
                     "source": planned.source,
                     "confidence": planned.confidence,
                     "reason": planned.reason,
+                    "resolutions": resolution_records,
                 }
             )
 
@@ -233,6 +267,7 @@ class MultiAgentTradeBot:
             },
         )
         post = self.post_trade_agent.run(trace_id=trace_id, symbol="_system", state=self.state)
+        self.state.update_peak_equity(self._compute_equity())
         self.bus.emit(
             trace_id=trace_id,
             stage="post_trade",
@@ -240,6 +275,26 @@ class MultiAgentTradeBot:
             agent=self.post_trade_agent.name,
             data={"output": self._to_payload(post), "reflection_hint": self.state.reflection_hint},
         )
+
+        self.bus.emit(trace_id=trace_id, stage="reconciliation", phase="start", agent=self.exec_agent.name)
+        reconciliation = self.exec_agent.reconcile(trace_id=trace_id, state=self.state)
+        self.bus.emit(
+            trace_id=trace_id,
+            stage="reconciliation",
+            phase="end",
+            agent=self.exec_agent.name,
+            data={"reconciliation_report": self._to_payload(reconciliation)},
+        )
+        if self.cfg.reconciliation_auto_sync and reconciliation.status in {"warning", "error"}:
+            self.bus.emit(trace_id=trace_id, stage="reconciliation_repair", phase="start", agent=self.exec_agent.name)
+            reconciliation = self.exec_agent.repair(trace_id=trace_id, state=self.state, reconciliation=reconciliation)
+            self.bus.emit(
+                trace_id=trace_id,
+                stage="reconciliation_repair",
+                phase="end",
+                agent=self.exec_agent.name,
+                data={"reconciliation_report": self._to_payload(reconciliation)},
+            )
 
         status = "success" if executed else ("blocked" if blocked else "wait")
         action = executed[0]["action"] if executed else (selected_actions[0].action if selected_actions else "wait")
@@ -254,12 +309,13 @@ class MultiAgentTradeBot:
             details={
                 "executed": executed,
                 "blocked": blocked,
+                "execution_resolutions": execution_resolutions,
                 "open_positions": list(self.state.positions.keys()),
                 "cash": self.state.cash,
                 "post_trade_notes": post.notes,
+                "reconciliation": self._to_payload(reconciliation),
             },
         )
         if self.state_store is not None:
-            cycle_events = self.bus.events[events_start:]
-            self.state_store.persist(state=self.state, cycle_result=result, events=cycle_events)
+            self.state_store.persist(state=self.state, cycle_result=result, events=list(self.bus.events))
         return result

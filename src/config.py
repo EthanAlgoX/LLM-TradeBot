@@ -78,6 +78,11 @@ class RuntimeConfig:
     binance_api_key: str | None = None
     binance_api_secret: str | None = None
     live_confirm_token: str = "NO"
+    reconciliation_auto_sync: bool = False
+    reconciliation_auto_cancel_remote_only_orders: bool = False
+    reconciliation_remote_only_cancel_min_cycle_age: int = 0
+    reconciliation_auto_cancel_remote_only_conflicts_only: bool = False
+    execution_auto_cancel_conflicting_pending_orders: bool = False
     persistence_enabled: bool = False
     persistence_path: str = "data/tradebot.db"
     backtest_fee_bps: float = 3.0
@@ -113,6 +118,25 @@ class RuntimeConfig:
         cfg.binance_api_key = os.getenv("TRADEBOT_BINANCE_API_KEY")
         cfg.binance_api_secret = os.getenv("TRADEBOT_BINANCE_API_SECRET")
         cfg.live_confirm_token = os.getenv("TRADEBOT_LIVE_CONFIRM", cfg.live_confirm_token)
+        cfg.reconciliation_auto_sync = os.getenv("TRADEBOT_RECONCILIATION_AUTO_SYNC", "0") in {"1", "true", "True"}
+        cfg.reconciliation_auto_cancel_remote_only_orders = os.getenv(
+            "TRADEBOT_RECONCILIATION_AUTO_CANCEL_REMOTE_ONLY_ORDERS",
+            "0",
+        ) in {"1", "true", "True"}
+        cfg.reconciliation_remote_only_cancel_min_cycle_age = int(
+            os.getenv(
+                "TRADEBOT_RECONCILIATION_REMOTE_ONLY_CANCEL_MIN_CYCLE_AGE",
+                str(cfg.reconciliation_remote_only_cancel_min_cycle_age),
+            )
+        )
+        cfg.reconciliation_auto_cancel_remote_only_conflicts_only = os.getenv(
+            "TRADEBOT_RECONCILIATION_AUTO_CANCEL_REMOTE_ONLY_CONFLICTS_ONLY",
+            "0",
+        ) in {"1", "true", "True"}
+        cfg.execution_auto_cancel_conflicting_pending_orders = os.getenv(
+            "TRADEBOT_EXECUTION_AUTO_CANCEL_CONFLICTING_PENDING_ORDERS",
+            "0",
+        ) in {"1", "true", "True"}
         cfg.persistence_enabled = os.getenv("TRADEBOT_PERSISTENCE_ENABLED", "0") in {"1", "true", "True"}
         cfg.persistence_path = os.getenv("TRADEBOT_PERSISTENCE_PATH", cfg.persistence_path)
         cfg.backtest_fee_bps = float(os.getenv("TRADEBOT_BACKTEST_FEE_BPS", str(cfg.backtest_fee_bps)))
