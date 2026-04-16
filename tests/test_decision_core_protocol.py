@@ -7,7 +7,7 @@ import sys
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from src.agents.decision_core_agent import DecisionCoreAgent, OvertradingGuard, VoteResult
+from src.agents.decision_core.decision_core_agent import DecisionCoreAgent, OvertradingGuard, VoteResult
 
 
 def test_overtrading_guard_counts_only_open_actions():

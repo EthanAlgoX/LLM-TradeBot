@@ -16,7 +16,7 @@ import json
 from src.utils.logger import log
 from src.utils.semantic_converter import SemanticConverter
 from src.agents.regime_detector_agent import RegimeDetector
-from src.agents.trigger_detector_agent import TriggerDetector
+from src.agents.trigger import TriggerDetector
 from src.server.state import global_state
 
 class StrategyComposer:
@@ -31,16 +31,16 @@ class StrategyComposer:
         
         # Semantic Agents (Lazy initialization or init here)
         if self.use_llm:
-            from src.agents.trend_agent import TrendAgentLLM
-            from src.agents.setup_agent import SetupAgentLLM
-            from src.agents.trigger_agent import TriggerAgentLLM
+            from src.agents.trend import TrendAgentLLM
+            from src.agents.setup import SetupAgentLLM
+            from src.agents.trigger import TriggerAgentLLM
             self.trend_agent = TrendAgentLLM()
             self.setup_agent = SetupAgentLLM()
             self.trigger_agent = TriggerAgentLLM()
         else:
-            from src.agents.trend_agent import TrendAgent
-            from src.agents.setup_agent import SetupAgent
-            from src.agents.trigger_agent import TriggerAgent
+            from src.agents.trend import TrendAgent
+            from src.agents.setup import SetupAgent
+            from src.agents.trigger import TriggerAgent
             self.trend_agent = TrendAgent()
             self.setup_agent = SetupAgent()
             self.trigger_agent = TriggerAgent()

@@ -15,6 +15,7 @@ from .gemini_client import GeminiClient
 from .kimi_client import KimiClient
 from .minimax_client import MiniMaxClient
 from .glm_client import GLMClient
+from .openrouter_client import OpenRouterClient
 
 
 # 注册所有支持的提供商
@@ -27,6 +28,7 @@ PROVIDERS: Dict[str, Type[BaseLLMClient]] = {
     "kimi": KimiClient,
     "minimax": MiniMaxClient,
     "glm": GLMClient,
+    "openrouter": OpenRouterClient
 }
 
 

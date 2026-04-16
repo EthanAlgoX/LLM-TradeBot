@@ -94,7 +94,7 @@ class TriggerAgentLLM:
             
             # Use unified LLM interface
             response = self.client.chat(
-                system_prompt=self._get_system_prompt(),
+                system_prompt=self.get_system_prompt(),
                 user_prompt=prompt
             )
             
@@ -140,7 +140,7 @@ class TriggerAgentLLM:
                 'metadata': {'error': str(e)}
             }
     
-    def _get_system_prompt(self) -> str:
+    def get_system_prompt(self) -> str:
         """System prompt for trigger analysis"""
         return """You are a professional crypto trigger analyst. Your task is to analyze 5m timeframe data and assess entry triggers using candlestick patterns and volume.
 

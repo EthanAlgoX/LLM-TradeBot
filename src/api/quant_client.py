@@ -11,7 +11,7 @@ from src.utils.logger import log
 class QuantClient:
     """外部量化 API 客户端"""
     
-    BASE_URL = "http://nofxaios.com:30006/api/coin"
+    BASE_URL = "https://nofxos.ai/api"
     @property
     def auth_token(self) -> str:
         """从环境变量动态获取最新的认证令牌"""
@@ -55,8 +55,7 @@ class QuantClient:
         """
         获取指定币种的量化深度数据
         """
-        clean_symbol = symbol.replace("USDT", "USDT") # 兼容性处理
-        url = f"{self.BASE_URL}/{clean_symbol}?include=netflow,oi,price&auth={self.auth_token}"
+        url = f"{self.BASE_URL}/ai500/{symbol}?include=netflow,oi,price&auth={self.auth_token}"
         
         try:
             session = await self._get_session()
@@ -78,7 +77,7 @@ class QuantClient:
         """
         获取 AI500 优质币池列表
         """
-        url = f"http://nofxaios.com:30006/api/ai500/list?auth={self.auth_token}"
+        url = f"{self.BASE_URL}/ai500/list?auth={self.auth_token}"
         
         try:
             session = await self._get_session()
@@ -103,7 +102,7 @@ class QuantClient:
             duration: 时间周期 (1h, 4h, 24h)
         """
         endpoint = "top-ranking" if ranking_type == 'top' else "low-ranking"
-        url = f"http://nofxaios.com:30006/api/oi/{endpoint}?limit={limit}&duration={duration}&auth={self.auth_token}"
+        url = f"{self.BASE_URL}/oi/{endpoint}?limit={limit}&duration={duration}&auth={self.auth_token}"
         
         try:
             session = await self._get_session()

@@ -14,7 +14,7 @@ Key Logic:
 """
 
 from typing import Dict
-from src.agents.predict_agent import PredictResult
+from src.agents.predict import PredictResult
 from src.utils.logger import log
 
 

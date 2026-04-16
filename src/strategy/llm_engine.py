@@ -192,8 +192,8 @@ class StrategyEngine:
         except Exception as e:
             log.warning(f"Failed to save bull/bear perspectives log: {e}")
         
-        system_prompt = self._build_system_prompt()
-        user_prompt = self._build_user_prompt(market_context_text, bull_perspective, bear_perspective, reflection)
+        system_prompt = self.get_system_prompt()
+        user_prompt = self.get_user_prompt(market_context_text, bull_perspective, bear_perspective, reflection)
         
         # 记录 LLM 输入
         log.llm_input(f"正在发送市场数据到 {self.provider}...", market_context_text)
@@ -387,7 +387,7 @@ Focus ONLY on bearish factors. Ignore bullish signals."""
             log.warning(f"Bear Agent failed: {e}")
             return {"bearish_reasons": "Analysis unavailable", "bear_confidence": 50}
     
-    def _build_system_prompt(self) -> str:
+    def get_system_prompt(self) -> str:
         """Build System Prompt (English Version) or Load Custom"""
         import os
         
@@ -414,7 +414,7 @@ Focus ONLY on bearish factors. Ignore bullish signals."""
             log.error("Failed to import DEFAULT_SYSTEM_PROMPT")
             return "Error: Default prompt missing"
     
-    def _build_user_prompt(self, market_context: str, bull_perspective: Dict = None, bear_perspective: Dict = None, reflection: str = None) -> str:
+    def get_user_prompt(self, market_context: str, bull_perspective: Dict = None, bear_perspective: Dict = None, reflection: str = None) -> str:
         """Build User Prompt - DATA ONLY (No instructions, all rules are in system prompt)"""
         
         # Build adversarial analysis section (data only)

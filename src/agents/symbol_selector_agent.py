@@ -1083,14 +1083,3 @@ class SymbolSelectorAgent:
         except RuntimeError:
             # No event loop, create one
             return asyncio.run(self.select_top3(force_refresh))
-
-
-# Global instance
-_selector_instance: Optional[SymbolSelectorAgent] = None
-
-def get_selector() -> SymbolSelectorAgent:
-    """Get global SymbolSelectorAgent instance (singleton)"""
-    global _selector_instance
-    if _selector_instance is None:
-        _selector_instance = SymbolSelectorAgent()
-    return _selector_instance

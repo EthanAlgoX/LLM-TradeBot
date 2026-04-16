@@ -17,7 +17,7 @@ import pandas as pd
 from typing import Dict
 from dataclasses import asdict
 
-from src.agents.data_sync_agent import MarketSnapshot
+from src.agents.data_sync import MarketSnapshot
 from src.utils.logger import log
 from src.agents.regime_detector_agent import RegimeDetector
 import numpy as np

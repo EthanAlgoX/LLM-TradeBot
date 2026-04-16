@@ -1,5 +1,5 @@
 """
-AI Trader - 配置管理模块
+AI Trader - Configuration Management Module
 """
 import os
 import yaml
@@ -7,12 +7,12 @@ from pathlib import Path
 from typing import Dict, Any
 from dotenv import load_dotenv
 
-# 加载环境变量 (使用 override=True 确保 .env 中的设置能覆盖当前进程的环境变量)
+# Load environment variables (use override=True to ensure settings in .env override current process environment variables)
 load_dotenv(override=True)
 
 
 class Config:
-    """配置管理类"""
+    """Configuration Management Class"""
     
     _instance = None
     _config: Dict[str, Any] = {}
@@ -24,11 +24,11 @@ class Config:
         return cls._instance
     
     def _load_config(self):
-        """加载配置文件"""
+        """Load configuration file"""
         config_path = Path(__file__).parent.parent.parent / "config.yaml"
         
         if not config_path.exists():
-            # 如果没有config.yaml,使用example
+            # If there is no config.yaml, use example
             example_path = Path(__file__).parent.parent.parent / "config.example.yaml"
             if example_path.exists():
                 with open(example_path, 'r', encoding='utf-8') as f:
@@ -37,7 +37,7 @@ class Config:
             with open(config_path, 'r', encoding='utf-8') as f:
                 self._config = yaml.safe_load(f)
         
-        # 从环境变量覆盖敏感信息
+        # from环境变量覆盖敏感信息
         self._override_from_env()
     
     def _override_from_env(self):
@@ -82,6 +82,7 @@ class Config:
             'kimi': os.getenv('KIMI_API_KEY'),
             'minimax': os.getenv('MINIMAX_API_KEY'),
             'glm': os.getenv('GLM_API_KEY'),
+            'openrouter': os.getenv('OPENROUTER_API_KEY'),
         }
         self._config['llm']['api_keys'] = {k: v for k, v in llm_api_keys.items() if v}
 
@@ -102,8 +103,8 @@ class Config:
     
     def get(self, key_path: str, default=None):
         """
-        获取配置值
-        key_path: 使用点分隔的路径，如 'binance.api_key'
+        Get configuration value
+        key_path: use dot-separated path, e.g., 'binance.api_key'
         """
         keys = key_path.split('.')
         value = self._config
@@ -148,5 +149,5 @@ class Config:
         return self._config.get('llm', {})
 
 
-# 全局配置实例
+# Global configuration instance
 config = Config()

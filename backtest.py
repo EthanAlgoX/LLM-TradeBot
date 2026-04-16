@@ -197,7 +197,7 @@ async def main():
     # 导入回测模块
     from src.backtest.engine import BacktestEngine, BacktestConfig
     from src.backtest.report import BacktestReport
-    from src.agents.symbol_selector_agent import get_selector
+    from src.agents.symbol_selector_agent import SymbolSelectorAgent
     
     # AUTO3/AUTO1 动态选币
     symbols_to_test = []
@@ -207,7 +207,7 @@ async def main():
     if use_auto3:
         print("\n🔝 AUTO3 启动中 - 正在选择最佳交易币种...")
         try:
-            selector = get_selector()
+            selector = SymbolSelectorAgent()
             selected = selector.get_symbols(force_refresh=False)
             if selected:
                 symbols_to_test = selected
@@ -221,7 +221,7 @@ async def main():
     elif use_auto1:
         print("\n🎯 AUTO1 启动中 - 使用近期动量选币...")
         try:
-            selector = get_selector()
+            selector = SymbolSelectorAgent()
             selected = await selector.select_auto1_recent_momentum()
             if selected:
                 symbols_to_test = selected

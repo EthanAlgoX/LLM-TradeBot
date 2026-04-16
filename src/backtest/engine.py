@@ -1,8 +1,8 @@
 """
-回测引擎核心 (Backtest Engine)
+Backtest Engine Core
 ================================
 
-协调数据回放、策略执行和性能评估
+Coordinate data replay, strategy execution, and performance evaluation
 
 Author: AI Trader Team
 Date: 2025-12-31
@@ -30,7 +30,7 @@ from src.utils.action_protocol import (
 
 @dataclass
 class BacktestConfig:
-    """回测配置"""
+    """Backtest configuration"""
     symbol: str
     start_date: str
     end_date: str
@@ -41,24 +41,24 @@ class BacktestConfig:
     take_profit_pct: float = 1.5
     slippage: float = 0.001
     commission: float = 0.0004
-    step: int = 1  # 1=每5分钟, 3=每15分钟, 12=每小时
+    step: int = 1  # 1=5m, 3=15m, 12=1h
     margin_mode: str = "cross"  # "cross" 或 "isolated"
     contract_type: str = "linear"  # "linear" 或 "inverse"
-    contract_size: float = 100.0  # 币本位合约面值 (BTC=100 USD)
+    contract_size: float = 100.0  # Inverse contract notional value (BTC=100 USD)
     strategy_mode: str = "agent"  # "technical" (EMA) or "agent" (Multi-Agent) - Default: agent for prompt optimization
-    use_llm: bool = False  # 是否在回测中调用 LLM（费用高、速度慢）
-    llm_cache: bool = True  # 缓存 LLM 响应
-    llm_throttle_ms: int = 100  # LLM 调用间隔（毫秒），避免速率限制
+    use_llm: bool = False  # Whether to call LLM during backtest (expensive and slow)
+    llm_cache: bool = True  # Cache LLM responses
+    llm_throttle_ms: int = 100  # LLM call interval (milliseconds) to avoid rate limiting
     
     # 🔧 P0 Realism Improvements
-    execution_latency_ms: int = 0  # 执行延迟（毫秒），模拟决策到执行的延迟，0=关闭
-    min_hold_hours: float = 1.0  # 最小持仓时间（小时），防止过度交易
+    execution_latency_ms: int = 0  # Execution latency (milliseconds), simulate decision to execution latency, 0=off
+    min_hold_hours: float = 1.0  # Minimum holding time (hours) to prevent overtrading
     
     def __post_init__(self):
-        """验证配置参数"""
+        """Verify configuration parameters"""
         from datetime import datetime
         
-        # 验证日期格式
+        # Verify date format
         try:
             # Try full datetime format first
             try:
@@ -80,7 +80,7 @@ class BacktestConfig:
                 raise ValueError(f"Invalid date format. Expected YYYY-MM-DD or YYYY-MM-DD HH:MM, got start_date={self.start_date}, end_date={self.end_date}")
             raise
         
-        # 验证数值范围
+        # Verify numeric ranges
         if self.initial_capital <= 0:
             raise ValueError(f"initial_capital must be positive, got {self.initial_capital}")
         
@@ -105,19 +105,19 @@ class BacktestConfig:
         if self.step < 1:
             raise ValueError(f"step must be at least 1, got {self.step}")
         
-        # 验证symbol格式
+        # Verify symbol format
         if not self.symbol or not isinstance(self.symbol, str):
             raise ValueError("symbol must be a non-empty string")
         
-        # 验证策略模式
+        # Verify strategy mode
         if self.strategy_mode not in ['technical', 'agent']:
             raise ValueError(f"strategy_mode must be 'technical' or 'agent', got {self.strategy_mode}")
         
-        # 验证保证金模式
+        # Verify margin mode
         if self.margin_mode not in ['cross', 'isolated']:
             raise ValueError(f"margin_mode must be 'cross' or 'isolated', got {self.margin_mode}")
         
-        # 验证合约类型
+        # Verify contract type
         if self.contract_type not in ['linear', 'inverse']:
             raise ValueError(f"contract_type must be 'linear' or 'inverse', got {self.contract_type}")
 
@@ -125,7 +125,7 @@ class BacktestConfig:
 
 @dataclass
 class BacktestResult:
-    """回测结果"""
+    """Backtest Result"""
     config: BacktestConfig
     metrics: MetricsResult
     equity_curve: pd.DataFrame
@@ -134,23 +134,23 @@ class BacktestResult:
     duration_seconds: float = 0.0
     
     def to_dict(self) -> Dict:
-        # 获取决策数据并去重
+        # Get filtered and deduplicated decision list
         def _get_filtered_decisions():
-            """获取过滤和去重后的决策列表"""
-            # 获取最后50个决策
+            """Get filtered and deduplicated decision list"""
+            # Get last 50 decisions
             recent = self.decisions[-50:] if len(self.decisions) > 50 else self.decisions
-            # 获取所有非被动决策
+            # Get all non-passive decisions
             non_hold = [d for d in self.decisions if not is_passive_action(d.get('action'))]
             
-            # 合并并去重（基于timestamp）
+            # Merge and deduplicate (based on timestamp)
             seen = set()
             result = []
             for d in recent + non_hold:
-                # 使用timestamp作为唯一键
+                # Use timestamp as unique key
                 key = d.get('timestamp')
                 if key and key not in seen:
                     seen.add(key)
-                    # 只保留需要的字段
+                    # Keep only required fields
                     filtered = {k: v for k, v in d.items() if k in ['timestamp', 'action', 'confidence', 'reason', 'price', 'vote_details']}
                     result.append(filtered)
             return result
@@ -171,17 +171,17 @@ class BacktestResult:
 
 class BacktestEngine:
     """
-    回测引擎核心
+    Backtest Engine Core
     
-    工作流程：
-    1. 加载历史数据
-    2. 初始化虚拟投资组合
-    3. 遍历每个时间点
-    4. 执行策略决策
-    5. 模拟交易执行
-    6. 记录净值和交易
-    7. 计算性能指标
-    8. 生成报告
+    Workflow:
+    1. Load historical data
+    2. Initialize virtual portfolio
+    3. Iterate through each timestamp
+    4. Execute strategy decision
+    5. Simulate trade execution
+    6. Record equity and trades
+    7. Calculate performance metrics
+    8. Generate report
     """
     
     def __init__(
@@ -190,16 +190,16 @@ class BacktestEngine:
         strategy_fn: Optional[Callable] = None
     ):
         """
-        初始化回测引擎
+        Initialize backtest engine
         
         Args:
-            config: 回测配置
-            strategy_fn: 策略函数，接收 (snapshot, portfolio) 返回 {'action': 'long/short/hold', 'confidence': 0-100}
+            config: Backtest configuration
+            strategy_fn: Strategy function, receives (snapshot, portfolio) returns {'action': 'long/short/hold', 'confidence': 0-100}
         """
         self.config = config
         self.strategy_fn = strategy_fn or self._default_strategy
         
-        # 组件
+        # Components
         self.data_replay: Optional[DataReplayAgent] = None
         self.portfolio: Optional[BacktestPortfolio] = None
         self.agent_runner = None
@@ -210,7 +210,7 @@ class BacktestEngine:
             from src.backtest.agent_wrapper import BacktestAgentRunner
             self.agent_runner = BacktestAgentRunner(config.__dict__)
         
-        # 状态
+        # State
         self.is_running = False
         self.current_timestamp: Optional[datetime] = None
         self.decisions: List[Dict] = []
@@ -220,13 +220,13 @@ class BacktestEngine:
     
     async def run(self, progress_callback: Callable = None) -> BacktestResult:
         """
-        运行完整回测
+        Run complete backtest
         
         Args:
-            progress_callback: 进度回调函数 (data: dict)
+            progress_callback: Progress callback function (data: dict)
             
         Returns:
-            BacktestResult 对象
+            BacktestResult object
         """
         start_time = datetime.now()
         self.is_running = True
@@ -235,7 +235,7 @@ class BacktestEngine:
         log.info("🚀 Starting Backtest")
         log.info("=" * 60)
         
-        # 1. 初始化数据回放器
+        # 1. Initialize data replay agent
         self.data_replay = DataReplayAgent(
             symbol=self.config.symbol,
             start_date=self.config.start_date,
@@ -246,14 +246,14 @@ class BacktestEngine:
         if not success:
             raise RuntimeError("Failed to load historical data")
         
-        # 2. 初始化投资组合
+        # 2. Initialize portfolio
         self.portfolio = BacktestPortfolio(
             initial_capital=self.config.initial_capital,
             slippage=self.config.slippage,
             commission=self.config.commission
         )
         
-        # 3. 遍历时间点
+        # 3. Iterate timestamps
         timestamps = list(self.data_replay.iterate_timestamps(step=self.config.step))
         total = len(timestamps)
         
@@ -268,33 +268,33 @@ class BacktestEngine:
             self.current_timestamp = timestamp
             
             try:
-                # 获取市场快照
+                # Get market snapshot
                 snapshot = self.data_replay.get_snapshot_at(timestamp)
                 current_price = self.data_replay.get_current_price()
                 
-                # 🆕 检查并应用资金费率结算
+                # 🆕 Check and apply funding rate settlement
                 funding_rate = self.data_replay.get_funding_rate_for_settlement(timestamp)
                 if funding_rate is not None:
-                    # 获取标记价格（若有）
+                    # Get mark price (if available)
                     fr_record = self.data_replay.get_funding_rate_at(timestamp)
                     mark_price = fr_record.mark_price if fr_record and fr_record.mark_price > 0 else current_price
                     
-                    # 对所有持仓应用资金费率
+                    # Apply funding rate to all positions
                     for symbol in list(self.portfolio.positions.keys()):
                         self.portfolio.apply_funding_fee(symbol, funding_rate, mark_price, timestamp)
                 
-                # 🆕 检查强平
+                # 🆕 Check liquidation
                 prices = {self.config.symbol: current_price}
                 liquidated = self.portfolio.check_liquidation(prices, timestamp)
                 if liquidated:
                     log.warning(f"⚠️ Positions liquidated: {liquidated}")
-                    continue  # 强平后跳过本轮策略执行
+                    continue  # Skip strategy execution after liquidation
 
-                # 执行策略
+                # Execute strategy
                 decision = await self._execute_strategy(snapshot, current_price)
                 self.decisions.append(decision)
                 
-                # 执行交易
+                # Execute trade
                 await self._execute_decision(decision, current_price, timestamp)
 
                 # Intrabar SL/TP after decisions using bar high/low
@@ -304,13 +304,13 @@ class BacktestEngine:
                     timestamp
                 )
                 
-                # 记录净值 (OPTIMIZATION: Sample every 12 steps or on key events)
+                # Record equity (OPTIMIZATION: Sample every 12 steps or on key events)
                 should_record_equity = (i % 12 == 0) or (i == total - 1) or (not is_passive_action(decision.get('action')))
                 if should_record_equity:
                     self.portfolio.record_equity(timestamp, prices)
                 
                 
-                # 进度回调（包含实时收益数据和增量可视化数据）
+                # Progress callback (includes real-time profit data and incremental visualization data)
                 if progress_callback:
                     progress_pct = (i + 1) / total * 100  # +1 because we just completed this timepoint
                     
@@ -335,7 +335,7 @@ class BacktestEngine:
                         'drawdown_pct': float(drawdown_pct)
                     }
                     
-                    # 获取最新交易（最近1笔）
+                    # Get latest trade (most recent)
                     latest_trade = None
                     if self.portfolio.trades:
                         trade = self.portfolio.trades[-1]
@@ -348,7 +348,7 @@ class BacktestEngine:
                             'pnl_pct': float(trade.pnl_pct)
                         }
                     
-                    # 计算实时指标
+                    # Calculate real-time metrics
                     trades_count = len(self.portfolio.trades)
                     winning_trades = sum(1 for t in self.portfolio.trades if t.pnl > 0 and t.action == 'close')
                     win_rate = (winning_trades / trades_count * 100) if trades_count > 0 else 0
@@ -378,19 +378,19 @@ class BacktestEngine:
                         progress_callback(callback_data)
                 
             except (KeyError, ValueError, IndexError) as e:
-                # 可恢复的数据错误：记录警告并跳过此时间点
+                # Recoverable data error: log warning and skip this timestamp
                 log.warning(f"Data error at {timestamp}: {type(e).__name__}: {e}, skipping this timestamp")
                 continue
             except Exception as e:
-                # 致命错误：记录错误并终止回测
+                # Fatal error: log error and terminate backtest
                 log.error(f"Fatal error at {timestamp}: {type(e).__name__}: {e}")
                 log.error(f"Backtest terminated due to fatal error")
                 raise RuntimeError(f"Backtest failed at {timestamp}: {e}") from e
         
-        # 4. 强制平仓所有持仓
+        # 4. Force close all positions
         await self._close_all_positions()
         
-        # 5. 计算性能指标
+        # 5. Calculate performance metrics
         equity_curve = self.portfolio.get_equity_dataframe()
         trades = self.portfolio.trades
         
@@ -400,7 +400,7 @@ class BacktestEngine:
             initial_capital=self.config.initial_capital
         )
         
-        # 6. 生成结果
+        # 6. Generate result
         duration = (datetime.now() - start_time).total_seconds()
         
         result = BacktestResult(
@@ -435,9 +435,9 @@ class BacktestEngine:
         snapshot,
         current_price: float
     ) -> Dict:
-        """执行策略并返回决策"""
+        """Execute strategy并返回决策"""
         try:
-            # 调用策略函数
+            # Call strategy function
             # DEBUG LOG
             log.info(f"DEBUG: execute_strategy mode={self.config.strategy_mode} runner={self.agent_runner}")
             
@@ -473,7 +473,7 @@ class BacktestEngine:
         current_price: float,
         timestamp: datetime
     ):
-        """执行交易决策"""
+        """Execute trade决策"""
         action_raw = str(decision.get('action', 'hold'))
         position_side = None
         if self.config.symbol in self.portfolio.positions:
@@ -542,7 +542,7 @@ class BacktestEngine:
 
         # Basic Action Filtering
         if (action in ['close_short', 'close_long'] or is_close_action(action)) and has_position:
-            # 平仓 (Close Position)
+            # Close Position
             # Validate direction matches if specified (close_short for SHORT, close_long for LONG)
             current_side = self.portfolio.positions[symbol].side
             if action == 'close_short' and current_side != Side.SHORT:
@@ -580,7 +580,7 @@ class BacktestEngine:
         if action in ['long', 'short']:
             side = Side.LONG if action == 'long' else Side.SHORT
 
-            # --- 动态参数逻辑 ---
+            # --- Dynamic parameter logic ---
             params = decision.get('trade_params') or {}
             leverage = params.get('leverage') or self.config.leverage
             sl_pct = params.get('stop_loss_pct') or self.config.stop_loss_pct
@@ -671,7 +671,7 @@ class BacktestEngine:
                         timestamp=timestamp,
                         reason='reverse_signal'
                     )
-                    has_position = False # 标记为无持仓，以便下面执行开仓
+                    has_position = False # 标记为No position，以便下面执行Open position
 
             if quantity > 0:
                 self.portfolio.open_position(
@@ -832,11 +832,11 @@ class BacktestEngine:
         prev_macd_hist = macd_hist.iloc[-2]
         macd_momentum = current_macd_hist > prev_macd_hist  # 动量增加
         
-        # 持仓状态
+        # 持仓State
         symbol = config.symbol
         has_position = symbol in portfolio.positions
         
-        # 趋势状态
+        # 趋势State
         is_uptrend = ema_fast > ema_slow
         golden_cross = ema_fast > ema_slow and ema_fast_prev <= ema_slow_prev
         death_cross = ema_fast < ema_slow and ema_fast_prev >= ema_slow_prev
@@ -927,7 +927,7 @@ class BacktestEngine:
         生成回测报告
         
         Args:
-            result: 回测结果
+            result: Backtest Result
             filename: 文件名
             
         Returns:
@@ -968,10 +968,10 @@ async def run_backtest_cli(
     CLI 运行回测
     
     Args:
-        symbol: 交易对
+        symbol: Trading pair
         start_date: 开始日期
         end_date: 结束日期
-        initial_capital: 初始资金
+        initial_capital: 初始Capital
         step: 时间步长
         
     Returns:
@@ -996,7 +996,7 @@ async def run_backtest_cli(
     result = await engine.run(progress_callback=progress)
     print()  # 换行
     
-    # 生成报告
+    # Generate report
     report_path = engine.generate_report(result)
     print(f"\n📄 Report: {report_path}")
     
@@ -1035,7 +1035,7 @@ async def test_backtest_engine():
     print(f"   Sharpe Ratio: {result.metrics.sharpe_ratio:.2f}")
     print(f"   Total Trades: {result.metrics.total_trades}")
     
-    # 生成报告
+    # Generate report
     report_path = engine.generate_report(result, "test_backtest")
     print(f"\n📄 Report: {report_path}")
     

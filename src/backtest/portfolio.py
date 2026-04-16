@@ -1,8 +1,8 @@
 """
-虚拟投资组合管理 (Backtest Portfolio)
+Virtual Portfolio Management (Backtest Portfolio)
 ======================================
 
-管理回测中的虚拟持仓、交易记录和净值曲线
+Manage virtual positions, trading records, and equity curves in backtesting
 
 Author: AI Trader Team
 Date: 2025-12-31
@@ -18,37 +18,37 @@ from src.utils.logger import log
 
 
 class Side(Enum):
-    """交易方向"""
+    """Trading Direction"""
     LONG = "long"
     SHORT = "short"
 
 
 class MarginMode(Enum):
-    """保证金模式"""
-    CROSS = "cross"      # 全仓模式
-    ISOLATED = "isolated"  # 逐仓模式
+    """Margin Mode"""
+    CROSS = "cross"      # Cross Margin Mode
+    ISOLATED = "isolated"  # Isolated Margin Mode
 
 
 class OrderType(Enum):
-    """订单类型"""
-    MARKET = "market"    # 市价单 (Taker)
-    LIMIT = "limit"      # 限价单 (可能是 Maker)
+    """Order Type"""
+    MARKET = "market"    # Market Order (Taker)
+    LIMIT = "limit"      # Limit Order (May be Maker)
 
 
 @dataclass
 class FeeStructure:
     """
-    手续费结构
+    Fee Structure
     
-    Binance 期货默认费率：
-    - 普通用户: Maker 0.02%, Taker 0.04%
+    Binance Futures default rates:
+    - Regular users: Maker 0.02%, Taker 0.04%
     - VIP1: Maker 0.016%, Taker 0.04%
-    - 持有 BNB 可享 10% 折扣
+    - 10% discount with BNB
     """
-    maker_fee: float = 0.0002   # 0.02% 挂单成交
-    taker_fee: float = 0.0004   # 0.04% 吃单成交
+    maker_fee: float = 0.0002   # 0.02% Maker
+    taker_fee: float = 0.0004   # 0.04% Taker
     
-    # Binance VIP 费率预设
+    # Binance VIP rate presets
     @classmethod
     def binance_vip0(cls) -> 'FeeStructure':
         return cls(maker_fee=0.0002, taker_fee=0.0004)
@@ -63,34 +63,34 @@ class FeeStructure:
     
     @classmethod
     def binance_with_bnb(cls) -> 'FeeStructure':
-        """使用 BNB 支付手续费 (10% 折扣)"""
+        """使用 BNB Fees Paid (10% 折扣)"""
         return cls(maker_fee=0.00018, taker_fee=0.00036)
     
     def get_fee(self, is_maker: bool) -> float:
-        """获取费率"""
+        """Get fee rate"""
         return self.maker_fee if is_maker else self.taker_fee
 
 
 @dataclass
 class MarginConfig:
     """
-    保证金配置
+    Margin configuration
     
-    用于模拟交易所的保证金和强平机制
+    Used to simulate exchange margin and liquidation mechanism
     """
     mode: MarginMode = MarginMode.CROSS
     leverage: int = 10
     margin_type: str = "USDT"  # "USDT" 或 "COIN" (币本位)
     
-    # 维持保证金率 (Binance 默认阶梯)
-    # 第一档：0-50,000 USDT 仓位，维持保证金率 0.4%
+    # Maintenance margin rate (Binance default tiers)
+    # Tier 1: 0-50,000 USDT position, maintenance margin 0.4%
     maintenance_margin_rate: float = 0.004  # 0.4%
     
-    # 强平费率
+    # Liquidation fee
     liquidation_fee: float = 0.005  # 0.5%
     
-    # 阶梯保证金表 (简化版 Binance BTCUSDT)
-    # 格式: [(最大仓位值, 维持保证金率), ...]
+    # Tiered margin table (simplified Binance BTCUSDT)
+    # Format: [(max position value, maintenance margin rate), ...]
     tiered_margins: List = field(default_factory=lambda: [
         (50000, 0.004),      # 0-50k: 0.4%
         (250000, 0.005),     # 50k-250k: 0.5%
@@ -101,7 +101,7 @@ class MarginConfig:
     ])
     
     def get_maintenance_margin_rate(self, position_value: float) -> float:
-        """根据仓位大小获取对应的维持保证金率"""
+        """Get maintenance margin rate by position size"""
         for max_value, rate in self.tiered_margins:
             if position_value <= max_value:
                 return rate
@@ -110,7 +110,7 @@ class MarginConfig:
 
 @dataclass
 class Position:
-    """持仓信息"""
+    """Position Information"""
     symbol: str
     side: Side
     quantity: float
@@ -126,7 +126,7 @@ class Position:
     
     @property
     def notional_value(self) -> float:
-        """头寸名义价值"""
+        """Notional Value"""
         if self.contract_type == "inverse":
             # 币本位：名义价值 = 合约数 * 合约面值
             return self.quantity * self.contract_size
@@ -134,35 +134,35 @@ class Position:
     
     def get_pnl(self, current_price: float) -> float:
         """
-        计算当前盈亏
+        Calculate current PnL
         
-        U本位: PnL = (exit - entry) * qty
-        币本位: PnL = (1/entry - 1/exit) * contracts * size (以币计价)
+        USDT: PnL = (exit - entry) * qty
+        Inverse: PnL = (1/entry - 1/exit) * contracts * size (in coin)
         """
         if self.contract_type == "inverse":
-            # 币本位计算 (返回币种单位，需要转换为 USD)
+            # Inverse calculation (returns coin unit, needs conversion to USD)
             if self.side == Side.LONG:
                 pnl_coin = (1/self.entry_price - 1/current_price) * self.quantity * self.contract_size
             else:
                 pnl_coin = (1/current_price - 1/self.entry_price) * self.quantity * self.contract_size
-            # 转换为 USD
+            # Convert to USD
             return pnl_coin * current_price
         else:
-            # U本位计算
+            # USDT calculation
             if self.side == Side.LONG:
                 return (current_price - self.entry_price) * self.quantity
             else:
                 return (self.entry_price - current_price) * self.quantity
     
     def get_pnl_pct(self, current_price: float) -> float:
-        """计算盈亏百分比"""
+        """Calculate PnL percentage"""
         if self.entry_price == 0:
             return 0.0
         pnl = self.get_pnl(current_price)
         return pnl / self.notional_value * 100
     
     def should_stop_loss(self, current_price: float) -> bool:
-        """是否触发止损"""
+        """Check if stop loss triggered"""
         if self.stop_loss is None:
             return False
         if self.side == Side.LONG:
@@ -171,7 +171,7 @@ class Position:
             return current_price >= self.stop_loss
     
     def should_take_profit(self, current_price: float) -> bool:
-        """是否触发止盈"""
+        """Check if take profit triggered"""
         if self.take_profit is None:
             return False
         if self.side == Side.LONG:
@@ -204,7 +204,7 @@ class Position:
 
 @dataclass
 class Trade:
-    """交易记录"""
+    """Trade records"""
     trade_id: int
     symbol: str
     side: Side
@@ -218,8 +218,8 @@ class Trade:
     slippage: float = 0.0
     
     # 关联信息
-    entry_price: Optional[float] = None  # 平仓时的开仓价
-    holding_time: Optional[float] = None  # 持仓时间（小时）
+    entry_price: Optional[float] = None  # 平仓时的Open position价
+    holding_time: Optional[float] = None  # Holding time（小时）
     close_reason: Optional[str] = None  # 平仓原因：signal/stop_loss/take_profit
     
     def to_dict(self) -> Dict:
@@ -243,7 +243,7 @@ class Trade:
 
 @dataclass
 class EquityPoint:
-    """净值曲线点"""
+    """Equity Point"""
     timestamp: datetime
     cash: float
     position_value: float
@@ -254,13 +254,13 @@ class EquityPoint:
 
 class BacktestPortfolio:
     """
-    虚拟投资组合管理
+    Virtual Portfolio Management
     
-    功能：
-    1. 管理现金和持仓
-    2. 记录所有交易
-    3. 跟踪净值曲线
-    4. 计算实时盈亏
+    Features:
+    1. Manage cash and positions
+    2. Record all trades
+    3. Track equity curve
+    4. Calculate real-time PnL
     """
     
     def __init__(
@@ -272,14 +272,14 @@ class BacktestPortfolio:
         fee_structure: FeeStructure = None
     ):
         """
-        初始化投资组合
+        Initialize portfolio
         
         Args:
-            initial_capital: 初始资金 (USDT)
-            slippage: 基础滑点 (0.001 = 0.1%)
-            commission: 默认手续费 (已弃用，使用 fee_structure)
-            margin_config: 保证金配置
-            fee_structure: 手续费结构（Maker/Taker）
+            initial_capital: Initial capital (USDT)
+            slippage: Base slippage (0.001 = 0.1%)
+            commission: Default commission (deprecated, use fee_structure)
+            margin_config: Margin configuration
+            fee_structure: Fee Structure（Maker/Taker）
         """
         self.initial_capital = initial_capital
         self.cash = initial_capital
@@ -288,26 +288,26 @@ class BacktestPortfolio:
         self.margin_config = margin_config or MarginConfig()
         self.fee_structure = fee_structure or FeeStructure()
         
-        # 持仓 (symbol -> Position)
+        # Positions (symbol -> Position)
         self.positions: Dict[str, Position] = {}
         
-        # 交易记录
+        # Trade records
         self.trades: List[Trade] = []
         self.trade_counter = 0
         
-        # 净值曲线
+        # Equity curve
         self.equity_curve: List[EquityPoint] = []
         self.peak_equity = initial_capital
         
-        # 资金费率追踪
+        # Funding rate tracking
         self.total_funding_paid: float = 0.0
         self.funding_history: List[Dict] = []
         
-        # 强平追踪
+        # Liquidation tracking
         self.liquidation_count: int = 0
         self.liquidation_history: List[Dict] = []
         
-        # 费用追踪
+        # Fee tracking
         self.total_fees_paid: float = 0.0
         self.total_slippage_cost: float = 0.0
         
@@ -323,22 +323,22 @@ class BacktestPortfolio:
         timestamp: datetime
     ) -> float:
         """
-        应用资金费率结算
+        应用CapitalRate结算
         
-        永续合约资金费率机制：
-        - 多头持仓：funding_rate > 0 时支付，< 0 时收取
-        - 空头持仓：funding_rate > 0 时收取，< 0 时支付
+        永续合约CapitalRate机制：
+        - Long position: pay when funding_rate > 0, receive when < 0
+        - Short position: receive when funding_rate > 0, pay when < 0
         
-        计算公式：Funding Fee = Position Size * funding_rate
+        Formula: Funding Fee = Position Size * funding_rate
         
         Args:
-            symbol: 交易对
-            funding_rate: 资金费率 (e.g., 0.0001 = 0.01%)
-            mark_price: 标记价格（用于计算仓位价值）
-            timestamp: 结算时间
+            symbol: Trading pair
+            funding_rate: CapitalRate (e.g., 0.0001 = 0.01%)
+            mark_price: Mark price (for position value calculation)
+            timestamp: Settlement timestamp
             
         Returns:
-            实际支付/收取的资金费用（负数表示支付）
+            实际支付/收取的Capital费用（负数表示支付）
         """
         if symbol not in self.positions:
             return 0.0
@@ -348,23 +348,23 @@ class BacktestPortfolio:
         # 计算仓位名义价值
         position_value = position.quantity * mark_price
         
-        # 计算资金费用
+        # 计算Capital费用
         funding_fee = position_value * abs(funding_rate)
         
-        # 根据持仓方向和费率方向决定支付/收取
+        # 根据持仓方向和Rate方向决定支付/收取
         if position.side == Side.LONG:
             if funding_rate > 0:
-                # 多头支付
+                # Long pays
                 fee_impact = -funding_fee
             else:
-                # 多头收取
+                # Long receives
                 fee_impact = funding_fee
         else:  # SHORT
             if funding_rate > 0:
-                # 空头收取
+                # Short receives
                 fee_impact = funding_fee
             else:
-                # 空头支付
+                # Short pays
                 fee_impact = -funding_fee
         
         # 更新现金
@@ -392,24 +392,24 @@ class BacktestPortfolio:
         timestamp: datetime
     ) -> List[str]:
         """
-        检查并执行强平
+        Check and execute liquidation
         
-        强平条件：账户权益 < 维持保证金
+        Liquidation condition: account equity < maintenance margin
         
-        全仓模式：所有持仓共享保证金
-        逐仓模式：每个持仓独立计算
+        Cross Margin Mode：所有持仓共享Margin
+        Isolated Margin Mode：每个持仓独立计算
         
         Args:
             prices: 当前市场价格 {symbol: price}
             timestamp: 当前时间
             
         Returns:
-            被强平的symbol列表
+            List of liquidated symbols
         """
         liquidated_symbols = []
         
         if self.margin_config.mode == MarginMode.CROSS:
-            # 全仓模式：计算总权益和总维持保证金
+            # Cross Margin Mode：计算总权益和总维持Margin
             total_position_value = 0.0
             total_unrealized_pnl = 0.0
             
@@ -421,16 +421,16 @@ class BacktestPortfolio:
                 total_position_value += position_value
                 total_unrealized_pnl += pnl
             
-            # 账户权益 = 现金 + 未实现盈亏
+            # Account equity = cash + unrealized PnL
             total_equity = self.cash + total_unrealized_pnl
             
-            # 维持保证金 = 仓位价值 * 维持保证金率
+            # Maintenance margin = position value * maintenance margin rate
             mm_rate = self.margin_config.get_maintenance_margin_rate(total_position_value)
             maintenance_margin = total_position_value * mm_rate
             
-            # 检查是否触发强平
+            # Check if liquidation triggered
             if self.positions and total_equity < maintenance_margin:
-                # 强平所有持仓
+                # Liquidate all positions
                 log.warning(f"⚠️ LIQUIDATION TRIGGERED | Equity: ${total_equity:.2f} < "
                            f"Maintenance: ${maintenance_margin:.2f}")
                 
@@ -440,17 +440,17 @@ class BacktestPortfolio:
                     liquidated_symbols.append(symbol)
         
         else:
-            # 逐仓模式：每个仓位独立检查
+            # Isolated Margin Mode：每个仓位独立检查
             for symbol, position in list(self.positions.items()):
                 current_price = prices.get(symbol, position.entry_price)
                 position_value = position.quantity * current_price
                 pnl = position.get_pnl(current_price)
                 
-                # 逐仓权益 = 初始保证金 + 未实现盈亏
+                # Isolated equity = initial margin + unrealized PnL
                 initial_margin = position_value / self.margin_config.leverage
                 isolated_equity = initial_margin + pnl
                 
-                # 维持保证金
+                # 维持Margin
                 mm_rate = self.margin_config.get_maintenance_margin_rate(position_value)
                 maintenance_margin = position_value * mm_rate
                 
@@ -470,22 +470,22 @@ class BacktestPortfolio:
         equity: float,
         maintenance_margin: float
     ):
-        """执行强平"""
+        """Execute liquidation"""
         if symbol not in self.positions:
             return
         
         position = self.positions[symbol]
         
-        # 计算强平损失（接近但不超过全部保证金）
+        # Calculate liquidation loss (close to but not exceeding all margin)
         pnl = position.get_pnl(price)
         liquidation_fee = position.quantity * price * self.margin_config.liquidation_fee
         
-        # 更新现金（强平后损失）
+        # 更新现金（强平后Loss）
         initial_margin = position.quantity * position.entry_price / self.margin_config.leverage
         loss = -initial_margin + min(pnl, 0) - liquidation_fee
         self.cash = max(0, self.cash + loss)
         
-        # 记录强平交易
+        # Record liquidation trade
         self.trade_counter += 1
         trade = Trade(
             trade_id=self.trade_counter,
@@ -503,7 +503,7 @@ class BacktestPortfolio:
         )
         self.trades.append(trade)
         
-        # 记录强平历史
+        # Record liquidation history
         self.liquidation_count += 1
         self.liquidation_history.append({
             'timestamp': timestamp,
@@ -515,7 +515,7 @@ class BacktestPortfolio:
             'loss': loss
         })
         
-        # 移除持仓
+        # Remove position
         del self.positions[symbol]
         
         log.error(f"🔥 LIQUIDATED: {symbol} {position.side.value} @ ${price:.2f} | "
@@ -533,46 +533,46 @@ class BacktestPortfolio:
         trailing_stop_pct: float = None
     ) -> Optional[Trade]:
         """
-        开仓
+        Open position
         
         Args:
-            symbol: 交易对
-            side: 交易方向 (LONG/SHORT)
-            quantity: 数量
-            price: 开仓价格
-            timestamp: 时间戳
-            stop_loss_pct: 止损百分比 (e.g., 1.0 = 1%)
-            take_profit_pct: 止盈百分比 (e.g., 2.0 = 2%)
+            symbol: Trading pair
+            side: Trading Direction (LONG/SHORT)
+            quantity: Quantity
+            price: Open position价格
+            timestamp: Timestamp
+            stop_loss_pct: Stop loss percentage (e.g., 1.0 = 1%)
+            take_profit_pct: Take profit percentage (e.g., 2.0 = 2%)
             
         Returns:
-            Trade 对象，或 None（如果开仓失败）
+            Trade 对象，或 None（如果Open position失败）
         """
-        # 检查是否已有持仓
+        # Check if position already exists
         if symbol in self.positions:
             log.warning(f"Position already exists for {symbol}, close it first")
             return None
         
-        # 计算滑点后的价格
+        # Calculate price after slippage
         slippage_impact = price * self.slippage
         if side == Side.LONG:
-            exec_price = price + slippage_impact  # 买入时滑点向上
+            exec_price = price + slippage_impact  # Buy slippage up
         else:
-            exec_price = price - slippage_impact  # 卖出时滑点向下
+            exec_price = price - slippage_impact  # Sell slippage down
         
-        # 计算手续费
+        # Calculate commission
         notional = quantity * exec_price
         commission = notional * self.commission
         
-        # 计算初始保证金
+        # Calculate initial margin
         initial_margin = notional / self.margin_config.leverage
         
-        # 检查资金是否足够（需要支付保证金 + 手续费）
+        # 检查Capital是否足够（需要支付Margin + Fee）
         total_cost = initial_margin + commission
         if total_cost > self.cash:
             log.warning(f"Insufficient cash: ${self.cash:.2f} < ${total_cost:.2f} (Margin: ${initial_margin:.2f}, Fee: ${commission:.2f})")
             return None
         
-        # 计算止损止盈价格
+        # Calculate stop loss and take profit prices
         stop_loss = None
         take_profit = None
         if stop_loss_pct is not None and stop_loss_pct > 0:
@@ -586,7 +586,7 @@ class BacktestPortfolio:
             else:
                 take_profit = exec_price * (1 - take_profit_pct / 100)
         
-        # 创建持仓
+        # Create position
         position = Position(
             symbol=symbol,
             side=side,
@@ -601,7 +601,7 @@ class BacktestPortfolio:
         )
         self.positions[symbol] = position
         
-        # 扣除资金（保证金 + 手续费）
+        # 扣除Capital（Margin + Fee）
         self.cash -= total_cost
         
         # 记录交易
@@ -638,9 +638,9 @@ class BacktestPortfolio:
         平仓
         
         Args:
-            symbol: 交易对
+            symbol: Trading pair
             price: 平仓价格
-            timestamp: 时间戳
+            timestamp: Timestamp
             reason: 平仓原因 (signal/stop_loss/take_profit)
             
         Returns:
@@ -652,10 +652,10 @@ class BacktestPortfolio:
         
         position = self.positions[symbol]
         
-        # 计算滑点后的价格
+        # Calculate price after slippage
         slippage_impact = price * self.slippage
         if position.side == Side.LONG:
-            exec_price = price - slippage_impact  # 卖出时滑点向下
+            exec_price = price - slippage_impact  # Sell slippage down
         else:
             exec_price = price + slippage_impact  # 买回时滑点向上
         
@@ -663,17 +663,17 @@ class BacktestPortfolio:
         pnl = position.get_pnl(exec_price)
         pnl_pct = position.get_pnl_pct(exec_price)
         
-        # 计算手续费
+        # Calculate commission
         notional = position.quantity * exec_price
         commission = notional * self.commission
         
-        # 计算持仓时间
+        # 计算Holding time
         holding_time = (timestamp - position.entry_time).total_seconds() / 3600
         
-        # 计算初始保证金
+        # Calculate initial margin
         initial_margin = position.quantity * position.entry_price / self.margin_config.leverage
         
-        # 更新资金: 返还保证金 + 盈亏 - 手续费
+        # 更新Capital: 返还Margin + 盈亏 - Fee
         self.cash += initial_margin + pnl - commission
         
         # 记录交易
@@ -686,7 +686,7 @@ class BacktestPortfolio:
             quantity=position.quantity,
             price=exec_price,
             timestamp=timestamp,
-            pnl=pnl,  # 原始PnL（未扣手续费）
+            pnl=pnl,  # 原始PnL（未扣Fee）
             pnl_pct=pnl_pct,
             commission=commission,
             slippage=slippage_impact * position.quantity,
@@ -810,7 +810,7 @@ class BacktestPortfolio:
             current_prices: 当前价格字典 {symbol: price}
             
         Returns:
-            总净值 (现金/可用余额 + 占用保证金 + 持仓未实现盈亏)
+            总净值 (现金/可用余额 + 占用Margin + 持仓未实现盈亏)
         """
         unrealized_pnl = 0.0
         used_margin = 0.0
@@ -821,14 +821,14 @@ class BacktestPortfolio:
                 pnl = position.get_pnl(current_prices[symbol])
                 unrealized_pnl += pnl
                 
-                # 2. 累加占用保证金
-                # 注意：目前简化假设占用保证金固定为 initial_margin
+                # 2. 累加占用Margin
+                # 注意：目前简化假设占用Margin固定为 initial_margin
                 # 实际上应该基于 position.entry_price 计算，而不是当前价格
-                # 全仓模式下 margin = quantity * entry_price / leverage
+                # Cross Margin Mode下 margin = quantity * entry_price / leverage
                 margin = position.notional_value / self.margin_config.leverage
                 used_margin += margin
         
-        # 净值 = 现金(可用余额) + 占用保证金 + 未实现盈亏
+        # 净值 = 现金(可用余额) + 占用Margin + 未实现盈亏
         return self.cash + used_margin + unrealized_pnl
     
     def record_equity(
@@ -836,7 +836,7 @@ class BacktestPortfolio:
         timestamp: datetime,
         current_prices: Dict[str, float]
     ):
-        """记录净值曲线点"""
+        """记录Equity Point"""
         total_equity = self.get_current_equity(current_prices)
         
         # 计算持仓价值
@@ -864,7 +864,7 @@ class BacktestPortfolio:
         self.equity_curve.append(point)
     
     def get_equity_dataframe(self) -> pd.DataFrame:
-        """获取净值曲线 DataFrame"""
+        """获取Equity curve DataFrame"""
         if not self.equity_curve:
             return pd.DataFrame()
         
@@ -884,7 +884,7 @@ class BacktestPortfolio:
         return df
     
     def get_trades_dataframe(self) -> pd.DataFrame:
-        """获取交易记录 DataFrame"""
+        """获取Trade records DataFrame"""
         if not self.trades:
             return pd.DataFrame()
         
@@ -924,7 +924,7 @@ def test_portfolio():
         commission=0.0004
     )
     
-    # 开仓
+    # Open position
     now = datetime.now()
     trade1 = portfolio.open_position(
         symbol="BTCUSDT",

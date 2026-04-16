@@ -9,49 +9,14 @@ Analyzes 1h timeframe data and produces semantic analysis:
 """
 
 from typing import Dict, Optional
-from src.config import config
+from src.config import Config
 from src.utils.logger import log
 from src.llm import create_client, LLMConfig
 
-
-def _compute_trend_signals(data: Dict) -> Dict[str, Optional[float]]:
-    close = data.get('close_1h', 0)
-    ema20 = data.get('ema20_1h', 0)
-    ema60 = data.get('ema60_1h', 0)
-    adx = data.get('adx', 0)
-    oi_change = data.get('oi_change', 0)
-
-    if close > ema20 > ema60:
-        stance = 'UPTREND'
-    elif close < ema20 < ema60:
-        stance = 'DOWNTREND'
-    else:
-        stance = 'NEUTRAL'
-
-    if adx > 25:
-        strength = 'STRONG'
-    elif adx >= 20:
-        strength = 'MODERATE'
-    else:
-        strength = 'WEAK'
-
-    if abs(oi_change) > 3:
-        fuel = 'STRONG'
-    elif abs(oi_change) >= 1:
-        fuel = 'MODERATE'
-    else:
-        fuel = 'WEAK'
-
-    return {
-        'stance': stance,
-        'strength': strength,
-        'fuel': fuel,
-        'adx': adx,
-        'oi_change': oi_change
-    }
+from .trend_agent import TrendAgent
 
 
-class TrendAgentLLM:
+class TrendAgentLLM(TrendAgent):
     """
     1h Trend Analysis Agent
     
@@ -59,7 +24,10 @@ class TrendAgentLLM:
     Output: Semantic analysis paragraph
     """
     
-    def __init__(self):
+    def __init__(
+        self,
+        config: Config
+    ):
         """Initialize TrendAgent with LLM client"""
         llm_config = config.llm
         provider = llm_config.get('provider', 'deepseek')
@@ -109,13 +77,13 @@ class TrendAgentLLM:
             
             # Use unified LLM interface
             response = self.client.chat(
-                system_prompt=self._get_system_prompt(),
+                system_prompt=self.get_system_prompt(),
                 user_prompt=prompt
             )
             
             analysis = response.content.strip()
             
-            signals = _compute_trend_signals(data)
+            signals = self._compute_trend_signals(data)
 
             result = {
                 'analysis': analysis,
@@ -155,7 +123,7 @@ class TrendAgentLLM:
                 'metadata': {'error': str(e)}
             }
     
-    def _get_system_prompt(self) -> str:
+    def get_system_prompt(self) -> Optional[str]:
         """System prompt for trend analysis"""
         return """You are a professional crypto trend analyst. Your task is to analyze 1h timeframe data and provide a concise semantic analysis.
 
@@ -241,64 +209,4 @@ Provide a 2-3 sentence semantic analysis of the trend situation."""
         fuel = "strong" if abs(oi_change) > 3 else "moderate" if abs(oi_change) >= 1 else "weak"
         strength = "strong" if adx > 25 else "weak"
         
-        return f"1h shows {trend} with {fuel} OI fuel ({oi_change:+.1f}%). ADX={adx:.0f} indicates {strength} trend strength. {'Suitable for trend trading.' if adx >= 20 and abs(oi_change) >= 1 else 'Not suitable for trend trading.'}"
-
-
-class TrendAgent:
-    """
-    1h Trend Analysis Agent (no LLM)
-
-    Uses rule-based heuristics only.
-    """
-
-    def __init__(self):
-        log.info("📈 Trend Agent (no LLM) initialized")
-
-    def analyze(self, data: Dict) -> Dict:
-        signals = _compute_trend_signals(data)
-        analysis = self._get_fallback_analysis(data)
-        result = {
-            'analysis': analysis,
-            'stance': signals['stance'],
-            'metadata': {
-                'strength': signals['strength'],
-                'adx': round(signals['adx'], 1),
-                'oi_fuel': signals['fuel'],
-                'oi_change': round(signals['oi_change'], 1)
-            }
-        }
-        log.info(f"📈 Trend Agent (no LLM) [{signals['stance']}] (Strength: {signals['strength']}, ADX: {signals['adx']:.1f}) for {data.get('symbol', 'UNKNOWN')}")
-
-        try:
-            from src.server.state import global_state
-            if hasattr(global_state, 'saver') and hasattr(global_state, 'current_cycle_id'):
-                global_state.saver.save_trend_analysis(
-                    analysis=analysis,
-                    input_data=data,
-                    symbol=data.get('symbol', 'UNKNOWN'),
-                    cycle_id=global_state.current_cycle_id,
-                    model='rule_based'
-                )
-        except Exception as e:
-            log.warning(f"Failed to save trend analysis log: {e}")
-
-        return result
-
-    def _get_fallback_analysis(self, data: Dict) -> str:
-        close = data.get('close_1h', 0)
-        ema20 = data.get('ema20_1h', 0)
-        ema60 = data.get('ema60_1h', 0)
-        oi_change = data.get('oi_change', 0)
-        adx = data.get('adx', 20)
-
-        if close > ema20 > ema60:
-            trend = "uptrend"
-        elif close < ema20 < ema60:
-            trend = "downtrend"
-        else:
-            trend = "neutral"
-
-        fuel = "strong" if abs(oi_change) > 3 else "moderate" if abs(oi_change) >= 1 else "weak"
-        strength = "strong" if adx > 25 else "weak"
-
         return f"1h shows {trend} with {fuel} OI fuel ({oi_change:+.1f}%). ADX={adx:.0f} indicates {strength} trend strength. {'Suitable for trend trading.' if adx >= 20 and abs(oi_change) >= 1 else 'Not suitable for trend trading.'}"

@@ -11,6 +11,9 @@ import threading
 import time
 from typing import Any, Dict, Optional
 
+from src.trading import CycleContext
+
+from src.server.state import global_state
 
 _seq_lock = threading.RLock()
 _seq_by_run: Dict[str, int] = {}
@@ -60,3 +63,32 @@ def emit_runtime_event(
         pass
     return event
 
+
+def emit_global_runtime_event(
+    context: CycleContext,
+    *,
+    stream: str,
+    agent: str,
+    phase: str,
+    data: Optional[Dict[str, Any]] = None
+) -> None:
+    emit_runtime_event(
+        shared_state=global_state,
+        run_id=context.run_id,
+        stream=stream,
+        agent=agent,
+        phase=phase,
+        symbol=context.symbol,
+        cycle_id=context.cycle_id,
+        data=data or {}
+    )
+    
+def emit_cycle_pipeline_end(context: CycleContext, *, result: Dict[str, Any]) -> None:
+    """Emit cycle_pipeline end event using normalized result payload."""
+    emit_global_runtime_event(
+        context,
+        stream="lifecycle",
+        agent="cycle_pipeline",
+        phase="end",
+        data={"status": result.get('status'), "action": result.get('action')}
+    )

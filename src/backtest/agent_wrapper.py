@@ -18,7 +18,7 @@ import asyncio
 from typing import Dict, Any, Optional
 from dataclasses import dataclass
 
-from src.agents.decision_core_agent import DecisionCoreAgent
+from src.agents.decision_core.decision_core_agent import DecisionCoreAgent
 from src.strategy.composer import StrategyComposer # ✅ Shared Strategy Logic
 from src.utils.logger import log
 
@@ -419,7 +419,7 @@ class BacktestAgentRunner:
             )
             
             # Convert dict to VoteResult-like object
-            from src.agents.decision_core_agent import VoteResult
+            from src.agents.decision_core.decision_core_agent import VoteResult
             llm_result = VoteResult(
                 action=llm_result_dict.get('action', 'hold'),
                 confidence=llm_result_dict.get('confidence', 0),

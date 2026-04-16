@@ -166,7 +166,7 @@ class TestDecisionCoreAgentIntegration:
     def test_make_decision_with_correct_format(self):
         """Verify make_decision works with new quant_analysis format"""
         from src.agents.quant_analyst_agent import QuantAnalystAgent
-        from src.agents.decision_core_agent import DecisionCoreAgent
+        from src.agents.decision_core.decision_core_agent import DecisionCoreAgent
         
         quant_agent = QuantAnalystAgent()
         decision_agent = DecisionCoreAgent()
@@ -195,7 +195,7 @@ class TestDecisionCoreAgentIntegration:
     def test_generate_reason_no_keyerror(self):
         """Verify _generate_reason doesn't throw KeyError"""
         from src.agents.quant_analyst_agent import QuantAnalystAgent
-        from src.agents.decision_core_agent import DecisionCoreAgent
+        from src.agents.decision_core.decision_core_agent import DecisionCoreAgent
         
         quant_agent = QuantAnalystAgent()
         decision_agent = DecisionCoreAgent()

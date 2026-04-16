@@ -16,6 +16,7 @@ from datetime import datetime
 import numpy as np
 import pandas as pd
 
+from src.agents.predict import PredictAgent
 from src.utils.logger import log
 
 # 尝试导入 LightGBM
@@ -439,35 +440,32 @@ class ProphetAutoTrainer:
     
     def __init__(
         self,
-        predict_agent,
         binance_client,
         interval_hours: float = 2.0,
         training_days: int = 70,  # 10x samples (70 days)
-        symbol: str = 'BTCUSDT'
     ):
         """
         初始化自动训练器
         
         Args:
-            predict_agent: PredictAgent 实例
             binance_client: BinanceClient 实例
             interval_hours: 训练间隔 (小时)
             training_days: 使用的历史数据天数
-            symbol: 交易对
         """
-        self.predict_agent = predict_agent
         self.client = binance_client
         self.interval_hours = interval_hours
         self.training_days = training_days
-        self.symbol = symbol
-        self.model_path = f'models/prophet_lgb_{symbol}.pkl'
         
         self._running = False
         self._thread = None
         self.last_train_time = None
         self.train_count = 0
         
-    def start(self):
+    def start(
+        self,
+        predict_agent: PredictAgent,
+        symbol: str = 'BTCUSDT'
+    ):
         """启动自动训练线程"""
         import threading
         
@@ -476,7 +474,7 @@ class ProphetAutoTrainer:
             return
         
         self._running = True
-        self._thread = threading.Thread(target=self._training_loop, daemon=True)
+        self._thread = threading.Thread(target=self._training_loop, args=(predict_agent, symbol), daemon=True)
         self._thread.start()
         log.info(f"🔄 Prophet 自动训练器已启动 | 间隔: {self.interval_hours}h | 数据: {self.training_days}天")
     
@@ -485,7 +483,10 @@ class ProphetAutoTrainer:
         self._running = False
         log.info("🛑 Prophet 自动训练器已停止")
     
-    def _training_loop(self):
+    def _training_loop(
+        self,
+        predict_agent: PredictAgent,
+        symbol: str):
         """训练循环"""
         import time
         
@@ -494,7 +495,7 @@ class ProphetAutoTrainer:
         while self._running:
             try:
                 # 执行训练
-                self._do_train()
+                self._do_train(predict_agent, symbol)
                 self.train_count += 1
                 self.last_train_time = datetime.now()
                 
@@ -512,12 +513,18 @@ class ProphetAutoTrainer:
                 # 出错后等待 10 分钟再重试
                 time.sleep(600)
     
-    def _do_train(self):
+    def _do_train(
+        self,
+        predict_agent: PredictAgent,
+        symbol: str
+    ):
         """执行训练"""
         log.info(f"🔮 开始自动训练 Prophet ML 模型...")
         
+        model_path = f'models/prophet_lgb_{symbol}.pkl'
+        
         # 1. 获取历史数据
-        df = self._fetch_data()
+        df = self._fetch_data(symbol)
         if df is None or len(df) < 500:
             log.warning(f"数据不足，跳过训练 (当前: {len(df) if df is not None else 0})")
             return
@@ -551,16 +558,19 @@ class ProphetAutoTrainer:
         metrics = model.train(X_train, y_train, X_val, y_val)
         
         # 7. 保存模型
-        model.save(self.model_path)
+        model.save(model_path)
         
         # 8. 重新加载到 PredictAgent
-        self.predict_agent.load_ml_model(self.model_path)
+        predict_agent.load_ml_model(model_path)
         
         log.info(f"✅ 自动训练完成! 训练次数: #{self.train_count + 1}")
         log.info(f"   训练 AUC: {metrics.get('train_auc', 0):.4f}")
         log.info(f"   验证 AUC: {metrics.get('val_auc', 0):.4f}")
     
-    def _fetch_data(self) -> pd.DataFrame:
+    def _fetch_data(
+        self,
+        symbol: str
+    ) -> pd.DataFrame:
         """获取历史数据"""
         try:
             limit = self.training_days * 24 * 12  # 5分钟K线
@@ -572,7 +582,7 @@ class ProphetAutoTrainer:
             while remaining > 0:
                 batch_size = min(remaining, 1000)
                 klines = self.client.client.futures_klines(
-                    symbol=self.symbol,
+                    symbol=symbol,
                     interval='5m',
                     limit=batch_size,
                     endTime=end_time

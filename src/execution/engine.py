@@ -1,5 +1,5 @@
 """
-执行指挥官 (The Executor) 模块
+Execution Commander (The Executor) Module
 """
 from typing import Dict, Optional, List
 from src.api.binance_client import BinanceClient
@@ -17,7 +17,7 @@ import time
 
 class ExecutionEngine:
     """
-    执行指挥官 (The Executor)
+    Execution Commander (The Executor)
 """
     
     def __init__(self, binance_client: BinanceClient, risk_manager: RiskManager):
@@ -34,16 +34,16 @@ class ExecutionEngine:
         current_price: float
     ) -> Dict:
         """
-        执行交易决策
+        Execute trading decision
         
         Args:
-            decision: 经过风控验证的决策
-            account_info: 账户信息
-            position_info: 持仓信息
-            current_price: 当前价格
+            decision: Decision verified by risk control
+            account_info: Account information
+            position_info: Position information
+            current_price: Current price
             
         Returns:
-            执行结果
+            Execution result
         """
         
         raw_action = str(decision.get('action', 'wait'))
@@ -79,8 +79,8 @@ class ExecutionEngine:
 
             if is_passive_action(action):
                 result['success'] = True
-                result['message'] = '观望，不执行操作'
-                log.info(f"执行{action}，无操作")
+                result['message'] = 'Wait and observe, do not execute'
+                log.info(f"Execute {action}, no operation")
                 return result
             
             elif is_open_action(action) and action == 'open_long':
@@ -93,20 +93,20 @@ class ExecutionEngine:
                 return self._close_position(decision, position_info, close_action=action)
             
             else:
-                result['message'] = f'未知操作: {action}'
+                result['message'] = f'Unknown action: {action}'
                 log.error(result['message'])
                 return result
                 
         except Exception as e:
-            log.error(f"执行交易失败: {e}")
-            result['message'] = f'执行失败: {str(e)}'
+            log.error(f"Trade execution failed: {e}")
+            result['message'] = f'Execution failed: {str(e)}'
             return result
     
     def _open_long(self, decision: Dict, account_info: Dict, current_price: float) -> Dict:
-        """开多仓"""
+        """Open long position"""
         symbol = decision['symbol']
         
-        # 计算开仓数量
+        # Calculate position size
         quantity = self.risk_manager.calculate_position_size(
             account_balance=account_info['available_balance'],
             position_pct=decision['position_size_pct'],
@@ -114,25 +114,25 @@ class ExecutionEngine:
             current_price=current_price
         )
         
-        # 设置杠杆
+        # Set leverage
         try:
             self.client.client.futures_change_leverage(
                 symbol=symbol,
                 leverage=decision['leverage']
             )
-            log.executor(f"杠杆已设置为 {decision['leverage']}x")
+            log.executor(f"Leverage set to {decision['leverage']}x")
         except Exception as e:
-            log.executor(f"设置杠杆失败: {e}", success=False)
+            log.executor(f"Failed to set leverage: {e}", success=False)
         
-        # 下市价买单（开多仓）
+        # Place market buy order (open long)
         order = self.client.place_market_order(
             symbol=symbol,
             side='BUY',
             quantity=quantity,
-            position_side='LONG'  # 双向持仓模式下明确指定为LONG
+            position_side='LONG'  # Explicitly specify as LONG in two-way position mode
         )
         
-        # 计算止损止盈价格
+        # Calculate stop loss and take profit prices
         entry_price = float(order.get('avgPrice', current_price))
         
         stop_loss_price = self.risk_manager.calculate_stop_loss_price(
@@ -147,15 +147,15 @@ class ExecutionEngine:
             side='LONG'
         )
         
-        # 设置止损止盈
+        # Set stop loss and take profit
         sl_tp_orders = self.client.set_stop_loss_take_profit(
             symbol=symbol,
             stop_loss_price=stop_loss_price,
             take_profit_price=take_profit_price,
-            position_side='LONG'  # 明确指定多仓
+            position_side='LONG'  # Explicitly specify long position
         )
         
-        log.executor(f"开多仓成功: {quantity} {symbol} @ {entry_price}")
+        log.executor(f"Open long position successful: {quantity} {symbol} @ {entry_price}")
         
         return {
             'success': True,
@@ -166,11 +166,11 @@ class ExecutionEngine:
             'quantity': quantity,
             'stop_loss': stop_loss_price,
             'take_profit': take_profit_price,
-            'message': '开多仓成功'
+            'message': 'Open long position successful'
         }
     
     def _open_short(self, decision: Dict, account_info: Dict, current_price: float) -> Dict:
-        """开空仓"""
+        """Open short position"""
         symbol = decision['symbol']
         
         quantity = self.risk_manager.calculate_position_size(
@@ -180,21 +180,21 @@ class ExecutionEngine:
             current_price=current_price
         )
         
-        # 设置杠杆
+        # Set leverage
         try:
             self.client.client.futures_change_leverage(
                 symbol=symbol,
                 leverage=decision['leverage']
             )
         except Exception as e:
-            log.executor(f"设置杠杆失败: {e}", success=False)
+            log.executor(f"Failed to set leverage: {e}", success=False)
         
-        # 下市价卖单（开空仓）
+        # Place market sell order (open short)
         order = self.client.place_market_order(
             symbol=symbol,
             side='SELL',
             quantity=quantity,
-            position_side='SHORT'  # 双向持仓模式下明确指定为SHORT
+            position_side='SHORT'  # Explicitly specify as SHORT in two-way position mode
         )
         
         entry_price = float(order.get('avgPrice', current_price))
@@ -215,10 +215,10 @@ class ExecutionEngine:
             symbol=symbol,
             stop_loss_price=stop_loss_price,
             take_profit_price=take_profit_price,
-            position_side='SHORT'  # 明确指定空仓
+            position_side='SHORT'  # Explicitly specify short position
         )
         
-        log.executor(f"开空仓成功: {quantity} {symbol} @ {entry_price}")
+        log.executor(f"Open short position successful: {quantity} {symbol} @ {entry_price}")
         
         return {
             'success': True,
@@ -229,7 +229,7 @@ class ExecutionEngine:
             'quantity': quantity,
             'stop_loss': stop_loss_price,
             'take_profit': take_profit_price,
-            'message': '开空仓成功'
+            'message': 'Open short position successful'
         }
 
     def set_stop_loss_take_profit(
@@ -253,13 +253,13 @@ class ExecutionEngine:
         position_info: Optional[Dict],
         close_action: str = "close_position",
     ) -> Dict:
-        """平仓"""
+        """Close position"""
         if not position_info or position_info.get('position_amt', 0) == 0:
             return {
                 'success': False,
                 'action': close_action,
                 'timestamp': datetime.now().isoformat(),
-                'message': '无持仓，无需平仓'
+                'message': 'No position, no need to close'
             }
         
         symbol = decision['symbol']
@@ -269,24 +269,24 @@ class ExecutionEngine:
                 'success': False,
                 'action': close_action,
                 'timestamp': datetime.now().isoformat(),
-                'message': '持仓方向不匹配: 当前为空仓'
+                'message': 'Position direction mismatch: current position is short'
             }
         if close_action == "close_short" and position_amt > 0:
             return {
                 'success': False,
                 'action': close_action,
                 'timestamp': datetime.now().isoformat(),
-                'message': '持仓方向不匹配: 当前为多仓'
+                'message': 'Position direction mismatch: current position is long'
             }
         
-        # 取消所有挂单
+        # Cancel all pending orders
         self.client.cancel_all_orders(symbol)
         
-        # 平仓
+        # Close position
         side = 'SELL' if position_amt > 0 else 'BUY'
         quantity = abs(position_amt)
         
-        log.executor(f"开始执行平仓: {side} {quantity} {symbol}")
+        log.executor(f"Start executing close position: {side} {quantity} {symbol}")
         
         order = self.client.place_market_order(
             symbol=symbol,
@@ -295,7 +295,7 @@ class ExecutionEngine:
             reduce_only=True
         )
         
-        log.executor(f"平仓成功: {quantity} {symbol}")
+        log.executor(f"Close position successful: {quantity} {symbol}")
         
         return {
             'success': True,
@@ -303,7 +303,7 @@ class ExecutionEngine:
             'timestamp': datetime.now().isoformat(),
             'orders': [order],
             'quantity': quantity,
-            'message': '平仓成功'
+            'message': 'Close position successful'
         }
     
     def _add_position(
@@ -313,35 +313,35 @@ class ExecutionEngine:
         position_info: Optional[Dict],
         current_price: float
     ) -> Dict:
-        """加仓"""
+        """Add position"""
         if not position_info or position_info.get('position_amt', 0) == 0:
             return {
                 'success': False,
                 'action': 'add_position',
                 'timestamp': datetime.now().isoformat(),
-                'message': '无持仓，无法加仓'
+                'message': 'No position, cannot add position'
             }
         
-        # 判断当前是多还是空
+        # Determine whether current is long or short
         if position_info['position_amt'] > 0:
             return self._open_long(decision, account_info, current_price)
         else:
             return self._open_short(decision, account_info, current_price)
     
     def _reduce_position(self, decision: Dict, position_info: Optional[Dict]) -> Dict:
-        """减仓"""
+        """Reduce position"""
         if not position_info or position_info.get('position_amt', 0) == 0:
             return {
                 'success': False,
                 'action': 'reduce_position',
                 'timestamp': datetime.now().isoformat(),
-                'message': '无持仓，无法减仓'
+                'message': 'No position, cannot reduce position'
             }
         
         symbol = decision['symbol']
         position_amt = position_info['position_amt']
         
-        # 减半仓位
+        # Reduce position by half
         reduce_qty = abs(position_amt) * 0.5
         side = 'SELL' if position_amt > 0 else 'BUY'
         
@@ -352,7 +352,7 @@ class ExecutionEngine:
             reduce_only=True
         )
         
-        log.executor(f"减仓成功: {reduce_qty} {symbol}")
+        log.executor(f"Reduce position successful: {reduce_qty} {symbol}")
         
         return {
             'success': True,
@@ -360,5 +360,5 @@ class ExecutionEngine:
             'timestamp': datetime.now().isoformat(),
             'orders': [order],
             'quantity': reduce_qty,
-            'message': '减仓成功'
+            'message': 'Reduce position successful'
         }

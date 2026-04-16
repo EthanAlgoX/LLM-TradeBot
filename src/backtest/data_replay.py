@@ -1,9 +1,9 @@
 """
-历史数据回放器 (Data Replay Agent)
+Historical Data Replay Agent
 ===================================
 
-模拟 DataSyncAgent，从历史数据生成 MarketSnapshot
-用于回测时提供与实盘相同的数据接口
+Simulate DataSyncAgent, generate MarketSnapshot from historical data
+Provide same data interface as live trading for backtest
 
 Author: AI Trader Team
 Date: 2025-12-31
@@ -18,14 +18,14 @@ import numpy as np
 import os
 
 from src.api.binance_client import BinanceClient
-from src.agents.data_sync_agent import MarketSnapshot
+from src.agents.data_sync import MarketSnapshot
 from src.utils.logger import log
 from src.utils.kline_cache import get_kline_cache
 
 
 @dataclass
 class FundingRateRecord:
-    """资金费率记录"""
+    """Funding Rate Record"""
     timestamp: datetime
     funding_rate: float
     mark_price: float
@@ -33,26 +33,26 @@ class FundingRateRecord:
 
 @dataclass
 class DataCache:
-    """历史数据缓存"""
+    """Historical Data Cache"""
     symbol: str
     df_5m: pd.DataFrame
     df_15m: pd.DataFrame
     df_1h: pd.DataFrame
     start_date: datetime
     end_date: datetime
-    funding_rates: List['FundingRateRecord'] = field(default_factory=list)  # 资金费率历史
+    funding_rates: List['FundingRateRecord'] = field(default_factory=list)  # Funding rate history
 
 
 
 class DataReplayAgent:
     """
-    历史数据回放器
+    Historical Data Replay Agent
     
-    功能：
-    1. 从 Binance 获取历史 K 线数据
-    2. 本地缓存（Parquet 格式）
-    3. 在指定时间点生成 MarketSnapshot
-    4. 模拟实时数据流用于回测
+    Features:
+    1. Fetch historical K-line data from Binance
+    2. Local cache (Parquet format)
+    3. Generate MarketSnapshot at specified timestamp
+    4. Simulate real-time data stream for backtest
     """
     
     CACHE_DIR = "data/backtest/cache"  # Backtest-specific cache
@@ -66,13 +66,13 @@ class DataReplayAgent:
         client: BinanceClient = None
     ):
         """
-        初始化数据回放器
+        Initialize data replay agent
         
         Args:
-            symbol: 交易对 (e.g., "BTCUSDT")
-            start_date: 开始日期 "YYYY-MM-DD" 或 "YYYY-MM-DD HH:MM"
-            end_date: 结束日期 "YYYY-MM-DD" 或 "YYYY-MM-DD HH:MM"
-            client: Binance 客户端（可选）
+            symbol: Trading pair (e.g., "BTCUSDT")
+            start_date: Start date "YYYY-MM-DD" or "YYYY-MM-DD HH:MM"
+            end_date: End date "YYYY-MM-DD" or "YYYY-MM-DD HH:MM"
+            client: Binance client (optional)
         """
         self.symbol = symbol
 
@@ -87,7 +87,7 @@ class DataReplayAgent:
             
         self.client = client or BinanceClient()
         
-        # 数据缓存
+        # 数据cache
         self.data_cache: Optional[DataCache] = None
         
         # 当前回放位置
@@ -97,7 +97,7 @@ class DataReplayAgent:
         # 最新快照（模拟 DataSyncAgent.latest_snapshot）
         self.latest_snapshot: Optional[MarketSnapshot] = None
         
-        # 确保缓存目录存在
+        # 确保cache目录存在
         os.makedirs(self.CACHE_DIR, exist_ok=True)
         
         # Initialize shared K-line cache for incremental fetching
@@ -107,13 +107,13 @@ class DataReplayAgent:
     
     async def load_data(self) -> bool:
         """
-        加载历史数据 (使用统一的 KlineCache)
+        Load historical data (使用统一的 KlineCache)
         
-        优先从 data/kline/{symbol}/*.parquet 读取 (共享目录)
-        只获取增量数据从 API
+        Prioritize reading from data/kline/{symbol}/*.parquet (shared directory)
+        Only fetch incremental data from API
         
         Returns:
-            是否成功加载
+            Whether loading was successful
         """
         log.info(f"📥 Fetching historical data from Binance API...")
         
@@ -136,7 +136,7 @@ class DataReplayAgent:
             return False
 
     def _parse_input_date(self, value: str) -> Tuple[datetime, bool]:
-        """解析输入日期，返回 (datetime, 是否包含时间)"""
+        """Parse input date, return (datetime, whether includes time)"""
         try:
             return datetime.strptime(value, "%Y-%m-%d %H:%M"), True
         except ValueError:
@@ -150,11 +150,11 @@ class DataReplayAgent:
         return dt.astimezone(timezone.utc).replace(tzinfo=None)
 
     def _utc_timestamp_ms(self, dt: datetime) -> int:
-        """UTC-naive -> UTC 时间戳 (ms)"""
+        """UTC-naive -> UTC timestamp (ms)"""
         return int(dt.replace(tzinfo=timezone.utc).timestamp() * 1000)
 
     def _describe_cache_range(self) -> str:
-        """简要描述缓存数据时间范围（用于诊断）"""
+        """简要描述cache数据时间范围（用于诊断）"""
         if self.data_cache is None:
             return "cache=None"
         def _range(df: pd.DataFrame) -> str:
@@ -171,10 +171,10 @@ class DataReplayAgent:
         return pd.Timestamp(end_cutoff).floor("5min").to_pydatetime()
 
     def _cache_covers_range(self) -> bool:
-        """检查缓存是否覆盖完整回测窗口（含多周期）
+        """检查cache是否覆盖完整回测窗口（含多周期）
         
-        添加容错机制：允许数据有1小时的延迟容差
-        这样可以避免因Binance数据延迟导致的回测失败
+        Add fault tolerance: allow 1 hour data delay tolerance
+        This prevents backtest failure due to Binance data delay
         """
         if self.data_cache is None:
             return False
@@ -193,7 +193,7 @@ class DataReplayAgent:
         end_15m = pd.Timestamp(end_cutoff).floor("15min")
         end_1h = pd.Timestamp(end_cutoff).floor("60min")
 
-        # 添加容差：允许数据缺失最多1小时（用于处理实时数据延迟）
+        # 添加tolerance：允许数据缺失最多1小时（用于处理实时数据延迟）
         tolerance = pd.Timedelta(hours=1)
 
         # 检查起始时间（严格）
@@ -204,7 +204,7 @@ class DataReplayAgent:
         if df_1h.index.min() > start_1h:
             return False
 
-        # 检查结束时间（带容差）
+        # 检查结束时间（带tolerance）
         if df_5m.index.max() < (end_5m - tolerance):
             log.warning(f"⚠️ 5m data ends at {df_5m.index.max()}, expected {end_5m} (tolerance: 1h)")
             return False
@@ -215,7 +215,7 @@ class DataReplayAgent:
             log.warning(f"⚠️ 1h data ends at {df_1h.index.max()}, expected {end_1h} (tolerance: 1h)")
             return False
 
-        # 如果数据有缺失但在容差范围内，调整回测结束时间
+        # 如果数据有缺失但在tolerance范围内，Adjusting backtest end time
         actual_end = min(df_5m.index.max(), df_15m.index.max(), df_1h.index.max())
         if actual_end < end_5m:
             log.info(f"📊 Adjusting backtest end time: {self.end_date} → {actual_end} (data availability)")
@@ -224,7 +224,7 @@ class DataReplayAgent:
         return True
     
     def _get_cache_path(self) -> str:
-        """生成缓存文件路径"""
+        """生成cache文件路径"""
         # Use simple date string for cache key to maximize hits
         # (Even if precise time is used, we cache the whole day range usually)
         # But here start/end might be mid-day. 
@@ -246,7 +246,7 @@ class DataReplayAgent:
         )
     
     async def _fetch_from_api(self):
-        """从 Binance API 获取历史数据"""
+        """Fetch historical data from Binance API"""
         # CRITICAL FIX: Need historical data BEFORE backtest period for technical indicators
         # Add lookback period (default 30 days) before start_date
         lookback_days = 30
@@ -256,23 +256,23 @@ class DataReplayAgent:
         total_days = (self.end_date - extended_start).days + 1
         
         # Calculate required candles
-        # 5m K线：每天 288 根
+        # 5m K线：288 per day
         limit_5m = total_days * 288 * 2 # Safety factor
-        # 15m K线：每天 96 根
+        # 15m K线：96 per day
         limit_15m = total_days * 96 * 2
-        # 1h K线：每天 24 根
+        # 1h K线：24 per day
         limit_1h = total_days * 24 * 2
         
         log.info(f"📊 Fetching data from {extended_start.date()} to {self.end_date.date()}")
         log.info(f"   Lookback: {lookback_days} days before backtest start")
         
-        # Binance API 限制单次最多 1500 根，需要分批获取
+        # Binance API limit: max 1500 per request, need to batch fetch
         # Use KlineCache for local-first fetching
         df_5m = await self._fetch_klines_with_cache("5m", limit_5m)
         df_15m = await self._fetch_klines_with_cache("15m", limit_15m)
         df_1h = await self._fetch_klines_with_cache("1h", limit_1h)
         
-        # 获取资金费率历史
+        # 获取Funding rate history
         funding_rates = await self._fetch_funding_rates()
         
         # IMPORTANT: Do NOT filter out historical data before start_date here
@@ -282,7 +282,7 @@ class DataReplayAgent:
         df_15m = df_15m[df_15m.index <= self.end_date]
         df_1h = df_1h[df_1h.index <= self.end_date]
         
-        # 创建缓存对象
+        # 创建cache对象
         self.data_cache = DataCache(
             symbol=self.symbol,
             df_5m=df_5m,
@@ -305,15 +305,15 @@ class DataReplayAgent:
             log.info(f"   First: {self.timestamps[0]}, Last: {self.timestamps[-1]}")
     
     async def _fetch_funding_rates(self) -> List[FundingRateRecord]:
-        """获取资金费率历史数据"""
+        """获取Funding rate history数据"""
         funding_records = []
         
         try:
-            # 计算时间范围
+            # Calculate time range
             start_ts = self._utc_timestamp_ms(self.start_date)
             end_ts = self._utc_timestamp_ms(self.end_date)
             
-            # Binance API 每次最多返回 1000 条
+            # Binance API returns max 1000 per call
             current_start = start_ts
             
             # Safety break
@@ -341,9 +341,9 @@ class DataReplayAgent:
                 if len(funding_data) < 1000:
                     break
                 
-                # 下一批从最后一条时间 +1 开始
+                # 下一批from最后一条时间 +1 开始
                 current_start = funding_data[-1]['fundingTime'] + 1
-                await asyncio.sleep(0.1)  # 避免请求过快
+                await asyncio.sleep(0.1)  # Avoid requests too fast
             
             log.info(f"📊 Fetched {len(funding_records)} funding rate records")
             
@@ -474,7 +474,7 @@ class DataReplayAgent:
         all_klines = []
         batch_size = 1000  # Binance 推荐的批次大小
         
-        # 计算结束时间戳
+        # 计算结束Timestamp
         end_ts = self._utc_timestamp_ms(self.end_date)
         
         remaining = total_limit
@@ -502,7 +502,7 @@ class DataReplayAgent:
                 current_end = klines[0][0] - 1
                 remaining -= len(klines)
                 
-                # 避免请求过快
+                # Avoid requests too fast
                 await asyncio.sleep(0.1)
                 
             except Exception as e:
@@ -542,7 +542,7 @@ class DataReplayAgent:
         return df[(df.index >= self.start_date) & (df.index < self.end_date)]
     
     def _save_to_cache(self, cache_path: str):
-        """保存数据到缓存"""
+        """保存数据tocache"""
         if self.data_cache is None:
             return
         
@@ -566,12 +566,12 @@ class DataReplayAgent:
             pickle.dump(cache_data, f)
     
     def _load_from_cache(self, cache_path: str):
-        """从缓存加载数据"""
+        """fromcache加载数据"""
         import pickle
         with open(cache_path, 'rb') as f:
             cache_data = pickle.load(f)
         
-        # 加载资金费率（兼容旧缓存）
+        # 加载CapitalRate（兼容旧cache）
         funding_rates = []
         if 'funding_rates' in cache_data:
             for fr_dict in cache_data['funding_rates']:
@@ -607,7 +607,7 @@ class DataReplayAgent:
         
         Args:
             timestamp: 目标时间点
-            lookback: 回看的 K 线数量 (5m candles). Defaults to 1000 (~3.5 days) to ensure enough 1h data.
+            lookback: 回看的 K 线Quantity (5m candles). Defaults to 1000 (~3.5 days) to ensure enough 1h data.
             
         Returns:
             MarketSnapshot 对象（与 DataSyncAgent 兼容）
@@ -615,7 +615,7 @@ class DataReplayAgent:
         if self.data_cache is None:
             raise ValueError("Data not loaded. Call load_data() first.")
         
-        # 获取截止到 timestamp 的数据
+        # 获取截止to timestamp 的数据
         # Ensure we have enough data for 1h analysis (need > 60 candles)
         # 1000 5m candles = 83 1h candles.
         
@@ -677,12 +677,12 @@ class DataReplayAgent:
     
     def get_current_price(self) -> float:
         """
-        获取当前价格
+        Get current price
         
         CRITICAL FIX (Cycle 2):
         防止 Look-ahead Bias：
         返回当前 K 线的 Open 价格，而不是 Close 价格。
-        在回测时刻 T，我们只能看到 T 时刻的开盘价，看不到 T+5m 的收盘价。
+        在回测时刻 T，我们只能看to T 时刻的开盘价，看不to T+5m 的收盘价。
         """
         if self.latest_snapshot is None:
             return 0.0
@@ -737,14 +737,14 @@ class DataReplayAgent:
     
     def get_funding_rate_at(self, timestamp: datetime) -> Optional[FundingRateRecord]:
         """
-        获取指定时间点或之前最近的资金费率
+        获取指定时间点或之前最近的CapitalRate
         
-        Binance 资金费率每 8 小时结算（UTC 00:00, 08:00, 16:00）
+        Binance CapitalRate每 8 小时结算（UTC 00:00, 08:00, 16:00）
         """
         if self.data_cache is None or not self.data_cache.funding_rates:
             return None
         
-        # 找到时间戳之前最近的资金费率
+        # 找toTimestamp之前最近的CapitalRate
         latest_fr = None
         for fr in self.data_cache.funding_rates:
             if fr.timestamp <= timestamp:
@@ -756,9 +756,9 @@ class DataReplayAgent:
     
     def is_funding_settlement_time(self, timestamp: datetime) -> bool:
         """
-        检查是否是资金费率结算时间
+        检查是否是CapitalRateSettlement timestamp
         
-        Binance 合约资金费率结算时间：UTC 00:00, 08:00, 16:00
+        Binance 合约CapitalRateSettlement timestamp：UTC 00:00, 08:00, 16:00
         """
         if timestamp.tzinfo is not None:
             ts_utc = timestamp.astimezone(timezone.utc)
@@ -778,7 +778,7 @@ class DataReplayAgent:
         df_15m: pd.DataFrame,
         df_1h: pd.DataFrame
     ) -> bool:
-        """检查多周期数据对齐性（基于索引时间戳）"""
+        """检查多周期数据对齐性（基于索引Timestamp）"""
         if df_5m.empty or df_15m.empty or df_1h.empty:
             return False
 
@@ -799,7 +799,7 @@ class DataReplayAgent:
     
     def get_funding_rate_for_settlement(self, timestamp: datetime) -> Optional[float]:
         """
-        获取结算时刻适用的资金费率（仅在结算时刻返回，否则返回None）
+        获取结算时刻适用的CapitalRate（仅在结算时刻返回，否则返回None）
         """
         if not self.is_funding_settlement_time(timestamp):
             return None
@@ -815,7 +815,7 @@ class DataReplayAgent:
         """
         兼容 DataSyncAgent.fetch_all_timeframes 接口
         
-        在回测模式下，返回当前时间点的快照
+        在回测Mode下，返回当前时间点的快照
         """
         if self.current_idx < len(self.timestamps):
             timestamp = self.timestamps[self.current_idx]

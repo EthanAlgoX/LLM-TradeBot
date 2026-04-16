@@ -3834,6 +3834,7 @@ async function loadSettings() {
         setIfExists('cfg-kimi-key', config.api_keys.kimi_api_key);
         setIfExists('cfg-minimax-key', config.api_keys.minimax_api_key);
         setIfExists('cfg-glm-key', config.api_keys.glm_api_key);
+        setIfExists('cfg-openrouter-key', config.api_keys.openrouter_api_key);
 
         // LLM Provider Selection
         const llmProvider = config.llm?.provider || 'none';
@@ -3875,6 +3876,7 @@ async function saveSettings() {
     const elKimiKey = document.getElementById('cfg-kimi-key');
     const elMinimaxKey = document.getElementById('cfg-minimax-key');
     const elGlmKey = document.getElementById('cfg-glm-key');
+    const elOpenrouterKey = document.getElementById('cfg-openrouter-key');
     const elLlmProvider = document.getElementById('cfg-llm-provider');
 
     if (!elBinanceKey || !elDeepseekKey) {
@@ -3892,7 +3894,8 @@ async function saveSettings() {
             gemini_api_key: elGeminiKey ? elGeminiKey.value : '',
             kimi_api_key: elKimiKey ? elKimiKey.value : '',
             minimax_api_key: elMinimaxKey ? elMinimaxKey.value : '',
-            glm_api_key: elGlmKey ? elGlmKey.value : ''
+            glm_api_key: elGlmKey ? elGlmKey.value : '',
+            openrouter_api_key: elOpenrouterKey ? elOpenrouterKey.value : ''
         },
         llm: {
             llm_provider: elLlmProvider ? elLlmProvider.value : 'deepseek'
@@ -4489,7 +4492,8 @@ function syncTradingModeButtons(isTestMode) {
         gemini: 'gemini_api_key',
         kimi: 'kimi_api_key',
         minimax: 'minimax_api_key',
-        glm: 'glm_api_key'
+        glm: 'glm_api_key',
+        openrouter: 'openrouter_api_key'
     };
 
     const resolveProvider = (config) => {

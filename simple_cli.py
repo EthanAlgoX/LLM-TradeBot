@@ -92,8 +92,8 @@ class SimpleTradingBot:
         print("="*60)
         
         try:
-            from src.agents.symbol_selector_agent import get_selector
-            selector = get_selector()
+            from src.agents.symbol_selector_agent import SymbolSelectorAgent
+            selector = SymbolSelectorAgent()
             
             # 运行异步选择
             loop = asyncio.get_event_loop()

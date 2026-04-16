@@ -16,6 +16,9 @@ from src.utils.action_protocol import is_passive_action
 
 # Input Model
 from pydantic import BaseModel
+
+from src.utils.logger import log
+
 class ControlCommand(BaseModel):
     action: str  # start, pause, stop, restart, set_interval
     interval: float = None  # Optional: interval in minutes for set_interval action
@@ -625,42 +628,42 @@ def _build_default_agent_settings() -> Dict[str, Any]:
 
     # Trend / Setup / Trigger prompts
     try:
-        from src.agents.trend_agent import TrendAgentLLM
+        from src.agents.trend import TrendAgentLLM
         inst = TrendAgentLLM.__new__(TrendAgentLLM)
         defaults["agents"]["trend_agent"] = {
             "params": {"temperature": 0.3, "max_tokens": 300},
-            "system_prompt": inst._get_system_prompt()
+            "system_prompt": inst.get_system_prompt()
         }
     except Exception:
         defaults["agents"]["trend_agent"] = {"params": {"temperature": 0.3, "max_tokens": 300}, "system_prompt": ""}
 
     try:
-        from src.agents.setup_agent import SetupAgentLLM
+        from src.agents.setup.setup_agent_llm import SetupAgentLLM
         inst = SetupAgentLLM.__new__(SetupAgentLLM)
         defaults["agents"]["setup_agent"] = {
             "params": {"temperature": 0.3, "max_tokens": 300},
-            "system_prompt": inst._get_system_prompt()
+            "system_prompt": inst.get_system_prompt()
         }
     except Exception:
         defaults["agents"]["setup_agent"] = {"params": {"temperature": 0.3, "max_tokens": 300}, "system_prompt": ""}
 
     try:
-        from src.agents.trigger_agent import TriggerAgentLLM
+        from src.agents.trigger import TriggerAgentLLM
         inst = TriggerAgentLLM.__new__(TriggerAgentLLM)
         defaults["agents"]["trigger_agent"] = {
             "params": {"temperature": 0.3, "max_tokens": 300},
-            "system_prompt": inst._get_system_prompt()
+            "system_prompt": inst.get_system_prompt()
         }
     except Exception:
         defaults["agents"]["trigger_agent"] = {"params": {"temperature": 0.3, "max_tokens": 300}, "system_prompt": ""}
 
     # Reflection prompt
     try:
-        from src.agents.reflection_agent import ReflectionAgent
-        inst = ReflectionAgent.__new__(ReflectionAgent)
+        from src.agents.reflection.reflection_agent_llm import ReflectionAgentLLM
+        inst = ReflectionAgentLLM.__new__(ReflectionAgentLLM)
         defaults["agents"]["reflection_agent"] = {
             "params": {"temperature": 0.7, "max_tokens": 1500},
-            "system_prompt": inst._build_system_prompt()
+            "system_prompt": inst.get_system_prompt()
         }
     except Exception:
         defaults["agents"]["reflection_agent"] = {"params": {"temperature": 0.7, "max_tokens": 1500}, "system_prompt": ""}
@@ -672,7 +675,7 @@ def _build_default_agent_settings() -> Dict[str, Any]:
         DEFAULT_SYSTEM_PROMPT = ""
 
     try:
-        from src.agents.decision_core_agent import SignalWeight
+        from src.agents.decision_core.decision_core_agent import SignalWeight
         defaults["agents"]["decision_core"] = {
             "params": asdict(SignalWeight()),
             "system_prompt": DEFAULT_SYSTEM_PROMPT

@@ -15,8 +15,6 @@ Date: 2025-12-19
 
 import asyncio
 from typing import Dict, List, Optional, Tuple, Any
-from dataclasses import dataclass
-from datetime import datetime
 import json
 
 import pandas as pd
@@ -25,139 +23,11 @@ from src.utils.logger import log
 from src.utils.action_protocol import normalize_action, is_open_action
 from src.agents.position_analyzer_agent import PositionAnalyzer
 from src.agents.regime_detector_agent import RegimeDetector
-from src.agents.predict_agent import PredictResult
+from src.agents.predict import PredictResult
 
-
-# ============================================
-# 过度交易防护 (Overtrading Guard)
-# ============================================
-@dataclass
-class TradeRecord:
-    """交易记录"""
-    symbol: str
-    action: str
-    timestamp: datetime
-    pnl: float = 0.0
-
-
-class OvertradingGuard:
-    """
-    过度交易防护 - 防止频繁交易和连续亏损
-    
-    规则:
-    - 同一symbol最少间隔2个周期
-    - 6小时内最多3个新仓位
-    - 连续2次亏损后，需要等待4个周期
-    """
-    
-    MIN_CYCLES_SAME_SYMBOL = 4        # 同symbol最小间隔周期 (1小时)
-    MAX_POSITIONS_6H = 2              # 6小时内最多开仓数 (减少过度交易)
-    LOSS_STREAK_COOLDOWN = 6          # 连续亏损后冷却周期 (增加冷却时间)
-    CONSECUTIVE_LOSS_THRESHOLD = 2   # 触发冷却的连续亏损次数
-    
-    def __init__(self):
-        self.trade_history: List[TradeRecord] = []
-        self.consecutive_losses = 0
-        self.last_trade_cycle: Dict[str, int] = {}  # symbol -> cycle
-        self.cooldown_until_cycle: int = 0
-    
-    def record_trade(self, symbol: str, action: str, pnl: float = 0.0, current_cycle: int = 0):
-        """记录一笔交易"""
-        self.trade_history.append(TradeRecord(
-            symbol=symbol,
-            action=action,
-            timestamp=datetime.now(),
-            pnl=pnl
-        ))
-        self.last_trade_cycle[symbol] = current_cycle
-        
-        # 追踪连续亏损
-        if pnl < 0:
-            self.consecutive_losses += 1
-            if self.consecutive_losses >= self.CONSECUTIVE_LOSS_THRESHOLD:
-                self.cooldown_until_cycle = current_cycle + self.LOSS_STREAK_COOLDOWN
-                log.warning(f"⚠️ 连续{self.consecutive_losses}次亏损，冷却至周期 {self.cooldown_until_cycle}")
-        else:
-            self.consecutive_losses = 0
-    
-    def can_open_position(self, symbol: str, current_cycle: int = 0) -> Tuple[bool, str]:
-        """
-        检查是否可以开仓
-        
-        Returns:
-            (allowed, reason)
-        """
-        # 检查冷却期
-        if current_cycle < self.cooldown_until_cycle:
-            remaining = self.cooldown_until_cycle - current_cycle
-            return False, f"⛔ 连续亏损冷却中，剩余{remaining}周期"
-        
-        # 检查同symbol间隔
-        if symbol in self.last_trade_cycle:
-            cycles_since = current_cycle - self.last_trade_cycle[symbol]
-            if cycles_since < self.MIN_CYCLES_SAME_SYMBOL:
-                return False, f"⛔ {symbol}交易间隔不足，需等待{self.MIN_CYCLES_SAME_SYMBOL - cycles_since}周期"
-        
-        # 检查6小时内开仓数
-        six_hours_ago = datetime.now().timestamp() - 6 * 3600
-        recent_opens = sum(
-            1 for t in self.trade_history 
-            if t.timestamp.timestamp() > six_hours_ago and is_open_action(t.action)
-        )
-        if recent_opens >= self.MAX_POSITIONS_6H:
-            return False, f"⛔ 6小时内已开{recent_opens}仓，已达上限{self.MAX_POSITIONS_6H}"
-        
-        return True, "✅ 允许开仓"
-    
-    def get_status(self) -> Dict:
-        """获取当前状态"""
-        return {
-            'consecutive_losses': self.consecutive_losses,
-            'cooldown_until': self.cooldown_until_cycle,
-            'recent_trades': len(self.trade_history),
-            'symbols_traded': list(self.last_trade_cycle.keys())
-        }
-
-
-@dataclass
-class SignalWeight:
-    """信号权重配置
-    
-    注意: 所有权重应该合计为 1.0 (不包括动态 sentiment)
-    优化后配置 (2026-01-07): 基于回测分析进一步优化
-    - 增加1h权重，减少短周期噪音
-    - 减少prophet权重，更依赖技术指标
-    """
-    # 趋势信号 (合计 0.45) - 增加长周期权重
-    trend_5m: float = 0.03   # 减少5m噪音影响
-    trend_15m: float = 0.12  # 略增
-    trend_1h: float = 0.30   # 增加1h权重 (核心趋势判断)
-    # 震荡信号 (合计 0.20)
-    oscillator_5m: float = 0.03  # 减少5m噪音
-    oscillator_15m: float = 0.07
-    oscillator_1h: float = 0.10  # 增加1h权重
-    # Prophet ML 预测权重 - 进一步减少
-    prophet: float = 0.05  # 减少ML权重，避免过拟合
-    # 情绪信号 (动态权重)
-    sentiment: float = 0.25
-    # 其他扩展信号（如LLM）
-    llm_signal: float = 0.0  # 待整合
-
-
-@dataclass
-class VoteResult:
-    """投票结果"""
-    action: str  # 'open_long', 'open_short', 'close_long', 'close_short', 'wait/hold'
-    confidence: float  # 0-100
-    weighted_score: float  # -100 ~ +100
-    vote_details: Dict[str, float]  # 各信号的贡献分
-    multi_period_aligned: bool  # 多周期是否一致
-    reason: str  # 决策原因
-    regime: Optional[Dict] = None      # 市场状态信息
-    position: Optional[Dict] = None    # 价格位置信息
-    trade_params: Optional[Dict] = None # 动态交易参数 (stop_loss, take_profit, leverage, etc.)
-    traps: Optional[Dict] = None # 市场陷阱信息 (User Experience Logic)
-
+from .signal_weight import SignalWeight
+from .vote_result import VoteResult
+from .overtrading_guard import OvertradingGuard
 
 class DecisionCoreAgent:
     """对抗评论员 (The Critic)
@@ -989,7 +859,6 @@ class DecisionCoreAgent:
             'alignment_rate': aligned_count / total,
             'performance_tracker': self.performance_tracker,
         }
-
 
 # ============================================
 # 测试函数
