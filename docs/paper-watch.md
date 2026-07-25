@@ -9,7 +9,7 @@ npm run backtest:ts -- paper-watch \
   --account-id paper:main \
   --cycles 12 \
   --interval-seconds 300 \
-  --trace-db data/tradeboard.db
+  --trace-db data/tradebot.db
 ```
 
 每轮必须等待上一轮完成，避免数据同步、账户持久化和 Reflection 状态并发交错。默认遇错停止；加 `--continue-on-error` 才会记录失败后继续下一轮。

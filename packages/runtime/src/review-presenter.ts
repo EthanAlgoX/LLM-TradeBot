@@ -27,7 +27,7 @@ export function buildTradeReview(artifacts: readonly AgentArtifact[], orderId?: 
 
 export function renderTradeReview(review: TradeReview | undefined): string {
   if (!review) return "No matching artifacts found.";
-  const header = `TradeBoard Review · trace=${review.traceId} artifacts=${review.artifactCount} fallback=${review.fallbackCount} errors=${review.errorCount}`;
+  const header = `TradeBot Review · trace=${review.traceId} artifacts=${review.artifactCount} fallback=${review.fallbackCount} errors=${review.errorCount}`;
   const facts = `Decision: ${review.decision?.action ?? "unknown"} · Risk: ${review.risk?.passed === undefined ? "unknown" : review.risk.passed ? "passed" : "blocked"} · Execution: ${review.execution?.status ?? "none"}`;
   return [header, facts, "Timeline:", ...review.timeline.map((item) => `- ${item.startedAt.toISOString()} ${item.stage} [${item.agent}@${item.agentVersion}] ${item.status} ${item.summary}`)].join("\n");
 }

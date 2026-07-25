@@ -1,6 +1,6 @@
 # Agent Artifact Ledger
 
-每次 TradeBoard cycle 都有一个 `traceId`。当运行命令提供 `--artifact-db` 时，Pipeline 会把每个 Agent 调用的结构化输入、输出、版本、耗时和状态写入本地 SQLite append-only ledger。
+每次 TradeBot cycle 都有一个 `traceId`。当运行命令提供 `--artifact-db` 时，Pipeline 会把每个 Agent 调用的结构化输入、输出、版本、耗时和状态写入本地 SQLite append-only ledger。
 
 ```sh
 npm run backtest:ts -- paper-cycle --symbols BTCUSDT --paper-db data/paper.db --account-id paper:main --artifact-db data/artifacts.db

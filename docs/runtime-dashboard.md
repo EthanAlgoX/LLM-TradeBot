@@ -6,7 +6,7 @@
 npm run backtest:ts -- dashboard \
   --paper-db data/paper.db \
   --account-id paper:main \
-  --trace-db data/tradeboard.db \
+  --trace-db data/tradebot.db \
   --reflection-db data/paper.db.reflection.db
 ```
 

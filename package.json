@@ -1,18 +1,21 @@
 {
-  "name": "tradeboard",
+  "name": "tradebot",
   "private": true,
   "version": "0.1.0",
-  "description": "TypeScript runtime foundation for TradeBoard",
+  "description": "TypeScript runtime foundation for TradeBot",
   "type": "module",
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "check": "tsc -p tsconfig.json --noEmit",
     "test:ts": "npm run build && node --test dist/tests-ts/*.test.js",
-    "backtest:ts": "npm run build && node dist/apps/cli/src/main.js"
+    "backtest:ts": "npm run build && node dist/apps/cli/src/main.js",
+    "dev:web": "vite apps/web",
+    "build:web": "vite build apps/web"
   },
   "devDependencies": {
     "@types/node": "^22.10.1",
-    "typescript": "^5.7.2"
+    "typescript": "^5.7.2",
+    "vite": "^8.1.5"
   },
   "dependencies": {
     "zod": "^3.24.1"

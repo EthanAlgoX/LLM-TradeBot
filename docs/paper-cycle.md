@@ -9,7 +9,7 @@ npm run backtest:ts -- paper-cycle \
   --symbols BTCUSDT,ETHUSDT \
   --paper-db data/paper.db \
   --account-id paper:main \
-  --trace-db data/tradeboard.db
+  --trace-db data/tradebot.db
 ```
 
 只有显式给出 `--execution-enabled`，通过 Risk 的订单才会写入本地 SQLite Paper 账户；这仍是模拟撮合，绝不向 Binance 下单：

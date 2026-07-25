@@ -1,4 +1,4 @@
-# TradeBoard 架构与交付规划
+# TradeBot 架构与交付规划
 
 > 状态：基础阶段实施中  
 > 最后更新：2026-07-25  
@@ -52,7 +52,7 @@ Selector -> Data -> Signal/Prediction/Context/Semantic -> Fusion
 
 借鉴的是 Agent 职责划分和数据流，不是直接复制 UI、全局状态或阈值实现。
 
-| LLM-TradeBot 能力 | 在 TradeBoard 中的目标实现 | 迁移原则 |
+| LLM-TradeBot 能力 | 在 TradeBot 中的目标实现 | 迁移原则 |
 |---|---|---|
 | AUTO1 / AUTO3 Symbol Selector | `SelectorAgent` 产出候选、可交易性、方向性与拒绝原因 | 真实数据驱动；保留 Top-N 和单机会两种策略 |
 | DataSync 5m/15m/1h | `DataSyncAgent` 产出对齐的多周期快照 | 区分已收盘 `stable` 和实时 `live` 数据，避免未来函数 |
@@ -125,7 +125,7 @@ flowchart LR
 ### 推荐目录
 
 ```text
-tradeboard/
+tradebot/
   apps/
     cli/                    # CLI 与 TUI
   packages/

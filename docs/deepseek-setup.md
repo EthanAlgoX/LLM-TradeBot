@@ -1,6 +1,6 @@
 # DeepSeek 接入
 
-TradeBoard 的 LLM 仅用于 Bull / Bear 对抗观点；不能绕过 `Decision -> Portfolio -> Risk -> Execution` 链路，也没有任何交易所写权限。
+TradeBot 的 LLM 仅用于 Bull / Bear 对抗观点；不能绕过 `Decision -> Portfolio -> Risk -> Execution` 链路，也没有任何交易所写权限。
 
 配置环境变量（不要提交 `.env`）：
 

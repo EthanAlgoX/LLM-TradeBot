@@ -47,5 +47,5 @@ export function renderRuntimeDashboard(dashboard: RuntimeDashboard): string {
     ? `consecutiveFailures=${dashboard.safety.consecutiveFailures} cooldownUntil=${dashboard.safety.cooldownUntil?.toISOString() ?? "none"} lastFailure=${dashboard.safety.lastFailure ?? "none"}`
     : "unavailable";
   const cycle = dashboard.latestCycle.status === "available" ? `status=${dashboard.latestCycle.cycleStatus} asOf=${dashboard.latestCycle.asOf?.toISOString()} decisions=${dashboard.latestCycle.decisionCount} executions=${dashboard.latestCycle.executionCount} profile=${dashboard.latestCycle.strategyId ?? "unknown"}@${dashboard.latestCycle.profileVersion ?? "unknown"} config=${dashboard.latestCycle.configVersion ?? "unknown"} source=${dashboard.latestCycle.dataSourceKind ?? "unknown"}` : "unavailable";
-  return [`TradeBoard Dashboard · ${dashboard.accountId}`, `Account: ${account}`, `Trace: ${trace}`, `Reflection: ${reflection}`, `Safety: ${safety}`, `Latest cycle: ${cycle}`].join("\n");
+  return [`TradeBot Dashboard · ${dashboard.accountId}`, `Account: ${account}`, `Trace: ${trace}`, `Reflection: ${reflection}`, `Safety: ${safety}`, `Latest cycle: ${cycle}`].join("\n");
 }

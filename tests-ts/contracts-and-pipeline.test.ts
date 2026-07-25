@@ -412,7 +412,7 @@ test("pipeline evaluates an existing position exit before new directional cases"
 });
 
 test("SQLite trace sink persists replayable ordered events", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "tradeboard-trace-"));
+  const directory = await mkdtemp(join(tmpdir(), "tradebot-trace-"));
   const sink = new SQLiteTraceSink(join(directory, "trace.db"));
   try {
     await sink.append({ schemaVersion: SCHEMA_VERSION, traceId, stage: "data", agent: "fixture", phase: "start", at: asOf, data: { symbol: "BTCUSDT" } });
@@ -426,7 +426,7 @@ test("SQLite trace sink persists replayable ordered events", async () => {
 });
 
 test("paper cycle journal persists records per account", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "tradeboard-journal-"));
+  const directory = await mkdtemp(join(tmpdir(), "tradebot-journal-"));
   const journal = new SQLitePaperCycleJournal(join(directory, "journal.db"));
   try {
     await journal.append({ recordId: "one", accountId: "paper:a", traceId: "trace:one", asOf, status: "ok", executionEnabled: false, strategyId: "rule", profileVersion: "v2", configVersion: "abc", dataSource: { kind: "binance_futures_public", identifier: "binance", observedAt: asOf }, decisionCount: 1, riskDecisionCount: 1, executionCount: 0 });
@@ -438,7 +438,7 @@ test("paper cycle journal persists records per account", async () => {
 });
 
 test("artifact ledger preserves ordered sanitized agent evidence and filters it", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "tradeboard-artifacts-"));
+  const directory = await mkdtemp(join(tmpdir(), "tradebot-artifacts-"));
   const ledger = new SQLiteAgentArtifactLedger(join(directory, "artifacts.db"));
   try {
     await ledger.append({ schemaVersion: SCHEMA_VERSION, artifactId: "a1", traceId, asOf, symbol: "BTCUSDT", stage: "analysis", agent: "rule", agentVersion: "v1", status: "success", startedAt: asOf, completedAt: asOf, durationMs: 0, input: { bars: 50 }, output: { trend: "long" } });
@@ -494,7 +494,7 @@ test("dashboard presenter combines account, trace, reflection, and renders stabl
   assert.equal(dashboard.trace.riskRejectedCount, 1);
   assert.equal(dashboard.reflection.fallbackUsed, true);
   assert.equal(dashboard.safety.consecutiveFailures, 2);
-  assert.match(renderRuntimeDashboard(dashboard), /TradeBoard Dashboard · paper:main/);
+  assert.match(renderRuntimeDashboard(dashboard), /TradeBot Dashboard · paper:main/);
   assert.match(renderRuntimeDashboard(dashboard), /recommendations: review entries/);
   assert.match(renderRuntimeDashboard(dashboard), /Safety: consecutiveFailures=2/);
   assert.match(renderRuntimeDashboard(dashboard), /profile=rule@v2 config=abc source=binance_futures_public/);
@@ -557,7 +557,7 @@ test("paper safety guard blocks before a market cycle after consecutive failures
 });
 
 test("SQLite runtime safety store restores cooldown across restart", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "tradeboard-safety-"));
+  const directory = await mkdtemp(join(tmpdir(), "tradebot-safety-"));
   const path = join(directory, "safety.db");
   const first = new SQLiteRuntimeSafetyStore(path);
   try {
@@ -575,7 +575,7 @@ test("SQLite runtime safety store restores cooldown across restart", async () =>
 });
 
 test("persistent paper execution restores an open position after restart", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "tradeboard-paper-"));
+  const directory = await mkdtemp(join(tmpdir(), "tradebot-paper-"));
   const store = new SQLitePaperAccountStore(join(directory, "paper.db"));
   const risk = { schemaVersion: SCHEMA_VERSION, traceId, symbol: "BTCUSDT", passed: true, riskLevel: "safe" as const, corrections: {}, warnings: [] };
   const opening = { schemaVersion: SCHEMA_VERSION, traceId, asOf, symbol: "BTCUSDT", action: "open_long" as const, confidence: 80, reason: "open", evidence: [], missingConfirmations: [], orderIntent: { symbol: "BTCUSDT", action: "open_long" as const, entryPrice: 100, notional: 100, stopLoss: 98, takeProfit: 103, leverage: 1 } };
@@ -803,7 +803,7 @@ test("LLM reflection falls back to the rule report on timeout or invalid output"
 });
 
 test("SQLite reflection store restores the latest structured report", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "tradeboard-reflection-"));
+  const directory = await mkdtemp(join(tmpdir(), "tradebot-reflection-"));
   const store = new SQLiteReflectionStore(join(directory, "reflection.db"));
   try {
     const report = await new RuleReflectionAgent({ minimumTrades: 3, intervalTrades: 1 }).run({ asOf, trades: reflectionTrades });
@@ -863,7 +863,7 @@ test("optimization inputs are constrained to explicitly approved numeric knobs",
 });
 
 test("run manifests bind a CSV content hash and retain only safe provenance", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "tradeboard-manifest-"));
+  const directory = await mkdtemp(join(tmpdir(), "tradebot-manifest-"));
   const csv = join(directory, "bars.csv");
   try {
     await writeFile(csv, "one");

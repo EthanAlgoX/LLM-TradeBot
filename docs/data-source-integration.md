@@ -8,7 +8,7 @@
 - 选币趋势强度由 `15m` 与 `1h` 共同计算，`5m` 用于 30 分钟动量与波动率，避免只按单一周期排名。
 - DataSync 仍只使用已收盘 K 线；当前未收盘 bar 不进入规则分析或回测。
 
-TradeBoard 不迁移 LLM-TradeBot 的 WebSocket 常驻管理、前端全局状态或 Binance 写接口。实时单次运行使用：
+TradeBot 不迁移 LLM-TradeBot 的 WebSocket 常驻管理、前端全局状态或 Binance 写接口。实时单次运行使用：
 
 ```sh
 npm run backtest:ts -- paper-cycle \
