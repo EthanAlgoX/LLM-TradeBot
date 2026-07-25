@@ -22,3 +22,7 @@ reports/
 # Temporary files
 /tmp/
 test_output.txt
+
+# TypeScript build and dependencies
+node_modules/
+dist/
