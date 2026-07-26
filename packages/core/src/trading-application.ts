@@ -101,7 +101,10 @@ export class DecisionPipeline implements TradingApplication {
 
     const selected = universe.candidates.filter((candidate) => candidate.tradable).map((candidate) => candidate.symbol);
     const openPositions = await this.deps.positionState?.getOpenPositions() ?? [];
-    const symbols = [...new Set([...(request.symbols ?? selected), ...openPositions.map((position) => position.symbol)])];
+    // The request symbols are the Selector's candidate pool, not an instruction
+    // to bypass its ranking. Only admitted symbols enter the opening pipeline;
+    // open positions are always included so Position Monitor can still exit them.
+    const symbols = [...new Set([...selected, ...openPositions.map((position) => position.symbol)])];
     const decisions: DecisionBundle[] = [];
     const riskDecisions: RiskDecision[] = [];
     const executions: ExecutionResult[] = [];
@@ -159,6 +162,24 @@ export class DecisionPipeline implements TradingApplication {
 
       if (!risk.passed || !decision.orderIntent || !request.executionEnabled) {
         continue;
+      }
+
+      if (request.executionMode === "close_only") {
+        const position = openPositions.find(
+          (candidate) => candidate.symbol === symbol,
+        );
+        const reducesExistingPosition =
+          (position?.side === "long" && decision.action === "close_long") ||
+          (position?.side === "short" && decision.action === "close_short");
+        if (!reducesExistingPosition) {
+          await emit("execution", this.deps.execution.name, "end", {
+            symbol,
+            status: "skipped",
+            reason: "close_only_new_opening_blocked",
+            decisionIndex,
+          });
+          continue;
+        }
       }
 
       if (this.deps.portfolioRisk && this.deps.portfolioState) {

@@ -10,6 +10,7 @@
     "test:ts": "npm run build && node --test dist/tests-ts/*.test.js",
     "backtest:ts": "npm run build && node dist/apps/cli/src/main.js",
     "dev:web": "vite apps/web",
+    "dev:orchestration": "npm run build && node dist/packages/runtime/src/pipeline-orchestration-server-cli.js",
     "build:web": "vite build apps/web"
   },
   "devDependencies": {

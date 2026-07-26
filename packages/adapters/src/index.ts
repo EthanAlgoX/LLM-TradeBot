@@ -15,3 +15,4 @@ export * from "./binance-futures-market-data-source.js";
 export * from "./sqlite-runtime-safety-store.js";
 export * from "./sqlite-paper-cycle-journal.js";
 export * from "./sqlite-agent-artifact-ledger.js";
+export * from "./data-source-capability-manifests.js";

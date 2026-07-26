@@ -2,6 +2,8 @@
 
 `paper-cycle` 使用 Binance Futures 的公共 GET 行情接口运行一次完整 Multi-Agent 周期。它不会调用任何 Binance 交易接口。
 
+`--symbols` 是 Selector 的候选池，不是并行运行清单。默认 Strategy Profile 使用 `selector.topN = 1`：Selector 会对候选池过滤和排名，每个 cycle 只允许一个新标的进入 Data、Analysis、Decision 与 Risk 链路。已有持仓始终会额外进入 Position Monitor，以保证止盈、止损、趋势反转和最长持仓退出仍然工作。
+
 默认只生成候选、分析、决策、风控、trace 与 Reflection 摘要，不改变本地账户：
 
 ```sh

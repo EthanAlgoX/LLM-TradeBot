@@ -1,5 +1,7 @@
 # Agent Artifact Ledger
 
+> 本文前半描述当前已实现能力；“目标扩展”描述已确认但尚未实现的下一阶段设计。
+
 每次 TradeBot cycle 都有一个 `traceId`。当运行命令提供 `--artifact-db` 时，Pipeline 会把每个 Agent 调用的结构化输入、输出、版本、耗时和状态写入本地 SQLite append-only ledger。
 
 ```sh
@@ -27,3 +29,33 @@ npm run backtest:ts -- review --artifact-db data/artifacts.db --order-id paper:4
 ```
 
 按订单 ID 查询时，系统先定位对应的 Execution artifact，再自动加载该 trace 的完整 Agent 时间线。报告会汇总决策动作、风控是否通过、执行状态，以及 fallback/error 数量；该命令只读本地 SQLite，不改变交易或账户状态。
+
+## 目标扩展：可编排与持续进化
+
+未来 Artifact Ledger 仍是 append-only 运行证据层，但会增加以下关联：
+
+- `marketPackVersion`；
+- `dataSourceId` 与 `dataSnapshotVersion`；
+- `pipelineGraphVersion`；
+- `agentConfigVersion`；
+- `observationWindow`；
+- 原生或派生数据 lineage；
+- `strategyProfileVersion` 与 execution model；
+- release candidate、backtest、walk-forward 和 approval ID。
+
+建议新增的 Artifact 类型：
+
+```text
+DataCapabilityArtifact
+DataLineageArtifact
+MarketEventArtifact
+AnalysisArtifact
+DecisionContextArtifact
+LessonCandidateArtifact
+LessonValidationArtifact
+ReleaseEvidenceArtifact
+```
+
+Reflection 输出只能先写为 `LessonCandidateArtifact`。它不能直接修改运行中的 Decision Prompt、Agent 权重或风险参数。只有经过证据验证、回测、Walk-Forward 和人工审批的经验，才能生成带适用市场、Regime、有效期、置信度和最大影响范围的 `ValidatedLesson`。
+
+Artifact Ledger 不承担配置真相。Data Source Registry、Agent Registry、Pipeline Graph Registry 和 Release Registry 保存版本化配置；Ledger 保存这些配置在某次运行中实际产生的不可变证据。

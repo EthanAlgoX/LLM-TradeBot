@@ -405,6 +405,7 @@ export const CycleRequestSchema = z.object({
   configVersion: z.string().min(1),
   symbols: z.array(z.string().min(1)).optional(),
   executionEnabled: z.boolean(),
+  executionMode: z.enum(["normal", "close_only"]).optional(),
 });
 export type CycleRequest = z.infer<typeof CycleRequestSchema>;
 
@@ -698,8 +699,358 @@ export const StageEventSchema = z.object({
 });
 export type StageEvent = z.infer<typeof StageEventSchema>;
 
+export const EntityLifecycleStatusSchema = z.enum([
+  "draft",
+  "validated",
+  "approved",
+  "active",
+  "deprecated",
+  "archived",
+]);
+export type EntityLifecycleStatus = z.infer<typeof EntityLifecycleStatusSchema>;
+
+export const ObservationWindowKindSchema = z.enum([
+  "bar_interval",
+  "rolling_window",
+  "event_batch",
+  "reporting_period",
+]);
+export type ObservationWindowKind = z.infer<typeof ObservationWindowKindSchema>;
+
+export const ObservationTimeUnitSchema = z.enum([
+  "second",
+  "minute",
+  "hour",
+  "day",
+  "week",
+  "month",
+  "quarter",
+]);
+export type ObservationTimeUnit = z.infer<typeof ObservationTimeUnitSchema>;
+
+export const ObservationWindowSchema = z.object({
+  kind: ObservationWindowKindSchema,
+  value: z.number().int().positive(),
+  unit: ObservationTimeUnitSchema,
+}).strict();
+export type ObservationWindow = z.infer<typeof ObservationWindowSchema>;
+
+const VersionedEntityFields = {
+  schemaVersion: z.literal(SCHEMA_VERSION),
+  humanReadableVersion: z.string().min(1),
+  fingerprint: z.string().min(1),
+  lifecycleStatus: EntityLifecycleStatusSchema,
+  createdAt: z.coerce.date(),
+};
+
+export const MarketPackDefinitionSchema = z.object({
+  ...VersionedEntityFields,
+  marketPackId: z.string().min(1),
+  name: z.string().min(1),
+  market: z.string().min(1),
+  timezone: z.string().min(1),
+  tradingCalendar: z.string().min(1),
+  marketSchemaRef: z.string().min(1),
+  schemaRefs: z.array(z.string().min(1)).min(1),
+  capabilities: z.array(z.string().min(1)),
+  executionModes: z.array(z.enum(["backtest", "paper", "read_only"])).min(1),
+}).strict();
+export type MarketPackDefinition = z.infer<typeof MarketPackDefinitionSchema>;
+
+export const DataSourceKindSchema = z.enum([
+  "public_api",
+  "private_read_api",
+  "historical_file",
+  "database",
+  "event_feed",
+]);
+export type DataSourceKind = z.infer<typeof DataSourceKindSchema>;
+
+export const MarketDataTypeSchema = z.enum([
+  "ohlcv",
+  "tick",
+  "orderbook",
+  "news",
+  "fundamental",
+  "macro",
+  "alternative",
+]);
+export type MarketDataType = z.infer<typeof MarketDataTypeSchema>;
+
+export const DataSourceDefinitionSchema = z.object({
+  ...VersionedEntityFields,
+  dataSourceId: z.string().min(1),
+  name: z.string().min(1),
+  provider: z.string().min(1),
+  sourceKind: DataSourceKindSchema,
+  connectorRef: z.string().min(1),
+  marketPackRefs: z.array(z.string().min(1)).min(1),
+  marketSchemaRefs: z.array(z.string().min(1)).min(1),
+  capabilityRefs: z.array(z.string().min(1)).min(1),
+  readOnly: z.boolean(),
+}).strict();
+export type DataSourceDefinition = z.infer<typeof DataSourceDefinitionSchema>;
+
+export const DataSourceCapabilitySchema = z.object({
+  ...VersionedEntityFields,
+  capabilityId: z.string().min(1),
+  dataSourceId: z.string().min(1),
+  markets: z.array(z.string().min(1)).min(1),
+  marketPackRefs: z.array(z.string().min(1)).min(1),
+  schemaRefs: z.array(z.string().min(1)).min(1),
+  dataTypes: z.array(MarketDataTypeSchema).min(1),
+  nativeObservationWindows: z.array(ObservationWindowSchema),
+  historyStart: z.coerce.date().optional(),
+  supportsRealtime: z.boolean(),
+  updateCadence: ObservationWindowSchema.optional(),
+  timezone: z.string().min(1),
+  timestampSemantics: z.enum(["event_time", "publish_time", "open_time", "close_time"]),
+  tradingCalendar: z.string().min(1),
+  aggregation: z.object({
+    allowed: z.boolean(),
+    transformerVersion: z.string().min(1).optional(),
+    closedWindowsOnly: z.boolean(),
+  }).strict(),
+  completeness: z.number().min(0).max(1),
+  latencyMs: z.number().nonnegative().optional(),
+}).strict();
+export type DataSourceCapability = z.infer<typeof DataSourceCapabilitySchema>;
+
+export const DataLineageSchema = z.object({
+  ...VersionedEntityFields,
+  lineageId: z.string().min(1),
+  dataSourceId: z.string().min(1),
+  capabilityId: z.string().min(1),
+  sourceWindow: ObservationWindowSchema,
+  targetWindow: ObservationWindowSchema,
+  transformation: z.enum(["native", "aggregate"]),
+  transformerVersion: z.string().min(1),
+  timezone: z.string().min(1),
+  tradingCalendar: z.string().min(1),
+  sourceSchemaRef: z.string().min(1),
+  targetSchemaRef: z.string().min(1),
+  asOfPolicy: z.literal("closed_windows_only"),
+}).strict();
+export type DataLineage = z.infer<typeof DataLineageSchema>;
+
+export const AgentRoleSchema = z.enum([
+  "selector",
+  "data_sync",
+  "data_quality",
+  "processing",
+  "analysis",
+  "bull_case",
+  "bear_case",
+  "context",
+  "decision",
+  "portfolio",
+  "risk",
+  "execution",
+  "position_monitor",
+  "reflection",
+]);
+export type AgentRole = z.infer<typeof AgentRoleSchema>;
+
+export const AgentPermissionSchema = z.enum([
+  "observe",
+  "analyze",
+  "propose_decision",
+  "propose_close_only",
+  "allocate_portfolio",
+  "veto_risk",
+  "execute_paper",
+  "reflect",
+]);
+export type AgentPermission = z.infer<typeof AgentPermissionSchema>;
+
+export const AgentPortSchema = z.object({
+  portId: z.string().min(1),
+  schemaRefs: z.array(z.string().min(1)).min(1),
+  required: z.boolean(),
+  external: z.boolean(),
+}).strict();
+export type AgentPort = z.infer<typeof AgentPortSchema>;
+
+export const AgentTemplateSchema = z.object({
+  ...VersionedEntityFields,
+  templateId: z.string().min(1),
+  name: z.string().min(1),
+  role: AgentRoleSchema,
+  implementationRef: z.string().min(1),
+  configSchemaRef: z.string().min(1),
+  inputPorts: z.array(AgentPortSchema),
+  outputPorts: z.array(AgentPortSchema),
+  supportedMarkets: z.array(z.string().min(1)).min(1),
+  supportedMarketPackRefs: z.array(z.string().min(1)).min(1),
+  supportedDataTypes: z.array(MarketDataTypeSchema),
+  permissions: z.array(AgentPermissionSchema),
+  timeoutPolicy: z.object({
+    maxDurationMs: z.number().int().positive(),
+    onTimeout: z.enum(["fail", "use_fallback", "continue_degraded"]),
+    fallbackTemplateId: z.string().min(1).optional(),
+  }).strict(),
+  fallbackPolicy: z.object({
+    supported: z.boolean(),
+    fallbackTemplateIds: z.array(z.string().min(1)),
+  }).strict(),
+  allowsFeedback: z.boolean(),
+}).strict();
+export type AgentTemplate = z.infer<typeof AgentTemplateSchema>;
+
+export const InputRequirementSchema = z.enum(["required", "optional", "fallback"]);
+export type InputRequirement = z.infer<typeof InputRequirementSchema>;
+
+export const FailurePolicySchema = z.object({
+  mode: InputRequirementSchema,
+  onFailure: z.enum(["block_openings", "continue_degraded", "use_fallback"]),
+  fallbackNodeId: z.string().min(1).optional(),
+}).strict();
+export type FailurePolicy = z.infer<typeof FailurePolicySchema>;
+
+export const AgentConfigSchema = z.object({
+  ...VersionedEntityFields,
+  agentConfigId: z.string().min(1),
+  templateId: z.string().min(1),
+  templateVersion: z.string().min(1),
+  market: z.string().min(1),
+  marketPackRef: z.string().min(1),
+  schemaRefs: z.array(z.string().min(1)).min(1),
+  dataSourceRefs: z.array(z.string().min(1)),
+  observationRequests: z.array(z.object({
+    portId: z.string().min(1),
+    dataSourceId: z.string().min(1),
+    capabilityId: z.string().min(1).optional(),
+    window: ObservationWindowSchema,
+    requirement: InputRequirementSchema,
+    fallbackDataSourceId: z.string().min(1).optional(),
+  }).strict()),
+  config: z.record(z.string(), z.unknown()),
+}).strict();
+export type AgentConfig = z.infer<typeof AgentConfigSchema>;
+
+export const PipelineNodeSchema = z.object({
+  nodeId: z.string().min(1),
+  displayName: z.string().min(1),
+  agentConfigId: z.string().min(1),
+  required: z.boolean(),
+  failurePolicy: FailurePolicySchema,
+}).strict();
+export type PipelineNode = z.infer<typeof PipelineNodeSchema>;
+
+export const PipelineEdgeSchema = z.object({
+  edgeId: z.string().min(1),
+  fromNodeId: z.string().min(1),
+  fromPort: z.string().min(1),
+  toNodeId: z.string().min(1),
+  toPort: z.string().min(1),
+  kind: z.enum(["data", "control", "post_process", "fallback", "feedback"]),
+  required: z.boolean(),
+  feedbackPolicy: z.object({
+    maxIterations: z.number().int().positive(),
+    delayMs: z.number().int().nonnegative(),
+  }).strict().optional(),
+}).strict();
+export type PipelineEdge = z.infer<typeof PipelineEdgeSchema>;
+
+export const PipelineReleaseGateSchema = z.enum([
+  "contract_validation",
+  "backtest",
+  "walk_forward",
+  "human_approval",
+  "paper_running",
+]);
+export type PipelineReleaseGate = z.infer<typeof PipelineReleaseGateSchema>;
+
+export const PipelineGraphVersionSchema = z.object({
+  ...VersionedEntityFields,
+  pipelineGraphId: z.string().min(1),
+  name: z.string().min(1),
+  market: z.string().min(1),
+  marketPackRef: z.string().min(1),
+  schemaRefs: z.array(z.string().min(1)).min(1),
+  dataSourceRefs: z.array(z.string().min(1)),
+  nodes: z.array(PipelineNodeSchema).min(1),
+  edges: z.array(PipelineEdgeSchema),
+  entryNodeIds: z.array(z.string().min(1)).min(1),
+  terminalNodeIds: z.array(z.string().min(1)).min(1),
+  dataLineage: z.array(DataLineageSchema),
+  releaseGates: z.array(PipelineReleaseGateSchema).min(1),
+}).strict();
+export type PipelineGraphVersion = z.infer<typeof PipelineGraphVersionSchema>;
+
+export const PipelineValidationCodeSchema = z.enum([
+  "INVALID_GRAPH_CONTRACT",
+  "DUPLICATE_NODE_ID",
+  "DUPLICATE_EDGE_ID",
+  "UNKNOWN_ENTRY_NODE",
+  "UNKNOWN_TERMINAL_NODE",
+  "UNKNOWN_EDGE_SOURCE",
+  "UNKNOWN_EDGE_TARGET",
+  "UNKNOWN_AGENT_CONFIG",
+  "UNKNOWN_AGENT_TEMPLATE",
+  "AGENT_TEMPLATE_VERSION_MISMATCH",
+  "PORT_NOT_FOUND",
+  "SCHEMA_INCOMPATIBLE",
+  "MARKET_PACK_NOT_FOUND",
+  "MARKET_PACK_MISMATCH",
+  "MARKET_UNSUPPORTED",
+  "DATA_SOURCE_NOT_FOUND",
+  "DATA_CAPABILITY_NOT_FOUND",
+  "DATA_SOURCE_TYPE_UNSUPPORTED",
+  "OBSERVATION_WINDOW_UNSUPPORTED",
+  "UPSAMPLING_FORBIDDEN",
+  "DATA_LINEAGE_REQUIRED",
+  "DATA_LINEAGE_INVALID",
+  "REQUIRED_INPUT_MISSING",
+  "DANGLING_NODE",
+  "UNREACHABLE_NODE",
+  "CYCLE_NOT_ALLOWED",
+  "FEEDBACK_POLICY_INCOMPLETE",
+  "DECISION_BOUNDARY_BYPASSED",
+  "RISK_BOUNDARY_BYPASSED",
+  "EXECUTION_BOUNDARY_BYPASSED",
+  "FAILURE_POLICY_INCOMPLETE",
+  "FALLBACK_NODE_INVALID",
+  "RELEASE_GATES_INCOMPLETE",
+]);
+export type PipelineValidationCode = z.infer<typeof PipelineValidationCodeSchema>;
+
+export const PipelineValidationIssueSchema = z.object({
+  issueId: z.string().min(1),
+  code: PipelineValidationCodeSchema,
+  severity: z.enum(["error", "warning"]),
+  entityType: z.enum(["graph", "node", "edge", "agent_config", "agent_template", "data_source", "capability", "lineage"]),
+  entityId: z.string().min(1).optional(),
+  path: z.array(z.union([z.string(), z.number()])),
+  details: z.record(z.string(), z.unknown()),
+}).strict();
+export type PipelineValidationIssue = z.infer<typeof PipelineValidationIssueSchema>;
+
+export const PipelineValidationResultSchema = z.object({
+  schemaVersion: z.literal(SCHEMA_VERSION),
+  pipelineGraphId: z.string().min(1),
+  graphVersion: z.string().min(1),
+  valid: z.boolean(),
+  issues: z.array(PipelineValidationIssueSchema),
+  summary: z.object({
+    errorCount: z.number().int().nonnegative(),
+    warningCount: z.number().int().nonnegative(),
+  }).strict(),
+}).strict();
+export type PipelineValidationResult = z.infer<typeof PipelineValidationResultSchema>;
+
 export interface Agent<Input, Output> {
   readonly name: string;
   readonly version: string;
   run(input: Input): Promise<Output>;
 }
+export * from "./orchestration-evidence.js";
+export * from "./historical-evidence-artifact.js";
+export * from "./approved-paper-plan.js";
+export * from "./paper-runtime-run.js";
+export * from "./paper-runtime-operations.js";
+export * from "./paper-runtime-supervision.js";
+export * from "./operational-delivery.js";
+export * from "./operational-retention.js";
+export * from "./semantic-agent-artifacts.js";
+export * from "./semantic-pipeline-preset.js";

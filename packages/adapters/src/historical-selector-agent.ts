@@ -31,7 +31,7 @@ export interface SelectorPolicy {
 
 const defaultPolicy: SelectorPolicy = {
   candidates: [],
-  topN: 3,
+  topN: 1,
   minQuoteVolume24h: 5_000_000,
   minPrice: 0.05,
   minTrendStrength: 20,

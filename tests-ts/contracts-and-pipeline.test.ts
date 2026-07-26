@@ -264,6 +264,64 @@ test("selector rejects illiquid candidates and returns ranked tradable symbols",
   assert.match(universe.candidates.find((candidate) => candidate.symbol === "ILLQUSDT")?.rejectionReasons.join(" ") ?? "", /volume/);
 });
 
+test("pipeline analyzes only the Selector winner from a larger request universe", async () => {
+  const analyzed: string[] = [];
+  const makeSnapshot = (symbol: string) => MultiTimeframeSnapshotSchema.parse({
+    schemaVersion: SCHEMA_VERSION,
+    traceId,
+    asOf,
+    symbol,
+    stableBars: { "5m": [], "15m": [], "1h": [] },
+    liveQuote: { price: 100, observedAt: asOf },
+    quality: { alignmentOk: true, missingTimeframes: [], warnings: [] },
+  });
+  const pipeline = new DecisionPipeline({
+    selector: {
+      name: "selector",
+      version: "test",
+      run: async () => ({
+        schemaVersion: SCHEMA_VERSION,
+        traceId,
+        asOf,
+        candidates: [
+          { symbol: "BTCUSDT", rank: 1, score: 91, tradable: true, selectedReasons: ["winner"], rejectionReasons: [] },
+          { symbol: "ETHUSDT", rank: 0, score: 82, tradable: false, selectedReasons: [], rejectionReasons: ["outside top 1 opportunity ranking"] },
+          { symbol: "SOLUSDT", rank: 0, score: 74, tradable: false, selectedReasons: [], rejectionReasons: ["outside top 1 opportunity ranking"] },
+        ],
+      }),
+    },
+    dataSync: { name: "data", version: "test", run: async ({ symbol }) => makeSnapshot(symbol) },
+    analysis: {
+      name: "analysis",
+      version: "test",
+      run: async (snapshot) => {
+        analyzed.push(snapshot.symbol);
+        return { schemaVersion: SCHEMA_VERSION, traceId, asOf, symbol: snapshot.symbol, regime: "choppy", trend: "neutral", setup: "wait", trigger: "waiting", diagnostics: [] };
+      },
+    },
+    bullCase: { name: "bull", version: "test", run: async (analysis) => ({ schemaVersion: SCHEMA_VERSION, traceId, symbol: analysis.symbol, side: "long", confidence: 30, evidence: [], invalidationConditions: [], veto: false }) },
+    bearCase: { name: "bear", version: "test", run: async (analysis) => ({ schemaVersion: SCHEMA_VERSION, traceId, symbol: analysis.symbol, side: "short", confidence: 25, evidence: [], invalidationConditions: [], veto: false }) },
+    decision: { name: "decision", version: "test", run: async (input) => ({ schemaVersion: SCHEMA_VERSION, traceId, asOf, symbol: input.snapshot.symbol, action: "wait", confidence: 30, reason: "fixture", evidence: [], missingConfirmations: [] }) },
+    portfolio: { name: "portfolio", version: "test", run: async (decisions) => [...decisions] },
+    risk: { name: "risk", version: "test", run: async ({ decision }) => ({ schemaVersion: SCHEMA_VERSION, traceId, symbol: decision.symbol, passed: true, riskLevel: "safe", corrections: {}, warnings: [] }) },
+    execution: { name: "execution", version: "test", run: async () => { throw new Error("must not execute"); } },
+  });
+
+  const result = await pipeline.runCycle(CycleRequestSchema.parse({
+    schemaVersion: SCHEMA_VERSION,
+    traceId,
+    runMode: "paper",
+    asOf,
+    strategyId: "fixture",
+    configVersion: "v1",
+    symbols: ["BTCUSDT", "ETHUSDT", "SOLUSDT"],
+    executionEnabled: false,
+  }));
+
+  assert.deepEqual(analyzed, ["BTCUSDT"]);
+  assert.deepEqual(result.decisions.map((decision) => decision.symbol), ["BTCUSDT"]);
+});
+
 test("rule agents produce a multi-period analysis bundle", async () => {
   const bars = Array.from({ length: 70 }, (_, index) => ({
     openTime: new Date(Date.UTC(2026, 6, 20, 0, index * 5)),
