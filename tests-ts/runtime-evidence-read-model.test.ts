@@ -29,7 +29,7 @@ function run(status: PaperRuntimeRun["status"]): PaperRuntimeRun {
     requestedByActorId: "actor:test",
     status,
     plannedCycles: 6,
-    processedCycles: 1,
+    processedCycles: 2,
     intervalMs: 1_000,
     lastControlMode: "normal",
     lastControlApplied: true,
@@ -61,6 +61,14 @@ const cycle: PaperRuntimeCycleAudit = {
     consecutiveFailures: 0,
     updatedAt: "2026-07-26T11:59:03.000Z",
   },
+};
+
+const secondCycle: PaperRuntimeCycleAudit = {
+  ...cycle,
+  cycle: 2,
+  traceId: "paper-runtime-run:test:cycle:2",
+  startedAt: "2026-07-26T11:59:04.000Z",
+  finishedAt: "2026-07-26T11:59:05.000Z",
 };
 
 const artifacts: AgentArtifact[] = [
@@ -129,6 +137,20 @@ const artifacts: AgentArtifact[] = [
   },
 ];
 
+const secondCycleArtifacts: AgentArtifact[] = artifacts.map((artifact) => ({
+  ...artifact,
+  artifactId: `${artifact.artifactId}:cycle:2`,
+  traceId: secondCycle.traceId,
+  sourceArtifactIds: artifact.sourceArtifactIds?.map((id) => `${id}:cycle:2`),
+}));
+
+const activeCycleArtifacts: AgentArtifact[] = [{
+  ...artifacts[0]!,
+  artifactId: "artifact:selector:cycle:3",
+  traceId: "paper-runtime-run:test:cycle:3",
+  sourceArtifactIds: [],
+}];
+
 function service(status: PaperRuntimeRun["status"]) {
   return new RuntimeEvidenceReadModelService(
     {
@@ -143,7 +165,7 @@ function service(status: PaperRuntimeRun["status"]) {
     {
       runs: {
         findLatestRun: () => run(status),
-        getCycles: () => [cycle],
+        getCycles: () => [cycle, secondCycle],
       },
       accounts: {
         load: async () => ({
@@ -157,7 +179,12 @@ function service(status: PaperRuntimeRun["status"]) {
         }),
       },
       artifacts: {
-        query: async () => artifacts,
+        query: async ({ traceId }) =>
+          traceId === secondCycle.traceId
+            ? secondCycleArtifacts
+            : traceId === cycle.traceId
+              ? artifacts
+              : activeCycleArtifacts,
       },
       reflections: {
         latest: async () => ({
@@ -187,6 +214,12 @@ test("Runtime evidence aggregates only bounded semantic read data", async () => 
   assert.equal(evidence.reflection.candidateOnly, true);
   assert.equal(evidence.reflection.runtimeApplied, false);
   assert.equal(evidence.exchangeWriteAllowed, false);
+  assert.deepEqual(
+    [...new Set(evidence.semanticTransfers.map((item) => item.cycle))],
+    [1, 2, 3],
+  );
+  assert.equal(evidence.cycle?.cycle, 2);
+  assert.equal(evidence.run?.activeCycle, 3);
   assert.equal(JSON.stringify(evidence).includes("MUST_NOT_LEAK"), false);
   assert.match(
     evidence.semanticTransfers.find((item) => item.stage === "selector")?.semanticSummary ?? "",

@@ -19,6 +19,16 @@ export interface StructuredLlmRequest {
 /** Provider-neutral port. Concrete model clients belong in adapters, not Agent logic. */
 export interface StructuredLlmPort { complete(request: StructuredLlmRequest): Promise<unknown>; }
 
+export type AgentResponseLocale = "zh-CN" | "en";
+
+export function structuredResponseLanguageInstruction(
+  locale: AgentResponseLocale,
+): string {
+  return locale === "zh-CN"
+    ? "使用中文回答；使用中文输出所有面向用户的语义内容。JSON 字段名、Schema 名称和枚举值必须保持合同定义，不得翻译。"
+    : "Answer in English and output all user-facing semantics in English. Keep JSON field names, schema names, and enum values exactly as defined by the contract.";
+}
+
 class LlmDirectionalCaseAgent implements Agent<AnalysisBundle, DirectionalCase> {
   readonly version = "v1";
   readonly name: string;
@@ -26,7 +36,7 @@ class LlmDirectionalCaseAgent implements Agent<AnalysisBundle, DirectionalCase> 
   private readonly timeoutMs: number;
   private readonly fallbackToRules: boolean;
 
-  constructor(private readonly side: "long" | "short", private readonly port: StructuredLlmPort | undefined, config: AgentRuntimeConfig, private readonly fallback: Agent<AnalysisBundle, DirectionalCase>) {
+  constructor(private readonly side: "long" | "short", private readonly port: StructuredLlmPort | undefined, config: AgentRuntimeConfig, private readonly fallback: Agent<AnalysisBundle, DirectionalCase>, private readonly locale: AgentResponseLocale = "en") {
     const normalized = AgentRuntimeConfigSchema.parse(config);
     this.name = side === "long" ? "llm_bull_case_agent" : "llm_bear_case_agent";
     this.enabled = side === "long" ? normalized.llm.bullCaseEnabled : normalized.llm.bearCaseEnabled;
@@ -55,21 +65,21 @@ class LlmDirectionalCaseAgent implements Agent<AnalysisBundle, DirectionalCase> 
 
   private systemPrompt(): string {
     const role = this.side === "long" ? "BULLISH" : "BEARISH";
-    return `You are a ${role} market analyst. Use only the supplied structured analysis. Return JSON matching DirectionalCase exactly. Provide evidence and invalidation conditions. Do not emit an order, a trade action, a price target, or prose outside the JSON.`;
+    return `You are a ${role} market analyst. Use only the supplied structured analysis. Return JSON matching DirectionalCase exactly. Provide evidence and invalidation conditions. Do not emit an order, a trade action, a price target, or prose outside the JSON. ${structuredResponseLanguageInstruction(this.locale)}`;
   }
 }
 
 export class LlmBullCaseAgent extends LlmDirectionalCaseAgent {
-  constructor(port: StructuredLlmPort | undefined, config: AgentRuntimeConfig) { super("long", port, config, new RuleBullCaseAgent()); }
+  constructor(port: StructuredLlmPort | undefined, config: AgentRuntimeConfig, locale: AgentResponseLocale = "en") { super("long", port, config, new RuleBullCaseAgent(), locale); }
 }
 
 export class LlmBearCaseAgent extends LlmDirectionalCaseAgent {
-  constructor(port: StructuredLlmPort | undefined, config: AgentRuntimeConfig) { super("short", port, config, new RuleBearCaseAgent()); }
+  constructor(port: StructuredLlmPort | undefined, config: AgentRuntimeConfig, locale: AgentResponseLocale = "en") { super("short", port, config, new RuleBearCaseAgent(), locale); }
 }
 
 export interface DirectionalCaseAgentSet { readonly bullCase: Agent<AnalysisBundle, DirectionalCase>; readonly bearCase: Agent<AnalysisBundle, DirectionalCase>; }
-export function createDirectionalCaseAgents(config: AgentRuntimeConfig, port?: StructuredLlmPort): DirectionalCaseAgentSet {
-  return { bullCase: new LlmBullCaseAgent(port, config), bearCase: new LlmBearCaseAgent(port, config) };
+export function createDirectionalCaseAgents(config: AgentRuntimeConfig, port?: StructuredLlmPort, locale: AgentResponseLocale = "en"): DirectionalCaseAgentSet {
+  return { bullCase: new LlmBullCaseAgent(port, config, locale), bearCase: new LlmBearCaseAgent(port, config, locale) };
 }
 
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {

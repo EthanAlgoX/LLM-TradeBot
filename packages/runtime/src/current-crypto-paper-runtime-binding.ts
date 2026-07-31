@@ -51,6 +51,7 @@ export interface CurrentCryptoPaperRuntimeBindingConfig {
   artifactDatabasePath?: string;
   reflectionDatabasePath?: string;
   maxCycles?: number;
+  continuous?: boolean;
   intervalMs?: number;
   maxConsecutiveFailures?: number;
   cooldownMs?: number;
@@ -70,6 +71,28 @@ export interface CurrentCryptoPaperRuntimeBinding
   profileFingerprint: string;
   profile: StrategyProfile;
 }
+
+const registeredPaperCadences = [
+  "1m",
+  "5m",
+  "10m",
+  "15m",
+  "30m",
+  "1h",
+  "3h",
+  "5h",
+] as const;
+
+const cadenceByInterval = new Map<number, typeof registeredPaperCadences[number]>([
+  [60_000, "1m"],
+  [5 * 60_000, "5m"],
+  [10 * 60_000, "10m"],
+  [15 * 60_000, "15m"],
+  [30 * 60_000, "30m"],
+  [60 * 60_000, "1h"],
+  [3 * 60 * 60_000, "3h"],
+  [5 * 60 * 60_000, "5h"],
+]);
 
 export class CurrentCryptoPaperRuntimeBindingError extends Error {
   constructor(
@@ -244,6 +267,7 @@ export async function createCurrentCryptoPaperRuntimeBinding(
     "intervalMs",
     86_400_000,
   );
+  const defaultCadence = cadenceByInterval.get(intervalMs);
   const maxConsecutiveFailures = positiveInteger(
     rawConfig.maxConsecutiveFailures ?? 3,
     "maxConsecutiveFailures",
@@ -296,7 +320,15 @@ export async function createCurrentCryptoPaperRuntimeBinding(
     profile,
     riskPolicyRefs,
     candidateSymbols: [...symbols],
+    initialCash: profile.execution.initialCash,
     maxCycles,
+    continuous: rawConfig.continuous === true,
+    ...(defaultCadence
+      ? {
+          allowedCadences: registeredPaperCadences,
+          defaultCadence,
+        }
+      : {}),
     intervalMs,
     exchangeWriteAllowed: false,
     async preflight({ now }) {
@@ -462,6 +494,7 @@ export async function createCurrentCryptoPaperRuntimeBinding(
         if (artifactLedger) {
           closers.push(() => artifactLedger.close());
         }
+        await paperStore.reset(accountId, profile.execution.initialCash);
         const executor = await PersistentPaperExecutionAgent.open(
           accountId,
           paperStore,
@@ -530,6 +563,8 @@ export async function createCurrentCryptoPaperRuntimeBinding(
         return {
           application,
           safety,
+          portfolioState: (markPrices) =>
+            executor.markToMarket(markPrices),
           close() {
             if (closed) {
               return;
@@ -598,6 +633,8 @@ export async function loadCurrentCryptoPaperRuntimeBindingFromEnv(
       maxCycles: Number(
         environment.TRADEBOT_PAPER_MAX_CYCLES ?? 3,
       ),
+      continuous:
+        environment.TRADEBOT_PAPER_CONTINUOUS !== "false",
       intervalMs:
         Number(environment.TRADEBOT_PAPER_INTERVAL_SECONDS ?? 60) *
         1_000,

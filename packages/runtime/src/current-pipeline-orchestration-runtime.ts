@@ -449,9 +449,12 @@ export function createCurrentPipelineOrchestrationRuntime(
     paperRuntimeRunRepository,
     paperRuntimeOperationsRepository,
   );
+  const paperRuntimeBindingRegistry = new PaperRuntimeBindingRegistry(
+    options.paperRuntimeBindings ?? [],
+  );
   const paperRuntimeActivationService = new PaperRuntimeActivationService(
     paperPlanService,
-    new PaperRuntimeBindingRegistry(options.paperRuntimeBindings ?? []),
+    paperRuntimeBindingRegistry,
     paperRuntimeRunRepository,
     paperRuntimeOperationsRepository,
     {
@@ -471,6 +474,17 @@ export function createCurrentPipelineOrchestrationRuntime(
     new CurrentCryptoPaperLaunchService({
       available: options.currentCryptoPaperLaunchPreset === true,
       graph: CURRENT_CRYPTO_PIPELINE_GRAPH,
+      ...(options.paperPlanPolicy?.planVersion
+        ? { draftVersion: options.paperPlanPolicy.planVersion }
+        : {}),
+      isCurrentPlan: (plan) => {
+        try {
+          paperRuntimeBindingRegistry.resolve(plan);
+          return true;
+        } catch {
+          return false;
+        }
+      },
       orchestration: service,
       evidenceWorkflow,
       paperPlans: paperPlanService,

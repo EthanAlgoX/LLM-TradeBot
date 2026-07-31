@@ -332,7 +332,9 @@ function applyRuntimeDashboardToDom(): void {
   setText(
     "[data-runtime-cycle]",
     runtimeDashboard.activeRun
-      ? `${runtimeDashboard.processedCycles ?? 0}/${runtimeDashboard.plannedCycles ?? 0}`
+      ? runtimeDashboard.continuous
+        ? `${runtimeDashboard.processedCycles ?? 0} / ∞`
+        : `${runtimeDashboard.processedCycles ?? 0}/${runtimeDashboard.plannedCycles ?? 0}`
       : "-",
   );
   setText("[data-runtime-heartbeat]", runtimeHeartbeatLabel());
@@ -1039,7 +1041,7 @@ function renderAgentIdentity(): string {
       <dl class="agent-provenance">
         <div><dt>Run ID</dt><dd data-runtime-run-id>${runtimeDashboard.runId ?? "-"}</dd></div>
         <div><dt>${tr("控制模式", "Control mode")}</dt><dd data-runtime-control-mode>${runtimeDashboard.controlMode === "pause_new_openings_close_only" ? "ONLY CLOSE" : "NORMAL"}</dd></div>
-        <div><dt>${tr("当前周期", "Current cycle")}</dt><dd data-runtime-cycle>${runtimeDashboard.activeRun ? `${runtimeDashboard.processedCycles ?? 0}/${runtimeDashboard.plannedCycles ?? 0}` : "-"}</dd></div>
+        <div><dt>${tr("当前周期", "Current cycle")}</dt><dd data-runtime-cycle>${runtimeDashboard.activeRun ? runtimeDashboard.continuous ? `${runtimeDashboard.processedCycles ?? 0} / ∞` : `${runtimeDashboard.processedCycles ?? 0}/${runtimeDashboard.plannedCycles ?? 0}` : "-"}</dd></div>
         <div><dt>${tr("最后心跳", "Last heartbeat")}</dt><dd data-runtime-heartbeat>${runtimeHeartbeatLabel()}</dd></div>
       </dl>
     </section>

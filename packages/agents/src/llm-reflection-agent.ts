@@ -7,7 +7,11 @@ import {
   type ReflectionReport,
 } from "../../contracts/src/index.js";
 import type { ReflectionAgent, ReflectionInput } from "../../core/src/ports.js";
-import type { StructuredLlmPort } from "./llm-directional-case-agents.js";
+import {
+  structuredResponseLanguageInstruction,
+  type AgentResponseLocale,
+  type StructuredLlmPort,
+} from "./llm-directional-case-agents.js";
 
 const LlmReflectionEnhancementSchema = z.object({
   recommendations: z.array(z.string().min(1)).max(5),
@@ -22,6 +26,7 @@ export interface LlmReflectionConfig {
   readonly provider: string;
   readonly model: string;
   readonly adjustmentDurationMs?: number;
+  readonly locale?: AgentResponseLocale;
 }
 
 /** Rule report is authoritative; DeepSeek can only add bounded, non-executing suggestions. */
@@ -49,7 +54,7 @@ export class LlmReflectionAgent implements ReflectionAgent {
     }
     try {
       const output = await withTimeout(this.port.complete({
-        systemPrompt: "You are a trading-system reviewer. Return json only. Use only the supplied closed trades and rule reflection. You may add concise process recommendations and bounded policy suggestions. Never propose an order, symbol trade, position change, risk-limit override, or executable action.",
+        systemPrompt: `You are a trading-system reviewer. Return json only. Use only the supplied closed trades and rule reflection. You may add concise process recommendations and bounded policy suggestions. Never propose an order, symbol trade, position change, risk-limit override, or executable action. ${structuredResponseLanguageInstruction(this.config.locale ?? "en")}`,
         userPrompt: JSON.stringify({ asOf: input.asOf.toISOString(), closedTrades: input.trades, ruleReflection: baseline }),
         responseSchemaName: "LlmReflectionEnhancement",
         responseSchema: LlmReflectionEnhancementSchema,

@@ -25,6 +25,7 @@ export interface RuntimeSessionRun {
   status: RuntimeSessionRunStatus;
   plannedCycles: number;
   processedCycles: number;
+  continuous?: boolean;
 }
 
 export interface RuntimeDashboardEvent {
@@ -53,6 +54,7 @@ export interface RuntimeDashboardSnapshot {
   runId?: string;
   processedCycles?: number;
   plannedCycles?: number;
+  continuous?: boolean;
   heartbeatAt?: string;
   eventCount: number;
   latestEvent?: RuntimeDashboardEvent;
@@ -130,6 +132,9 @@ export function createRuntimeDashboardSnapshot(input: {
           runId: activeRun.runId,
           processedCycles: activeRun.processedCycles,
           plannedCycles: activeRun.plannedCycles,
+          ...(activeRun.continuous !== undefined
+            ? { continuous: activeRun.continuous }
+            : {}),
           ...(input.heartbeatAt ? { heartbeatAt: input.heartbeatAt } : {}),
         }
       : {}),

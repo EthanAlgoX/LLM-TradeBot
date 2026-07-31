@@ -1232,6 +1232,13 @@ body.orchestration-copilot-open {
   font-size: 9px;
 }
 
+.copilot-workflow__group span em {
+  color: var(--text-soft);
+  font-size: 10px;
+  font-style: normal;
+  line-height: 1.45;
+}
+
 .copilot-workflow > details {
   padding: 10px 15px;
   border-top: 1px solid var(--line);

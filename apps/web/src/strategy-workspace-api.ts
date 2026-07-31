@@ -602,7 +602,7 @@ function renderWorkflow(response: ConversationResponse): string {
         ? "决策与反思 Agent"
         : "Decision & Reflection Agents",
     source: locale() === "zh-CN" ? "数据源与输入处理" : "Sources & ingestion",
-    prompt: locale() === "zh-CN" ? "Prompt / 策略" : "Prompt / strategy",
+    prompt: locale() === "zh-CN" ? "系统提示词与策略" : "System prompt & strategy",
     controlled: locale() === "zh-CN" ? "受控策略" : "Controlled policy",
   };
   const configurationLabel = (kind: string): string =>
@@ -611,6 +611,9 @@ function renderWorkflow(response: ConversationResponse): string {
       : kind === "prompt_strategy"
         ? groupCopy.prompt
         : groupCopy.controlled;
+  const promptLanguageDirective = locale() === "zh-CN"
+    ? "使用中文回答；使用中文输出语义"
+    : "Answer in English; output semantics in English";
   const renderGroup = (
     label: string,
     agents: Array<{ id: string; configurationKind: string }>,
@@ -630,6 +633,9 @@ function renderWorkflow(response: ConversationResponse): string {
               <span>
                 <strong>${escapeHtml(friendlyEntityName(agent.id))}</strong>
                 <small>${configurationLabel(agent.configurationKind)}</small>
+                ${agent.configurationKind === "prompt_strategy"
+                  ? `<em>${escapeHtml(promptLanguageDirective)}</em>`
+                  : ""}
               </span>
             `,
           )
@@ -641,10 +647,16 @@ function renderWorkflow(response: ConversationResponse): string {
     <section class="copilot-workflow">
       <header>
         <div>
-          <span>${locale() === "zh-CN" ? "生成的 Workflow" : "Generated Workflow"}</span>
+          <span>${locale() === "zh-CN" ? "生成的工作流" : "Generated Workflow"}</span>
           <strong>${escapeHtml(proposal.presetRef.id)}</strong>
         </div>
-        <mark>${proposal.lifecycleStatus.toUpperCase()}</mark>
+        <mark>${locale() === "zh-CN"
+          ? proposal.lifecycleStatus === "draft"
+            ? "草案"
+            : proposal.lifecycleStatus === "validated"
+              ? "已验证"
+              : "已批准但未应用"
+          : proposal.lifecycleStatus.toUpperCase()}</mark>
       </header>
       <div class="copilot-workflow__path">
         ${renderGroup(

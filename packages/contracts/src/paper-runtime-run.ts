@@ -1,11 +1,27 @@
 import { z } from "zod";
 import { RuntimeControlModeSchema } from "./approved-paper-plan.js";
 
+export const PaperRuntimeCadenceSchema = z.enum([
+  "1m",
+  "5m",
+  "10m",
+  "15m",
+  "30m",
+  "1h",
+  "3h",
+  "5h",
+]);
+export type PaperRuntimeCadence = z.infer<
+  typeof PaperRuntimeCadenceSchema
+>;
+
 export const PaperRuntimeRunRequestSchema = z
   .object({
     schemaVersion: z.literal("1.0.0"),
     idempotencyKey: z.string().min(8).max(200),
     confirmation: z.literal("start_bounded_paper_run"),
+    locale: z.enum(["zh-CN", "en"]).optional(),
+    cadence: PaperRuntimeCadenceSchema.optional(),
   })
   .strict();
 export type PaperRuntimeRunRequest = z.infer<
@@ -38,6 +54,20 @@ export type PaperRuntimeSafetySnapshot = z.infer<
   typeof PaperRuntimeSafetySnapshotSchema
 >;
 
+export const PaperRuntimeAccountSnapshotSchema = z
+  .object({
+    cash: z.number(),
+    usedMargin: z.number().nonnegative(),
+    equity: z.number(),
+    realizedPnl: z.number(),
+    unrealizedPnl: z.number(),
+    fees: z.number().nonnegative(),
+  })
+  .strict();
+export type PaperRuntimeAccountSnapshot = z.infer<
+  typeof PaperRuntimeAccountSnapshotSchema
+>;
+
 export const PaperRuntimeCycleAuditSchema = z
   .object({
     schemaVersion: z.literal("1.0.0"),
@@ -59,6 +89,7 @@ export const PaperRuntimeCycleAuditSchema = z
     decisionCount: z.number().int().nonnegative(),
     riskDecisionCount: z.number().int().nonnegative(),
     executionCount: z.number().int().nonnegative(),
+    accountSnapshot: PaperRuntimeAccountSnapshotSchema.optional(),
     safety: PaperRuntimeSafetySnapshotSchema,
     errorCode: z.string().min(1).optional(),
   })
@@ -79,9 +110,13 @@ export const PaperRuntimeRunSchema = z
     strategyProfileRef: z.string().min(1),
     candidateSymbols: z.array(z.string().min(1)).min(1),
     requestedByActorId: z.string().min(1),
+    responseLocale: z.enum(["zh-CN", "en"]).optional(),
+    initialCash: z.number().positive().optional(),
+    cadence: PaperRuntimeCadenceSchema.optional(),
+    continuous: z.boolean().optional(),
     status: PaperRuntimeRunStatusSchema,
     plannedCycles: z.number().int().positive().max(100),
-    processedCycles: z.number().int().nonnegative().max(100),
+    processedCycles: z.number().int().nonnegative(),
     intervalMs: z.number().int().nonnegative().max(86_400_000),
     lastControlMode: RuntimeControlModeSchema,
     lastControlApplied: z.boolean(),

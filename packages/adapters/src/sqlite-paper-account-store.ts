@@ -35,9 +35,19 @@ export class SQLitePaperAccountStore {
   async initialize(accountId: string, initialCash: number): Promise<PaperAccountState> {
     const existing = await this.load(accountId);
     if (existing) return existing;
-    const state = PaperAccountStateSchema.parse({ schemaVersion: SCHEMA_VERSION, cash: initialCash, realizedPnl: 0, fees: 0, positions: [], closedTrades: [] });
+    const state = this.initialState(initialCash);
     await this.save(accountId, state);
     return state;
+  }
+
+  async reset(accountId: string, initialCash: number): Promise<PaperAccountState> {
+    const state = this.initialState(initialCash);
+    await this.save(accountId, state);
+    return state;
+  }
+
+  private initialState(initialCash: number): PaperAccountState {
+    return PaperAccountStateSchema.parse({ schemaVersion: SCHEMA_VERSION, cash: initialCash, realizedPnl: 0, fees: 0, positions: [], closedTrades: [] });
   }
 
   close(): void { this.database.close(); }

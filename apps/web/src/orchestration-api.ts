@@ -106,11 +106,50 @@ interface PaperRuntimeRunResponse {
     | "safety_blocked";
   plannedCycles: number;
   processedCycles: number;
+  continuous?: boolean;
+  cadence?: PaperRuntimeCadence;
   lastControlMode: "normal" | "pause_new_openings_close_only";
   lastControlApplied: boolean;
   failureCode?: string;
   paperRuntimeApplied: boolean;
   exchangeWriteAllowed: false;
+}
+
+type PaperRuntimeCadence =
+  | "1m"
+  | "5m"
+  | "10m"
+  | "15m"
+  | "30m"
+  | "1h"
+  | "3h"
+  | "5h";
+
+const paperRuntimeCadences: readonly PaperRuntimeCadence[] = [
+  "1m",
+  "5m",
+  "10m",
+  "15m",
+  "30m",
+  "1h",
+  "3h",
+  "5h",
+];
+
+let selectedPaperRuntimeCadence: PaperRuntimeCadence = "1m";
+
+function cadenceLabel(cadence: PaperRuntimeCadence): string {
+  const labels: Record<PaperRuntimeCadence, [string, string]> = {
+    "1m": ["1 分钟", "1 minute"],
+    "5m": ["5 分钟", "5 minutes"],
+    "10m": ["10 分钟", "10 minutes"],
+    "15m": ["15 分钟", "15 minutes"],
+    "30m": ["30 分钟", "30 minutes"],
+    "1h": ["1 小时", "1 hour"],
+    "3h": ["3 小时", "3 hours"],
+    "5h": ["5 小时", "5 hours"],
+  };
+  return labels[cadence][locale() === "zh" ? 0 : 1];
 }
 
 interface ApiEnvelope<T> {
@@ -581,7 +620,7 @@ const releaseGuideCopy = {
       "paper-plan": "生成 Paper Plan",
       "activate-paper": "显式激活计划",
       "paper-preflight": "运行只读 Preflight",
-      "start-paper-run": "开始有界 Paper Run",
+      "start-paper-run": "开始持续 Paper 模拟",
       retry: "重新连接 Runtime",
     },
   },
@@ -627,7 +666,7 @@ const releaseGuideCopy = {
       "paper-plan": "Create Paper Plan",
       "activate-paper": "Explicitly activate plan",
       "paper-preflight": "Run read-only Preflight",
-      "start-paper-run": "Start bounded Paper Run",
+      "start-paper-run": "Start continuous Paper simulation",
       retry: "Reconnect Runtime",
     },
   },
@@ -808,7 +847,11 @@ function renderRuntimeControl(): void {
       )
     : "-";
   const cycle = state.paperRun
-    ? `${state.paperRun.processedCycles}/${state.paperRun.plannedCycles}`
+    ? state.paperRun.continuous
+      ? locale() === "zh"
+        ? `${state.paperRun.processedCycles} 轮 · 持续运行`
+        : `${state.paperRun.processedCycles} rounds · continuous`
+      : `${state.paperRun.processedCycles}/${state.paperRun.plannedCycles}`
     : "-";
   const connectionLabel =
     state.mode === "live"
@@ -836,6 +879,14 @@ function renderRuntimeControl(): void {
       <div><dt>${text.exchange}</dt><dd class="is-locked">${text.exchangeOff}</dd></div>
     </dl>
     <div class="runtime-control__actions" aria-busy="${state.busy}">
+      <label class="runtime-control__cadence">
+        <span>${locale() === "zh" ? "运行频率" : "Run cadence"}</span>
+        <select data-runtime-cadence ${ui.canStop || state.busy ? "disabled" : ""}>
+          ${paperRuntimeCadences.map((cadence) => `
+            <option value="${cadence}" ${cadence === selectedPaperRuntimeCadence ? "selected" : ""}>${cadenceLabel(cadence)}${locale() === "zh" ? "一轮" : " per round"}</option>
+          `).join("")}
+        </select>
+      </label>
       ${state.mode === "offline" ? `<button type="button" data-runtime-action="retry">${text.retry}</button>` : ""}
       ${state.mode === "readonly" ? `<a href="#orchestration">${text.authenticate}</a>` : ""}
       ${
@@ -1242,7 +1293,7 @@ function renderBridge(): void {
       ? `${state.paperControl.mode} · ${text.runtimeNotApplied}`
       : undefined,
     state.paperRun
-      ? `Paper Run: ${state.paperRun.status} · ${state.paperRun.processedCycles}/${state.paperRun.plannedCycles} · control ${
+      ? `Paper Run: ${state.paperRun.status} · ${state.paperRun.continuous ? `${state.paperRun.processedCycles} cycles · continuous` : `${state.paperRun.processedCycles}/${state.paperRun.plannedCycles}`} · control ${
           state.paperRun.lastControlApplied ? "applied" : "pending"
         } · exchange write false`
       : undefined,
@@ -1747,6 +1798,10 @@ async function runAction(action: string): Promise<void> {
             schemaVersion: "1.0.0",
             idempotencyKey: state.paperKeys.run,
             confirmation: "start_bounded_paper_run",
+            locale: document.documentElement.lang.toLowerCase().startsWith("zh")
+              ? "zh-CN"
+              : "en",
+            cadence: selectedPaperRuntimeCadence,
           }),
         },
       );
@@ -1926,6 +1981,15 @@ document.addEventListener("click", (event) => {
     return;
   }
   void runAction(button.dataset.runtimeAction ?? "");
+});
+
+document.addEventListener("change", (event) => {
+  const target = event.target;
+  if (!(target instanceof HTMLSelectElement)) return;
+  if (!target.matches("[data-runtime-cadence]")) return;
+  if (paperRuntimeCadences.includes(target.value as PaperRuntimeCadence)) {
+    selectedPaperRuntimeCadence = target.value as PaperRuntimeCadence;
+  }
 });
 
 window.addEventListener("tradebot:runtime-action-request", (event) => {

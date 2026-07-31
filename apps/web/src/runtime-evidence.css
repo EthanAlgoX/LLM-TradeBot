@@ -71,6 +71,197 @@
   color: var(--muted);
 }
 
+.runtime-agent-progress {
+  display: grid;
+  gap: 9px;
+  margin-bottom: 16px;
+  border: 1px solid var(--line-strong);
+  padding: 12px 14px;
+  background: color-mix(in srgb, var(--surface) 94%, var(--accent));
+}
+
+.runtime-agent-progress__copy {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 12px;
+}
+
+.runtime-agent-progress__copy > span,
+.runtime-agent-progress__copy > small {
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+}
+
+.runtime-agent-progress__copy > strong {
+  color: var(--text-soft);
+  font-size: 12px;
+}
+
+.runtime-agent-progress__copy > small {
+  color: var(--accent);
+}
+
+.runtime-agent-progress__track {
+  height: 5px;
+  overflow: hidden;
+  background: var(--line-strong);
+}
+
+.runtime-agent-progress__track > i {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), var(--positive));
+  transition: width 280ms ease;
+}
+
+.runtime-agent-progress.is-continuous .runtime-agent-progress__track > i {
+  width: 38% !important;
+  animation: runtime-agent-continuous-progress 1.8s ease-in-out infinite;
+}
+
+@keyframes runtime-agent-continuous-progress {
+  from {
+    transform: translateX(-110%);
+  }
+
+  to {
+    transform: translateX(290%);
+  }
+}
+
+.runtime-equity-curve {
+  margin-bottom: 16px;
+  border: 1px solid var(--line-strong);
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--positive) 8%, transparent), transparent 55%),
+    color-mix(in srgb, var(--surface) 96%, black);
+}
+
+.runtime-equity-curve > header {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--line-strong);
+}
+
+.runtime-equity-curve > header span,
+.runtime-equity-curve dt {
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+}
+
+.runtime-equity-curve h4 {
+  margin: 5px 0 0;
+  font-size: 21px;
+}
+
+.runtime-equity-curve dl {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: end;
+  gap: 12px 24px;
+  margin: 0;
+}
+
+.runtime-equity-curve dl > div {
+  display: grid;
+  gap: 3px;
+}
+
+.runtime-equity-curve dd {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-weight: 760;
+}
+
+.runtime-equity-curve dl > .is-positive dd {
+  color: var(--positive);
+}
+
+.runtime-equity-curve dl > .is-negative dd {
+  color: var(--danger);
+}
+
+.runtime-equity-chart {
+  padding: 12px 16px 14px;
+}
+
+.runtime-equity-chart svg {
+  display: block;
+  width: 100%;
+  height: clamp(180px, 23vw, 250px);
+  overflow: visible;
+}
+
+.runtime-equity-chart text {
+  fill: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+
+.runtime-equity-chart__grid {
+  stroke: color-mix(in srgb, var(--line-strong) 72%, transparent);
+  stroke-dasharray: 4 7;
+  stroke-width: 1;
+}
+
+.runtime-equity-chart__line {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 3;
+  vector-effect: non-scaling-stroke;
+}
+
+.runtime-equity-chart__line.is-cash,
+.runtime-equity-chart__point.is-cash {
+  stroke: var(--accent);
+}
+
+.runtime-equity-chart__line.is-equity,
+.runtime-equity-chart__point.is-equity {
+  stroke: var(--positive);
+}
+
+.runtime-equity-chart__point {
+  fill: var(--surface);
+  stroke-width: 3;
+  vector-effect: non-scaling-stroke;
+}
+
+.runtime-equity-chart__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 22px;
+  padding: 0 8px;
+  color: var(--text-soft);
+  font-size: 11px;
+}
+
+.runtime-equity-chart__legend span::before {
+  display: inline-block;
+  width: 18px;
+  height: 3px;
+  margin-right: 7px;
+  vertical-align: middle;
+  background: var(--positive);
+  content: "";
+}
+
+.runtime-equity-chart__legend span.is-cash::before {
+  background: var(--accent);
+}
+
 .runtime-agent-conversation ol {
   display: grid;
   gap: 10px;
@@ -677,20 +868,27 @@
 }
 
 .runtime-agent-room {
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
   width: 100%;
-  min-height: clamp(520px, 64vh, 760px);
+  height: clamp(480px, 64vh, 720px);
   border: 1px solid var(--line-strong);
   border-radius: 0;
   background: color-mix(in srgb, var(--surface) 97%, var(--accent));
+  overscroll-behavior: contain;
+  scrollbar-color: var(--line-strong) transparent;
 }
 
 .runtime-agent-room__status {
+  position: sticky;
+  z-index: 3;
+  top: 0;
   display: flex;
   align-items: center;
   gap: 8px;
   border-bottom: 1px solid var(--line);
   padding: 11px 18px;
+  background: color-mix(in srgb, var(--surface) 96%, var(--accent));
   color: var(--muted);
   font-size: 11px;
 }
@@ -701,6 +899,97 @@
   border-radius: 50%;
   background: var(--positive);
   box-shadow: 0 0 0 4px color-mix(in srgb, var(--positive) 12%, transparent);
+}
+
+.runtime-agent-round {
+  position: relative;
+  padding-bottom: 12px;
+}
+
+.runtime-agent-round + .runtime-agent-round {
+  border-top: 1px solid var(--line-strong);
+}
+
+.runtime-agent-round.is-current {
+  background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 7%, transparent), transparent 58%);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.runtime-agent-round__marker {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px clamp(14px, 2.5vw, 24px) 4px;
+  font-family: var(--font-mono);
+}
+
+.runtime-agent-round__marker > span {
+  border: 1px solid var(--line-strong);
+  padding: 5px 9px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.runtime-agent-round.is-current .runtime-agent-round__marker > span {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface));
+  color: var(--accent);
+}
+
+.runtime-agent-round__marker > strong,
+.runtime-agent-round__marker > small {
+  color: var(--muted);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+}
+
+.runtime-agent-round.is-current .runtime-agent-round__marker > strong {
+  color: var(--accent);
+}
+
+.runtime-agent-round__marker > small {
+  margin-left: auto;
+}
+
+.runtime-agent-round__waiting {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 12px clamp(14px, 2.5vw, 24px) 18px;
+  border: 1px dashed var(--line-strong);
+  padding: 18px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.runtime-agent-round__waiting > span {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 45%, transparent);
+  animation: runtime-agent-waiting-pulse 1.4s ease-out infinite;
+}
+
+.runtime-agent-round__waiting time {
+  margin-left: auto;
+  color: var(--text);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+@keyframes runtime-agent-waiting-pulse {
+  70% {
+    box-shadow: 0 0 0 8px transparent;
+  }
+
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
 }
 
 .runtime-agent-room-message {
@@ -759,6 +1048,13 @@
   font-size: 9px;
 }
 
+.runtime-agent-room-message__turn > header .runtime-agent-room-message__cycle {
+  border: 1px solid var(--line-strong);
+  padding: 2px 5px;
+  color: var(--text-soft);
+  font-weight: 750;
+}
+
 .runtime-agent-room-message__reply {
   margin: 3px 0 5px;
   color: var(--muted);
@@ -803,9 +1099,34 @@
 }
 
 @media (max-width: 620px) {
+  .runtime-equity-curve > header {
+    align-items: start;
+    flex-direction: column;
+  }
+
+  .runtime-equity-curve dl {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    justify-content: stretch;
+    width: 100%;
+  }
+
+  .runtime-equity-chart {
+    padding-inline: 8px;
+  }
+
   .runtime-agent-room {
-    min-height: 55vh;
+    height: 58vh;
     border-radius: 0;
+  }
+
+  .runtime-agent-progress__copy {
+    grid-template-columns: 1fr auto;
+  }
+
+  .runtime-agent-progress__copy > strong {
+    grid-column: 1 / -1;
+    grid-row: 2;
   }
 
   .runtime-agent-room-message {
@@ -817,6 +1138,15 @@
   .runtime-agent-room-message__avatar {
     width: 28px;
     height: 28px;
+  }
+
+  .runtime-agent-round__marker {
+    flex-wrap: wrap;
+  }
+
+  .runtime-agent-round__marker > small {
+    width: 100%;
+    margin-left: 0;
   }
 }
 

@@ -16,6 +16,7 @@ import {
   type PaperRuntimePreflightReport,
   type PaperRuntimeRun,
   type PaperRuntimeStopRecord,
+  type PortfolioState,
   type RuntimeSafetyDecision,
   type RuntimeSafetyState,
 } from "../../contracts/src/index.js";
@@ -51,18 +52,55 @@ export interface RegisteredPaperRuntimeBinding {
   strategyProfileRef: string;
   riskPolicyRefs: readonly string[];
   candidateSymbols: readonly string[];
+  initialCash?: number;
   maxCycles: number;
+  continuous?: boolean;
+  allowedCadences?: readonly (
+    | "1m"
+    | "5m"
+    | "10m"
+    | "15m"
+    | "30m"
+    | "1h"
+    | "3h"
+    | "5h"
+  )[];
+  defaultCadence?:
+    | "1m"
+    | "5m"
+    | "10m"
+    | "15m"
+    | "30m"
+    | "1h"
+    | "3h"
+    | "5h";
   intervalMs: number;
   exchangeWriteAllowed: false;
   preflight?(
     context: PaperRuntimeBindingPreflightContext,
   ): Promise<PaperRuntimeBindingPreflightResult>;
-  createRuntime(): Promise<{
+  createRuntime(context?: {
+    responseLocale: "zh-CN" | "en";
+  }): Promise<{
     application: TradingApplication;
     safety: PaperRuntimeSafetyPort;
+    portfolioState?: (
+      markPrices: Readonly<Record<string, number>>,
+    ) => PortfolioState;
     close?: () => void | Promise<void>;
   }>;
 }
+
+const registeredCadenceIntervals = {
+  "1m": 60_000,
+  "5m": 5 * 60_000,
+  "10m": 10 * 60_000,
+  "15m": 15 * 60_000,
+  "30m": 30 * 60_000,
+  "1h": 60 * 60_000,
+  "3h": 3 * 60 * 60_000,
+  "5h": 5 * 60 * 60_000,
+} as const;
 
 export interface PaperRuntimeRunRepository {
   findByIdempotency(
@@ -260,6 +298,10 @@ export class PaperRuntimeBindingRegistry {
       !Number.isInteger(binding.maxCycles) ||
       binding.maxCycles < 1 ||
       binding.maxCycles > 100 ||
+      (binding.continuous !== undefined &&
+        typeof binding.continuous !== "boolean") ||
+      (binding.defaultCadence !== undefined &&
+        !binding.allowedCadences?.includes(binding.defaultCadence)) ||
       !Number.isInteger(binding.intervalMs) ||
       binding.intervalMs < 0 ||
       binding.intervalMs > 86_400_000 ||
@@ -311,6 +353,24 @@ export class PaperRuntimeActivationService {
     }
     if (this.operations && this.repository.markOrphaned) {
       for (const lease of this.operations.recoverExpiredLeases(this.now())) {
+        const requestedStop = this.operations.findStop(lease.runId);
+        if (requestedStop) {
+          const finishedAt = this.now();
+          this.operations.markStopDrained(lease.runId, finishedAt);
+          const drained = this.repository.replaceRun(
+            PaperRuntimeRunSchema.parse({
+              ...this.repository.getRun(lease.runId),
+              status: "drained",
+              stopId: requestedStop.stopId,
+              finishedAt: finishedAt.toISOString(),
+            }),
+          );
+          this.emitOperationalEvent(drained, "run_drained", "info", {
+            stopId: requestedStop.stopId,
+            recoveredAfterLeaseExpiry: "true",
+          });
+          continue;
+        }
         const orphaned = this.repository.markOrphaned(
           lease.runId,
           this.now(),
@@ -556,6 +616,21 @@ export class PaperRuntimeActivationService {
       );
     }
 
+    const requestedCadence = parsed.data.cadence;
+    if (
+      requestedCadence &&
+      !binding.allowedCadences?.includes(requestedCadence)
+    ) {
+      throw new PaperRuntimeActivationError(
+        "PAPER_RUNTIME_REQUEST_INVALID",
+        "Requested cadence is not registered for this Paper Runtime binding.",
+        { cadence: requestedCadence, bindingId: binding.bindingId },
+      );
+    }
+    const cadence = requestedCadence ?? binding.defaultCadence;
+    const intervalMs = cadence
+      ? registeredCadenceIntervals[cadence]
+      : binding.intervalMs;
     const requestedAt = this.now();
     const runId = `paper-runtime-run:${randomUUID()}`;
     const lease = this.operations?.acquireLease(
@@ -576,10 +651,16 @@ export class PaperRuntimeActivationService {
       strategyProfileRef: binding.strategyProfileRef,
       candidateSymbols: [...binding.candidateSymbols],
       requestedByActorId: actor.actorId,
+      responseLocale: parsed.data.locale ?? "en",
+      ...(binding.initialCash !== undefined
+        ? { initialCash: binding.initialCash }
+        : {}),
+      ...(cadence ? { cadence } : {}),
+      continuous: binding.continuous === true,
       status: "queued",
       plannedCycles: binding.maxCycles,
       processedCycles: 0,
-      intervalMs: binding.intervalMs,
+      intervalMs,
       lastControlMode: "normal",
       lastControlApplied: false,
       requestedAt: requestedAt.toISOString(),
@@ -808,14 +889,47 @@ export class PaperRuntimeActivationService {
           expiresAt: firstLease.expiresAt,
         });
       }
-      const runtime = await binding.createRuntime();
+      const runtime = await binding.createRuntime({
+        responseLocale: run.responseLocale ?? "en",
+      });
       closeRuntime = runtime.close;
-      const report = await new SequentialCycleRunner().run(
+      let nextLeaseHeartbeatAt =
+        this.now().getTime() + Math.max(1_000, Math.floor(this.leaseTtlMs / 2));
+      const cycleRunner = new SequentialCycleRunner({
+        sleep: async (milliseconds) => {
+          await new Promise<void>((resolve) => setTimeout(resolve, milliseconds));
+          if (this.now().getTime() < nextLeaseHeartbeatAt) return;
+          const lease = this.renewLease(run);
+          if (!lease) return;
+          run = this.repository.replaceRun({
+            ...run,
+            heartbeatAt: lease.heartbeatAt,
+          });
+          this.emitOperationalEvent(run, "lease_heartbeat", "info", {
+            fencingToken: String(lease.fencingToken),
+            expiresAt: lease.expiresAt,
+            waiting: "true",
+          });
+          nextLeaseHeartbeatAt =
+            this.now().getTime() + Math.max(1_000, Math.floor(this.leaseTtlMs / 2));
+        },
+        shouldStop: () => {
+          if (!binding.continuous) return false;
+          const stop = this.operations?.findStop(run.runId);
+          if (!stop) return false;
+          drainRequested = true;
+          return true;
+        },
+      });
+      const runCycles = binding.continuous
+        ? cycleRunner.runUntilStopped.bind(cycleRunner)
+        : cycleRunner.run.bind(cycleRunner);
+      const report = await runCycles(
         {
           cycles: binding.maxCycles,
-          intervalMs: binding.intervalMs,
+          intervalMs: run.intervalMs,
           executionEnabled: true,
-          continueOnError: false,
+          continueOnError: binding.continuous === true,
         },
         async (cycle) => {
           const lease = this.renewLease(run);
@@ -897,6 +1011,19 @@ export class PaperRuntimeActivationService {
               executionMode,
             });
             const safetyState = await runtime.safety.recordSuccess();
+            const portfolioState = runtime.portfolioState?.(
+              result.markPrices,
+            );
+            const accountSnapshot = portfolioState
+              ? {
+                  cash: portfolioState.cash,
+                  usedMargin: portfolioState.usedMargin,
+                  equity: portfolioState.equity,
+                  realizedPnl: portfolioState.realizedPnl,
+                  unrealizedPnl: portfolioState.unrealizedPnl,
+                  fees: portfolioState.fees,
+                }
+              : undefined;
             const audit = PaperRuntimeCycleAuditSchema.parse({
               schemaVersion: "1.0.0",
               runId: run.runId,
@@ -911,6 +1038,7 @@ export class PaperRuntimeActivationService {
               decisionCount: result.decisions.length,
               riskDecisionCount: result.riskDecisions.length,
               executionCount: result.executions.length,
+              ...(accountSnapshot ? { accountSnapshot } : {}),
               safety: safetySnapshot(safetyState),
             });
             this.repository.appendCycle(audit);
@@ -956,6 +1084,9 @@ export class PaperRuntimeActivationService {
               cycle: String(cycle),
               errorCode: failureCode,
             });
+            if (binding.continuous) {
+              return;
+            }
             throw error;
           }
           this.emitOperationalEvent(run, "cycle_completed", "info", {

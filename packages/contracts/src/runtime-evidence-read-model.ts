@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { PaperRuntimeRunStatusSchema } from "./paper-runtime-run.js";
+import { PaperRuntimeCadenceSchema } from "./paper-runtime-run.js";
 
 export const RuntimeEvidenceSourceModeSchema = z.enum([
   "local_fixture",
@@ -24,8 +25,22 @@ export const RuntimeEvidencePositionSchema = z
   })
   .strict();
 
+export const RuntimeEvidenceEquityPointSchema = z
+  .object({
+    cycle: z.number().int().nonnegative(),
+    asOf: z.string().datetime(),
+    cash: z.number(),
+    equity: z.number(),
+    realizedPnl: z.number(),
+    unrealizedPnl: z.number(),
+    fees: z.number().nonnegative(),
+    returnPct: z.number(),
+  })
+  .strict();
+
 export const RuntimeEvidenceAgentSummarySchema = z
   .object({
+    cycle: z.number().int().positive(),
     artifactId: z.string().min(1),
     sourceArtifactIds: z.array(z.string().min(1)).max(50),
     traceId: z.string().min(1),
@@ -37,6 +52,12 @@ export const RuntimeEvidenceAgentSummarySchema = z
     completedAt: z.string().datetime(),
     durationMs: z.number().nonnegative(),
     semanticSummary: z.string().min(1).max(600),
+    semanticSummaryTranslations: z
+      .object({
+        zhCN: z.string().min(1).max(600),
+        en: z.string().min(1).max(600),
+      })
+      .strict(),
   })
   .strict();
 
@@ -60,8 +81,14 @@ export const RuntimeEvidenceDashboardSchema = z
         planId: z.string().min(1),
         status: PaperRuntimeRunStatusSchema,
         strategyProfileRef: z.string().min(1),
+        responseLocale: z.enum(["zh-CN", "en"]).optional(),
+        initialCash: z.number().positive().optional(),
+        cadence: PaperRuntimeCadenceSchema.optional(),
+        intervalMs: z.number().int().positive(),
+        continuous: z.boolean().optional(),
         processedCycles: z.number().int().nonnegative(),
         plannedCycles: z.number().int().positive(),
+        activeCycle: z.number().int().positive().optional(),
         controlMode: z.enum([
           "normal",
           "pause_new_openings_close_only",
@@ -108,6 +135,16 @@ export const RuntimeEvidenceDashboardSchema = z
       })
       .strict()
       .optional(),
+    equityCurve: z
+      .object({
+        initialCash: z.number().positive(),
+        currentCash: z.number(),
+        currentEquity: z.number(),
+        totalReturnPct: z.number(),
+        points: z.array(RuntimeEvidenceEquityPointSchema).max(120),
+      })
+      .strict()
+      .optional(),
     selection: z
       .object({
         topN: z.literal(1),
@@ -125,7 +162,7 @@ export const RuntimeEvidenceDashboardSchema = z
       .strict(),
     semanticTransfers: z
       .array(RuntimeEvidenceAgentSummarySchema)
-      .max(50),
+      .max(600),
     decisionRiskExecution: z
       .object({
         decisionAction: z.string().min(1).optional(),
@@ -144,6 +181,12 @@ export const RuntimeEvidenceDashboardSchema = z
         reflectionId: z.string().min(1).optional(),
         asOf: z.string().datetime().optional(),
         recommendations: z.array(z.string().max(600)).max(20),
+        recommendationTranslations: z
+          .object({
+            zhCN: z.array(z.string().max(600)).max(20),
+            en: z.array(z.string().max(600)).max(20),
+          })
+          .strict(),
         adjustmentCount: z.number().int().nonnegative(),
       })
       .strict(),
@@ -151,7 +194,7 @@ export const RuntimeEvidenceDashboardSchema = z
       .object({
         planFingerprint: z.string().min(1).optional(),
         traceId: z.string().min(1).optional(),
-        artifactIds: z.array(z.string().min(1)).max(50),
+        artifactIds: z.array(z.string().min(1)).max(600),
         schemaRefs: z.array(z.string().min(1)).min(1),
         dataSourceRef: z.string().min(1),
       })
@@ -184,6 +227,13 @@ export const RuntimeEvidenceDashboardSchema = z
         code: "custom",
         path: ["evidenceStatus"],
         message: "Evidence status must match the run lifecycle.",
+      });
+    }
+    if (value.run?.activeCycle !== undefined && !active) {
+      context.addIssue({
+        code: "custom",
+        path: ["run", "activeCycle"],
+        message: "Only an active run can expose an active cycle.",
       });
     }
   });

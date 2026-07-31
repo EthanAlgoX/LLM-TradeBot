@@ -16,7 +16,7 @@ export interface LocalPaperWorkspace {
 
 const localProfileOverride = {
   profileId: "current-crypto-local-paper",
-  profileVersion: "v1",
+  profileVersion: "v2",
   selector: {
     topN: 1,
     minQuoteVolume24h: 0,
@@ -47,7 +47,7 @@ const localProfileOverride = {
     maxOrderNotional: 500,
   },
   execution: {
-    initialCash: 10_000,
+    initialCash: 100_000,
     feeBps: 3,
     slippageBps: 1,
     maxExecutionsPerCycle: 1,
@@ -130,7 +130,7 @@ export function prepareLocalPaperWorkspace(
       TRADEBOT_PAPER_PROFILE_PATH: profilePath,
       TRADEBOT_PAPER_SYMBOLS: "BTCUSDT",
       TRADEBOT_PAPER_DB_PATH: join(directory, "paper.sqlite"),
-      TRADEBOT_PAPER_ACCOUNT_ID: "local-paper",
+      TRADEBOT_PAPER_ACCOUNT_ID: "local-paper-100k",
       TRADEBOT_PAPER_SAFETY_DB_PATH: join(
         directory,
         "safety.sqlite",
@@ -148,7 +148,8 @@ export function prepareLocalPaperWorkspace(
         "reflection.sqlite",
       ),
       TRADEBOT_PAPER_MAX_CYCLES: "6",
-      TRADEBOT_PAPER_INTERVAL_SECONDS: "10",
+      TRADEBOT_PAPER_CONTINUOUS: "true",
+      TRADEBOT_PAPER_INTERVAL_SECONDS: "60",
       TRADEBOT_PAPER_MAX_CONSECUTIVE_FAILURES: "3",
       TRADEBOT_PAPER_COOLDOWN_SECONDS: "30",
       TRADEBOT_PAPER_MARKET_DATA_MODE: "local_fixture",

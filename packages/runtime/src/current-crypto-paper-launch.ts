@@ -1,6 +1,7 @@
 import {
   PaperRuntimeLaunchContextSchema,
   PaperRuntimeLaunchPresetRequestSchema,
+  type ApprovedPaperPlan,
   type OrchestrationActor,
   type PaperRuntimeLaunchContext,
   type PipelineGraphVersion,
@@ -31,6 +32,8 @@ export class CurrentCryptoPaperLaunchError extends Error {
 export interface CurrentCryptoPaperLaunchOptions {
   available: boolean;
   graph: PipelineGraphVersion;
+  draftVersion?: string;
+  isCurrentPlan?: (plan: ApprovedPaperPlan) => boolean;
   orchestration: Pick<
     PipelineOrchestrationService,
     "createDraft" | "getDraft"
@@ -95,7 +98,11 @@ export class CurrentCryptoPaperLaunchService {
       exchangeWriteAllowed: false as const,
       clientRuntimeParametersAccepted: false as const,
     };
-    if (!current) {
+    if (
+      !current ||
+      (this.options.isCurrentPlan &&
+        !this.options.isCurrentPlan(current.plan))
+    ) {
       return PaperRuntimeLaunchContextSchema.parse({
         ...base,
         launchState: "release_required",
@@ -189,16 +196,25 @@ export class CurrentCryptoPaperLaunchService {
     }
 
     const existing = this.options.paperPlans.findLatestActivatedPlan();
-    if (existing) {
+    if (
+      existing &&
+      (!this.options.isCurrentPlan ||
+        this.options.isCurrentPlan(existing.plan))
+    ) {
       this.options.paperPlans.assertReadyForRuntime(
         existing.plan.planId,
       );
       return this.getContext();
     }
 
-    const draft = this.options.orchestration.createDraft(
-      this.options.graph,
-    );
+    const launchGraph = this.options.draftVersion
+      ? {
+          ...this.options.graph,
+          humanReadableVersion: this.options.draftVersion,
+          fingerprint: `sha256:${this.options.draftVersion}`,
+        }
+      : this.options.graph;
+    const draft = this.options.orchestration.createDraft(launchGraph);
     this.options.evidenceWorkflow.validateContract(
       draft.draftId,
       actor,
