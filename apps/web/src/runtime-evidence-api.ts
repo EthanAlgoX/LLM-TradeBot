@@ -60,6 +60,7 @@ interface RuntimeEvidenceResponse {
   };
   semanticTransfers: Array<{
     artifactId: string;
+    sourceArtifactIds: string[];
     stage: string;
     agent: string;
     agentVersion: string;
@@ -127,6 +128,209 @@ function money(value: number | undefined): string {
   }).format(value);
 }
 
+function agentLabel(stage: string, agent: string): string {
+  const labels: Record<string, [string, string]> = {
+    selector: ["市场机会筛选 Agent", "Market opportunity Selector"],
+    data: ["数据同步 Agent", "Data synchronization Agent"],
+    data_quality: ["数据质量门禁", "Data quality gate"],
+    analysis: ["多周期分析 Agent", "Multi-window analysis Agent"],
+    bull_case: ["看多观点 Agent", "Bull case Agent"],
+    bear_case: ["看空观点 Agent", "Bear case Agent"],
+    position_monitor: ["持仓监控 Agent", "Position Monitor"],
+    decision: ["决策 Agent", "Decision Agent"],
+    portfolio: ["组合 Agent", "Portfolio Agent"],
+    risk: ["风险门禁", "Risk Gate"],
+    execution: ["模拟执行 Agent", "Paper Execution Agent"],
+    reflection: ["反思 Agent", "Reflection Agent"],
+  };
+  const label = labels[stage];
+  return label ? label[zh() ? 0 : 1] : agent;
+}
+
+function transferStatusLabel(status: "success" | "fallback" | "error"): string {
+  if (!zh()) return status.toUpperCase();
+  if (status === "success") return "已完成";
+  if (status === "fallback") return "安全回退";
+  return "失败";
+}
+
+type RuntimeTransfer = RuntimeEvidenceResponse["semanticTransfers"][number];
+
+interface RuntimeTransferPosition {
+  x: number;
+  y: number;
+  depth: number;
+}
+
+function layoutRuntimeTransfers(transfers: RuntimeTransfer[]): {
+  width: number;
+  height: number;
+  positions: Map<string, RuntimeTransferPosition>;
+} {
+  const nodeWidth = 252;
+  const nodeHeight = 190;
+  const columnGap = 84;
+  const rowGap = 20;
+  const padding = 24;
+  const byId = new Map(transfers.map((item) => [item.artifactId, item]));
+  const depths = new Map<string, number>();
+
+  const findDepth = (item: RuntimeTransfer, visiting = new Set<string>()): number => {
+    const cached = depths.get(item.artifactId);
+    if (cached !== undefined) return cached;
+    if (visiting.has(item.artifactId)) return 0;
+    const nextVisiting = new Set(visiting).add(item.artifactId);
+    const parents = item.sourceArtifactIds
+      .map((id) => byId.get(id))
+      .filter((parent): parent is RuntimeTransfer => Boolean(parent));
+    const depth = parents.length === 0
+      ? 0
+      : Math.max(...parents.map((parent) => findDepth(parent, nextVisiting))) + 1;
+    depths.set(item.artifactId, depth);
+    return depth;
+  };
+
+  const columns = new Map<number, RuntimeTransfer[]>();
+  for (const item of transfers) {
+    const depth = findDepth(item);
+    columns.set(depth, [...(columns.get(depth) ?? []), item]);
+  }
+
+  const positions = new Map<string, RuntimeTransferPosition>();
+  for (const [depth, items] of columns) {
+    items.forEach((item, row) => {
+      positions.set(item.artifactId, {
+        depth,
+        x: padding + depth * (nodeWidth + columnGap),
+        y: padding + row * (nodeHeight + rowGap),
+      });
+    });
+  }
+
+  const maxDepth = Math.max(0, ...columns.keys());
+  const maxRows = Math.max(1, ...[...columns.values()].map((items) => items.length));
+  return {
+    width: padding * 2 + (maxDepth + 1) * nodeWidth + maxDepth * columnGap,
+    height: padding * 2 + maxRows * nodeHeight + (maxRows - 1) * rowGap,
+    positions,
+  };
+}
+
+function renderAgentTransfers(): string {
+  const transfers = evidence?.semanticTransfers ?? [];
+  const layout = layoutRuntimeTransfers(transfers);
+  const transferById = new Map(transfers.map((item) => [item.artifactId, item]));
+  const anchorById = new Map(
+    transfers.map((item, index) => [item.artifactId, `runtime-artifact-${index + 1}`]),
+  );
+  const childrenById = new Map<string, RuntimeTransfer[]>();
+  for (const artifact of transfers) {
+    for (const sourceId of artifact.sourceArtifactIds) {
+      childrenById.set(sourceId, [...(childrenById.get(sourceId) ?? []), artifact]);
+    }
+  }
+  const edges = transfers.flatMap((target) =>
+    target.sourceArtifactIds.flatMap((sourceId) => {
+      const source = layout.positions.get(sourceId);
+      const destination = layout.positions.get(target.artifactId);
+      if (!source || !destination) return [];
+      const sourceX = source.x + 252;
+      const sourceY = source.y + 95;
+      const targetX = destination.x;
+      const targetY = destination.y + 95;
+      const bend = Math.max(28, (targetX - sourceX) / 2);
+      return [`<path d="M ${sourceX} ${sourceY} C ${sourceX + bend} ${sourceY}, ${targetX - bend} ${targetY}, ${targetX} ${targetY}" />`];
+    }),
+  );
+  const edgeCount = edges.length;
+  return `
+    <section class="runtime-agent-conversation" aria-labelledby="runtime-agent-conversation-title">
+      <header>
+        <div>
+          <span>${zh() ? "当前周期 · 语义协作对话" : "CURRENT CYCLE · SEMANTIC COLLABORATION"}</span>
+          <h3 id="runtime-agent-conversation-title">${zh() ? "子 Agent 运行对话" : "Sub-agent runtime dialogue"}</h3>
+          <p>${zh() ? "主体展示各节点的真实语义输出；输入来源、并行分支和汇聚关系均取自 Artifact lineage，而不是消息出现顺序。" : "The dialogue centers on real semantic outputs. Inputs, parallel branches, and joins come from Artifact lineage rather than message order."}</p>
+        </div>
+        <code>${transfers.length} ARTIFACTS</code>
+      </header>
+      ${transfers.length > 0 ? `
+        <details class="runtime-conversation-topology">
+          <summary>
+            <span>${zh() ? "展开 Graph 关系概览" : "Expand Graph relationship overview"}</span>
+            <code>${transfers.length} ${zh() ? "节点" : "NODES"} · ${edgeCount} ${zh() ? "连线" : "EDGES"}</code>
+          </summary>
+          <div class="runtime-agent-graph-scroll" tabindex="0" aria-label="${zh() ? "可横向滚动的 Agent 运行拓扑" : "Scrollable Agent runtime topology"}">
+            <div class="runtime-agent-graph" style="width:${layout.width}px;height:${layout.height}px">
+              <svg aria-hidden="true" viewBox="0 0 ${layout.width} ${layout.height}" width="${layout.width}" height="${layout.height}">
+                <defs><marker id="runtime-agent-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" /></marker></defs>
+                <g>${edges.join("")}</g>
+              </svg>
+              ${transfers.map((artifact) => {
+                const position = layout.positions.get(artifact.artifactId)!;
+                return `
+                <a class="runtime-agent-map-node" data-status="${artifact.status}" style="left:${position.x}px;top:${position.y}px" href="#${anchorById.get(artifact.artifactId)}">
+                  <span>${escapeHtml(artifact.stage)}</span>
+                  <strong>${escapeHtml(agentLabel(artifact.stage, artifact.agent))}</strong>
+                  <small>${artifact.sourceArtifactIds.filter((id) => transferById.has(id)).length} ${zh() ? "个上游" : "UPSTREAM"}</small>
+                </a>`;
+              }).join("")}
+            </div>
+          </div>
+        </details>
+        <div class="runtime-agent-room" role="log" aria-live="polite">
+          <div class="runtime-agent-room__status">
+            <span></span>${zh() ? "Agent 语义频道" : "Agent semantic channel"}
+          </div>
+          ${transfers.map((artifact) => {
+            const knownParents = artifact.sourceArtifactIds
+              .map((id) => transferById.get(id))
+              .filter((item): item is RuntimeTransfer => Boolean(item));
+            const externalParentIds = artifact.sourceArtifactIds.filter((id) => !transferById.has(id));
+            const children = childrenById.get(artifact.artifactId) ?? [];
+            const branchParent = knownParents.find((parent) => (childrenById.get(parent.artifactId)?.length ?? 0) > 1);
+            const siblings = branchParent ? childrenById.get(branchParent.artifactId) ?? [] : [];
+            const branchIndex = siblings.findIndex((item) => item.artifactId === artifact.artifactId);
+            const displayName = agentLabel(artifact.stage, artifact.agent);
+            const parentLinks = knownParents
+              .map((parent) => `<a href="#${anchorById.get(parent.artifactId)}">${escapeHtml(agentLabel(parent.stage, parent.agent))}</a>`)
+              .join(zh() ? "、" : ", ");
+            const childLinks = children
+              .map((child) => `<a href="#${anchorById.get(child.artifactId)}">${escapeHtml(agentLabel(child.stage, child.agent))}</a>`)
+              .join(zh() ? "、" : ", ");
+            return `
+            <article class="runtime-agent-room-message" id="${anchorById.get(artifact.artifactId)}" data-status="${artifact.status}">
+              <div class="runtime-agent-room-message__avatar" aria-hidden="true">${escapeHtml(displayName.slice(0, 1).toUpperCase())}</div>
+              <div class="runtime-agent-room-message__turn">
+                <header>
+                  <strong>${escapeHtml(displayName)}</strong>
+                  <span>${transferStatusLabel(artifact.status)}</span>
+                </header>
+                ${knownParents.length > 0 ? `
+                  <div class="runtime-agent-room-message__reply">↳ ${zh() ? "回复" : "Replying to"} ${parentLinks}${siblings.length > 1 ? ` · ${zh() ? `并行 ${branchIndex + 1}/${siblings.length}` : `parallel ${branchIndex + 1}/${siblings.length}`}` : ""}</div>
+                ` : externalParentIds.length > 0 ? `
+                  <div class="runtime-agent-room-message__reply">↳ ${zh() ? "回复前序语义" : "Replying to prior semantics"}</div>
+                ` : ""}
+                <div class="runtime-agent-room-message__bubble">
+                  <p>${escapeHtml(artifact.semanticSummary)}</p>
+                </div>
+                <footer>
+                  <span>→ ${zh() ? "发送给" : "Send to"}</span>
+                  ${children.length > 0 ? childLinks : `<span>${zh() ? "无下游 Agent" : "No downstream Agent"}</span>`}
+                </footer>
+              </div>
+            </article>`;
+          }).join("")}
+        </div>
+      ` : `
+        <div class="runtime-agent-graph-empty">
+          <strong>${zh() ? "等待当前周期产生 Agent Artifact" : "Waiting for Agent artifacts from the current cycle"}</strong>
+          <span>${zh() ? "对话会在真实语义 Artifact 到达后自动形成。" : "The dialogue forms automatically as real semantic artifacts arrive."}</span>
+        </div>
+      `}
+    </section>
+  `;
+}
+
 function render(): void {
   const main = document.querySelector<HTMLElement>("#main-content");
   if (!main) return;
@@ -164,16 +368,19 @@ function render(): void {
       <div>
         <span>${view.live ? "LIVE READ MODEL" : "RECENT RUN EVIDENCE"}</span>
         <h2>${zh() ? "真实交易运行证据" : "Runtime trading evidence"}</h2>
-        <p>${escapeHtml(evidence.run.runId)} · ${escapeHtml(evidence.sourceMode)}</p>
+        <p>${escapeHtml(evidence.selection?.selectedSymbols[0] ?? (zh() ? "无入选标的" : "No admitted symbol"))} · ${escapeHtml(evidence.run.runId)} · ${escapeHtml(evidence.sourceMode)}</p>
       </div>
       <strong>${escapeHtml(evidence.run.status.toUpperCase())}</strong>
     </header>
     <div class="runtime-evidence-metrics">
       <div><span>${zh() ? "现金" : "Cash"}</span><strong>${money(account?.cash)}</strong></div>
-      <div><span>${zh() ? "已用保证金" : "Deployed margin"}</span><strong>${money(account?.deployedMargin)}</strong></div>
       <div><span>${zh() ? "已实现盈亏" : "Realized PnL"}</span><strong>${money(account?.realizedPnl)}</strong></div>
+      <div><span>${zh() ? "已用保证金" : "Deployed margin"}</span><strong>${money(account?.deployedMargin)}</strong></div>
+      <div><span>${zh() ? "手续费" : "Fees"}</span><strong>${money(account?.fees)}</strong></div>
+      <div><span>${zh() ? "当前持仓" : "Open positions"}</span><strong>${account?.openPositionCount ?? "-"}</strong></div>
       <div><span>${zh() ? "运行周期" : "Run cycles"}</span><strong>${evidence.run.processedCycles}/${evidence.run.plannedCycles}</strong></div>
     </div>
+    ${renderAgentTransfers()}
     <div class="runtime-evidence-grid">
       <section>
         <header><span>SELECTOR · TOP N = 1</span><strong>${escapeHtml(evidence.selection?.selectedSymbols[0] ?? (zh() ? "无入选标的" : "No admitted symbol"))}</strong></header>
@@ -214,21 +421,6 @@ function render(): void {
         </ul>
       </section>
     </div>
-    <section class="runtime-semantic-transfer">
-      <header>
-        <div><span>${zh() ? "语义交接" : "Semantic handoffs"}</span><h3>${zh() ? "Agent 输出摘要" : "Agent output summaries"}</h3></div>
-        <code>${evidence.semanticTransfers.length} ARTIFACTS</code>
-      </header>
-      <ol>
-        ${evidence.semanticTransfers.map((artifact, index) => `
-          <li data-status="${artifact.status}">
-            <span>${String(index + 1).padStart(2, "0")}</span>
-            <div><strong>${escapeHtml(artifact.stage)} · ${escapeHtml(artifact.agent)}</strong><p>${escapeHtml(artifact.semanticSummary)}</p></div>
-            <small>${artifact.durationMs} ms</small>
-          </li>
-        `).join("") || `<li><div><strong>${zh() ? "暂无 Agent Artifact" : "No Agent artifacts"}</strong></div></li>`}
-      </ol>
-    </section>
     <footer class="runtime-evidence-lineage">
       <span>TRACE ${escapeHtml(evidence.lineage.traceId ?? "-")}</span>
       <span>${evidence.lineage.artifactIds.length} ARTIFACT REFS</span>

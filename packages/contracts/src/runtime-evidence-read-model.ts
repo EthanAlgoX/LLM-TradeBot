@@ -27,6 +27,7 @@ export const RuntimeEvidencePositionSchema = z
 export const RuntimeEvidenceAgentSummarySchema = z
   .object({
     artifactId: z.string().min(1),
+    sourceArtifactIds: z.array(z.string().min(1)).max(50),
     traceId: z.string().min(1),
     stage: z.string().min(1),
     agent: z.string().min(1),

@@ -292,6 +292,36 @@ function runtimeEvidenceBoundaryLabel(): string {
   );
 }
 
+function environmentBannerLabel(): string {
+  if (runtimeDashboard.connectionMode === "live") {
+    return runtimeDashboard.activeRun
+      ? tr(
+          "真实 Paper Runtime 正在运行；页面中未标为 Runtime 的交易证据仍是 MOCK。",
+          "The real Paper Runtime is active; trading evidence not marked as Runtime remains MOCK.",
+        )
+      : tr(
+          "真实 Runtime 控制已连接；Atlas 交易证据是明确标注的 MOCK，不代表当前运行。",
+          "Real Runtime controls are connected; Atlas trading evidence is explicitly MOCK and does not represent an active run.",
+        );
+  }
+  if (runtimeDashboard.connectionMode === "readonly") {
+    return tr(
+      "Runtime API 已连接但需要 Operator 认证；交易控制不可用，页面证据为 MOCK。",
+      "Runtime API connected but Operator authentication is required; controls are unavailable and page evidence is MOCK.",
+    );
+  }
+  if (runtimeDashboard.connectionMode === "connecting") {
+    return tr(
+      "正在连接 Runtime API；连接确认前，页面交易证据均为 MOCK。",
+      "Connecting to the Runtime API; page trading evidence is MOCK until the connection is confirmed.",
+    );
+  }
+  return tr(
+    "Runtime API 离线；页面仅展示 MOCK 交易证据，所有真实运行控制均已禁用。",
+    "Runtime API is offline; the page shows MOCK trading evidence only and all real Runtime controls are disabled.",
+  );
+}
+
 function applyRuntimeDashboardToDom(): void {
   const setText = (selector: string, value: string): void => {
     const element = document.querySelector<HTMLElement>(selector);
@@ -313,6 +343,18 @@ function applyRuntimeDashboardToDom(): void {
       : "NORMAL",
   );
   setText("[data-runtime-evidence-boundary]", runtimeEvidenceBoundaryLabel());
+  setText("[data-environment-banner]", environmentBannerLabel());
+  const environmentBanner = document.querySelector<HTMLElement>(
+    "[data-environment-banner]",
+  );
+  environmentBanner?.classList.toggle(
+    "is-live",
+    runtimeDashboard.connectionMode === "live",
+  );
+  environmentBanner?.classList.toggle(
+    "is-readonly",
+    runtimeDashboard.connectionMode === "readonly",
+  );
 
   document
     .querySelector<HTMLElement>(".live-state")
@@ -1432,13 +1474,11 @@ function renderProductLoop(): string {
 }
 
 function renderOrchestration(): string {
-  const template = selectedPipelineTemplate();
-  const selectedNode = selectedOrchestrationNode();
   return `
     <section class="page-intro orchestration-intro">
       <div>
         <h1>${tr("编排 Agent", "Orchestration Agent")}</h1>
-        <p>${tr("在一个对话框里描述数据输入、子 Agent 能力和 Workflow 连接关系。系统会调用已注册接口，自动生成可确认、可验证的编排草案。", "Describe data inputs, sub-Agent capabilities, and Workflow relationships in one conversation. The system calls registered interfaces and automatically produces a reviewable, validatable orchestration draft.")}</p>
+        <p>${tr("直接说出交易思路、子 Agent 的连接关系和策略要求。系统会在对话中生成 Workflow 草案，并引导你完成试运行、回测与审批上线。", "Describe the trading idea, sub-Agent connections, and strategy requirements. The system generates a Workflow draft in the conversation and guides it through dry validation, backtesting, and approved release.")}</p>
       </div>
       <div class="orchestration-intro-actions">
         <button type="button" class="secondary-action" data-view="connections">${tr("数据输入与接口", "Data inputs & interfaces")}</button>
@@ -1450,168 +1490,16 @@ function renderOrchestration(): string {
       </div>
     </section>
 
-    <section class="orchestration-status">
-      <div><span>${tr("Market Pack", "Market Pack")}</span><strong>Crypto 24x7 / v1</strong></div>
-      <div><span>${tr("生命周期", "Lifecycle")}</span><strong>${tr("已验证，运行时未迁移", "Validated, Runtime not migrated")}</strong></div>
-      <div><span>${tr("编排方式", "Orchestration mode")}</span><strong>${tr("真实 Conversation API + 注册工具", "Live Conversation API + registered tools")}</strong></div>
-    </section>
-
     <section class="orchestration-workbench-shell" aria-labelledby="orchestration-workbench-title">
       <header class="orchestration-workbench-heading">
         <div>
-          <span>CONVERSATION-FIRST WORKFLOW</span>
-          <h2 id="orchestration-workbench-title">${tr("说出需求，系统完成结构化编排", "State the need; the system builds the structured workflow")}</h2>
-          <p>${tr("对话结果不是聊天摘要，而是持久化 Draft、字段级 Diff、接口能力检查和下一道发布门禁。", "The result is not a chat summary. It is a persisted draft, field-level diff, interface capability check, and the next release gate.")}</p>
+          <span>CONVERSATION-FIRST ORCHESTRATION</span>
+          <h2 id="orchestration-workbench-title">${tr("从一句需求到可验证的 Agent Workflow", "From one request to a verifiable Agent Workflow")}</h2>
+          <p>${tr("先对话生成方案，再确认策略与连接；所有变更只进入 Draft，不会直接修改运行中的交易 Agent。", "Generate the plan through conversation, then confirm its strategy and connections. Every change remains a Draft and never mutates the running Trading Agent directly.")}</p>
         </div>
-        <ol class="orchestration-delivery-rail">
-          <li class="is-current"><span>01</span><strong>${tr("描述连接", "Describe")}</strong></li>
-          <li><span>02</span><strong>${tr("确认编排", "Confirm")}</strong></li>
-          <li><span>03</span><strong>${tr("验证开发", "Validate")}</strong></li>
-          <li><span>04</span><strong>${tr("发布 Paper", "Release Paper")}</strong></li>
-        </ol>
       </header>
       <div id="orchestration-workspace-host" class="orchestration-workspace-host"></div>
     </section>
-
-    <header class="advanced-orchestration-heading">
-      <div><span>${tr("高级检查", "ADVANCED INSPECTION")}</span><h2>${tr("能力目录与 Workflow Graph", "Capability catalog & Workflow Graph")}</h2></div>
-      <p>${tr("Graph 只用于检查自动编排结果，不是普通用户的必经入口。", "The graph is an inspection view for generated workflows, not a required authoring step.")}</p>
-    </header>
-    ${renderProductLoop()}
-
-    <div class="orchestration-layout">
-      <aside class="orchestration-catalog" aria-label="${tr("能力目录", "Capability catalog")}">
-        <header><h2>${tr("能力目录", "Capability Catalog")}</h2><span>2 / 12</span></header>
-        <section>
-          <h3>Market Pack</h3>
-          <button type="button" data-orchestration-node="selector">
-            <strong>Crypto 24x7</strong>
-            <small>${tr("已注册 · 当前可验证", "Registered · currently validatable")}</small>
-            <span><b>${tr("规则", "Rules")}</b> UTC · 24/7 · perpetual</span>
-          </button>
-          <div class="market-pack-plan">
-            <span>A Shares</span><span>Hong Kong</span><span>US Equities</span>
-            <small>${tr("Planned：尚无真实 Adapter，不宣称可运行", "Planned: no real adapters, not claimed as runnable")}</small>
-          </div>
-        </section>
-        <section>
-          <h3>Data Source</h3>
-          <button type="button" data-orchestration-node="data-sync">
-            <strong>Binance Futures Public</strong>
-            <small>OHLCV / Crypto / Public API</small>
-            <span><b>${tr("原生", "Native")}</b> 5m · 15m · 1h</span>
-            <span><b>${tr("聚合规则", "Aggregation")}</b> 5m → 1h + lineage</span>
-          </button>
-          <button type="button" data-orchestration-node="data-sync">
-            <strong>CSV Historical Source</strong>
-            <small>OHLCV / Crypto / Historical file</small>
-            <span><b>${tr("原生", "Native")}</b> 5m · 15m · 1h</span>
-            <span><b>${tr("实时", "Realtime")}</b> ${tr("否", "No")}</span>
-          </button>
-        </section>
-        <section>
-          <h3>Agent Template</h3>
-          ${[
-            ["selector", tr("选币", "Selector"), "UniverseSet"],
-            ["analysis", tr("分析", "Analysis"), "AnalysisArtifact"],
-            ["decision", tr("决策", "Decision"), "DecisionBundle"],
-            ["risk", tr("风险门禁", "Risk Gate"), "RiskDecision"],
-            ["execution", tr("模拟执行", "Paper Execution"), "ExecutionResult"],
-          ].map(([id, name, output]) => `
-            <button type="button" class="catalog-agent" data-orchestration-node="${id}">
-              <strong>${name}</strong><small>${output}</small>
-            </button>
-          `).join("")}
-          <p>${tr("另有 7 个已注册模板。Copilot 不能创建或执行任意代码。", "Seven more templates are registered. Copilot cannot create or execute arbitrary code.")}</p>
-        </section>
-      </aside>
-
-      <main class="orchestration-canvas">
-        <header class="canvas-toolbar">
-          <div>
-            <span>${localized(template.mode)}</span>
-            <h2>${localized(template.name)}</h2>
-            <p>${localized(template.description)}</p>
-          </div>
-          <code>${template.id === "current" ? "validated" : "template-only"}</code>
-        </header>
-        <nav class="template-switcher" aria-label="${tr("Pipeline 模板", "Pipeline templates")}">
-          ${pipelineTemplates.map((item) => `
-            <button type="button" data-orchestration-template="${item.id}" class="${item.id === template.id ? "is-active" : ""}" aria-pressed="${item.id === template.id}">
-              ${localized(item.name)}
-            </button>
-          `).join("")}
-        </nav>
-        <div class="graph-canvas" aria-label="${tr("Pipeline Graph 预览", "Pipeline Graph preview")}">
-          ${template.id === "current" ? renderCurrentGraph() : renderTemplateGraph(template)}
-        </div>
-        <section class="canvas-validation">
-          <header>
-            <div><h3>${tr("Graph Validator", "Graph Validator")}</h3><span>${tr("稳定机器错误代码", "Stable machine error codes")}</span></div>
-            <div>
-              <button type="button" data-validation-preview="passed">${tr("当前 Graph", "Current Graph")}</button>
-              <button type="button" data-validation-preview="window-error">${tr("5m / 1d 错误", "5m / 1d error")}</button>
-              <button type="button" data-validation-preview="schema-error">${tr("Schema 错误", "Schema error")}</button>
-            </div>
-          </header>
-          ${renderValidationPreview()}
-        </section>
-      </main>
-
-      <aside class="orchestration-inspector">
-        <section class="node-inspector">
-          <header><span>${tr("节点检查器", "Node Inspector")}</span><strong>${localized(selectedNode.name)}</strong></header>
-          <dl>
-            <div><dt>${tr("角色", "Role")}</dt><dd>${selectedNode.role}</dd></div>
-            <div><dt>${tr("观察窗口", "Observation Window")}</dt><dd>${selectedNode.window ?? tr("不适用", "Not applicable")}</dd></div>
-            <div><dt>${tr("输入", "Input")}</dt><dd>${localized(selectedNode.input)}</dd></div>
-            <div><dt>${tr("输出", "Output")}</dt><dd>${localized(selectedNode.output)}</dd></div>
-          </dl>
-          <p>${localized(selectedNode.permission)}</p>
-          <div class="direct-draft-edit">
-            <button type="button" class="secondary-action" id="create-direct-edit-draft">
-              ${tr("创建可编辑 Draft 副本", "Create editable Draft copy")}
-            </button>
-            <small>${tr("直接编辑与 Copilot 共用同一结构化 Draft，不修改 Runtime。", "Direct editing and Copilot share the same structured Draft and never mutate Runtime.")}</small>
-          </div>
-        </section>
-
-        <section class="orchestration-copilot">
-          <header><span>${tr("编排 Copilot", "Orchestration Copilot")}</span><strong>${tr("只创建结构化草案", "Structured drafts only")}</strong></header>
-          <p>${tr("可选择已注册 Template、连接 Draft 节点并调用 Validator。无法修改运行 Graph、绕过 Risk 或下单。", "It can select registered templates, connect Draft nodes, and invoke validation. It cannot mutate the running Graph, bypass Risk, or place orders.")}</p>
-          <button type="button" class="primary-action" id="create-orchestration-draft">
-            ${state.orchestrationDraftCreated ? tr("草案节点已创建", "Draft node created") : tr("创建上下文汇总草案", "Create Context Fusion draft")}
-          </button>
-          ${state.orchestrationDraftCreated ? `
-            <div class="structured-draft">
-              <span>Draft / browser mock</span>
-              <strong>agent-config:draft-context</strong>
-              <dl>
-                <div><dt>templateId</dt><dd>context-fusion:v1</dd></div>
-                <div><dt>status</dt><dd>draft</dd></div>
-                <div><dt>runtimeApplied</dt><dd>false</dd></div>
-              </dl>
-            </div>
-          ` : ""}
-          <form id="orchestration-copilot-form">
-            <label for="orchestration-prompt">${tr("编排意图", "Orchestration intent")}</label>
-            <textarea id="orchestration-prompt" required placeholder="${tr("例如：增加已注册的上下文汇总 Agent", "Example: add the registered Context Fusion Agent")}"></textarea>
-            <button type="submit" class="secondary-action">${tr("生成 Draft", "Generate Draft")}</button>
-          </form>
-        </section>
-
-        <section class="orchestration-gates">
-          <h3>${tr("发布门禁", "Release Gates")}</h3>
-          <ol>
-            <li class="is-current"><span>1</span><strong>${tr("合同验证", "Contract Validation")}</strong></li>
-            <li><span>2</span><strong>${tr("回测", "Backtest")}</strong></li>
-            <li><span>3</span><strong>Walk-Forward</strong></li>
-            <li><span>4</span><strong>${tr("人工审批", "Human Approval")}</strong></li>
-            <li><span>5</span><strong>${tr("模拟运行", "Paper Running")}</strong></li>
-          </ol>
-        </section>
-      </aside>
-    </div>
   `;
 }
 
@@ -2245,7 +2133,7 @@ function render(): void {
     <div class="app-shell" id="app-shell">
       <a class="skip-link" href="#main-content">${tr("跳到主要内容", "Skip to main content")}</a>
       ${renderHeader()}
-      <div class="mock-banner">${tr("演示数据：Web 尚未连接 Runtime API", "Mock data: Web is not connected to the Runtime API")}</div>
+      <div class="mock-banner environment-banner ${runtimeDashboard.connectionMode === "live" ? "is-live" : runtimeDashboard.connectionMode === "readonly" ? "is-readonly" : ""}" data-environment-banner>${environmentBannerLabel()}</div>
       <main class="page-frame" id="main-content" tabindex="-1">${view}</main>
     </div>
     ${renderCopilot()}

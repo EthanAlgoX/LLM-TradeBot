@@ -45,6 +45,7 @@ import { validatePipelineGraph } from "../../core/src/pipeline-graph-validator.j
 import { createPipelineOrchestrationHttpServer } from "./pipeline-orchestration-http.js";
 import { SqlitePipelineDraftRepository } from "./sqlite-pipeline-draft-repository.js";
 import { SqlitePipelineEvidenceRepository } from "./sqlite-pipeline-evidence-repository.js";
+import { SqliteConversationReplayRepository } from "./sqlite-conversation-replay-repository.js";
 import { LocalBearerAuthenticator } from "./pipeline-orchestration-auth.js";
 import {
   HistoricalEvidenceArtifactStore,
@@ -343,6 +344,8 @@ export function createCurrentPipelineOrchestrationRuntime(
           : {}),
       })
     : undefined;
+  const conversationReplayRepository =
+    new SqliteConversationReplayRepository(database);
   const orchestrationCopilotService = new OrchestrationCopilotService({
     intentDraftService,
     configurationDraftService:
@@ -350,6 +353,7 @@ export function createCurrentPipelineOrchestrationRuntime(
     pipelineService: service,
     evidenceWorkflow,
     registry,
+    replayRepository: conversationReplayRepository,
     recipes: [
       {
         presetId: "preset.event-only-research",

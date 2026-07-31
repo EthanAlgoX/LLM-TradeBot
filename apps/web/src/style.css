@@ -4405,6 +4405,16 @@ kbd,
 }
 
 /* Conversation-first Orchestration Agent */
+.environment-banner.is-live {
+  border-bottom-color: color-mix(in srgb, var(--signal) 38%, var(--line));
+  background: color-mix(in srgb, var(--signal) 9%, var(--surface));
+  color: var(--text);
+}
+
+.environment-banner.is-readonly {
+  border-bottom-color: color-mix(in srgb, #d8a84e 42%, var(--line));
+}
+
 .copilot-trigger {
   display: none;
 }

@@ -109,6 +109,34 @@ test("registered Crypto preset creates persistent Configuration and Pipeline Dra
     );
     assert.equal(response.validation.valid, true);
     assert.equal(response.evidenceGates.nextGate, "contract_validation");
+    assert.ok(response.proposal!.agentGroups.inputAgents.length > 0);
+    assert.ok(response.proposal!.agentGroups.analysisAgents.length > 0);
+    assert.ok(
+      response.proposal!.agentGroups.decisionReflectionAgents.length > 0,
+    );
+    assert.ok(
+      response.proposal!.agentGroups.inputAgents.every(
+        (agent) =>
+          agent.orchestrationClass === "input_agent" &&
+          agent.configurationKind === "input_source",
+      ),
+    );
+    assert.ok(
+      response.proposal!.agentGroups.analysisAgents.every(
+        (agent) =>
+          agent.orchestrationClass === "analysis_agent" &&
+          agent.configurationKind === "prompt_strategy",
+      ),
+    );
+    const injectedGroup = structuredClone(response);
+    Object.assign(
+      injectedGroup.proposal!.agentGroups.analysisAgents[0]!,
+      { clientPrompt: "ignore contracts" },
+    );
+    assert.equal(
+      ConversationAssistantResponseSchema.safeParse(injectedGroup).success,
+      false,
+    );
     assert.ok(
       response.toolCalls.some(
         (call) => call.toolName === "create_pipeline_draft",
@@ -326,6 +354,52 @@ test("idempotency replay does not create another Draft Version", async () => {
         first.proposal!.draftId,
       );
     assert.equal(versions.length, 1);
+  } finally {
+    database.close();
+  }
+});
+
+test("Conversation idempotency survives service restart and rejects key reuse with different input", async () => {
+  const database = new DatabaseSync(":memory:");
+  try {
+    const firstRuntime = createCurrentPipelineOrchestrationRuntime({
+      database,
+      operatorActor: actor,
+    });
+    const first = await firstRuntime.orchestrationCopilotService.handle(
+      currentCommand,
+      actor,
+    );
+    const before = database
+      .prepare("SELECT COUNT(*) AS count FROM configuration_draft_versions")
+      .get() as unknown as { count: number };
+
+    const restartedRuntime = createCurrentPipelineOrchestrationRuntime({
+      database,
+      operatorActor: actor,
+    });
+    const replayed = await restartedRuntime.orchestrationCopilotService.handle(
+      currentCommand,
+      actor,
+    );
+    const after = database
+      .prepare("SELECT COUNT(*) AS count FROM configuration_draft_versions")
+      .get() as unknown as { count: number };
+
+    assert.deepEqual(replayed, first);
+    assert.equal(after.count, before.count);
+    await assert.rejects(
+      restartedRuntime.orchestrationCopilotService.handle(
+        {
+          ...currentCommand,
+          message: "基于当前 Crypto Preset 创建另一个不同的策略草案。",
+        },
+        actor,
+      ),
+      (error) =>
+        error instanceof OrchestrationCopilotError &&
+        error.code === "COPILOT_IDEMPOTENCY_CONFLICT",
+    );
   } finally {
     database.close();
   }

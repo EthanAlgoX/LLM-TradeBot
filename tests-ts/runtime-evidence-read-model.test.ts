@@ -66,6 +66,30 @@ const cycle: PaperRuntimeCycleAudit = {
 const artifacts: AgentArtifact[] = [
   {
     schemaVersion: "v1",
+    artifactId: "artifact:selector",
+    traceId: cycle.traceId,
+    asOf: now,
+    symbol: "BTCUSDT",
+    stage: "selector",
+    agent: "MarketOpportunitySelectorAgent",
+    agentVersion: "v1",
+    status: "success",
+    startedAt: now,
+    completedAt: now,
+    durationMs: 8,
+    input: {},
+    output: {
+      candidates: [{
+        symbol: "BTCUSDT",
+        rank: 1,
+        score: 56.28,
+        selectedReasons: ["trend strength=72.0"],
+      }],
+      prompt: "MUST_NOT_LEAK",
+    },
+  },
+  {
+    schemaVersion: "v1",
     artifactId: "artifact:decision",
     traceId: cycle.traceId,
     asOf: now,
@@ -77,6 +101,7 @@ const artifacts: AgentArtifact[] = [
     startedAt: now,
     completedAt: now,
     durationMs: 12,
+    sourceArtifactIds: ["artifact:selector"],
     input: { prompt: "MUST_NOT_LEAK" },
     output: {
       action: "hold",
@@ -98,6 +123,7 @@ const artifacts: AgentArtifact[] = [
     startedAt: now,
     completedAt: now,
     durationMs: 4,
+    sourceArtifactIds: ["artifact:decision"],
     input: {},
     output: { passed: true },
   },
@@ -162,6 +188,18 @@ test("Runtime evidence aggregates only bounded semantic read data", async () => 
   assert.equal(evidence.reflection.runtimeApplied, false);
   assert.equal(evidence.exchangeWriteAllowed, false);
   assert.equal(JSON.stringify(evidence).includes("MUST_NOT_LEAK"), false);
+  assert.match(
+    evidence.semanticTransfers.find((item) => item.stage === "selector")?.semanticSummary ?? "",
+    /Selected BTCUSDT · rank 1 · score 56.28/u,
+  );
+  assert.deepEqual(
+    evidence.semanticTransfers.find((item) => item.stage === "decision")?.sourceArtifactIds,
+    ["artifact:selector"],
+  );
+  assert.deepEqual(
+    evidence.semanticTransfers.find((item) => item.stage === "risk")?.sourceArtifactIds,
+    ["artifact:decision"],
+  );
 
   assert.equal(
     RuntimeEvidenceDashboardSchema.safeParse({

@@ -110,6 +110,75 @@ function semanticSummary(artifact: AgentArtifact): string {
   if (artifact.status === "error") {
     return (artifact.error ?? "agent_error").slice(0, 600);
   }
+  const output = artifact.output;
+  const record = safeRecord(output);
+  if (artifact.stage === "selector") {
+    const candidate = Array.isArray(record.candidates)
+      ? safeRecord(record.candidates[0])
+      : {};
+    const reasons = Array.isArray(candidate.selectedReasons)
+      ? candidate.selectedReasons
+          .filter((item): item is string => typeof item === "string")
+          .slice(0, 2)
+      : [];
+    if (typeof candidate.symbol === "string") {
+      return [
+        `Selected ${candidate.symbol}`,
+        typeof candidate.rank === "number" ? `rank ${candidate.rank}` : "",
+        typeof candidate.score === "number" ? `score ${candidate.score}` : "",
+        ...reasons,
+      ].filter(Boolean).join(" · ").slice(0, 600);
+    }
+    return "No symbol passed the Selector gate.";
+  }
+  if (artifact.stage === "data") {
+    const stableBars = safeRecord(record.stableBars);
+    const windows = Object.entries(stableBars)
+      .filter(([, bars]) => Array.isArray(bars))
+      .map(([window, bars]) => `${window} ${(bars as unknown[]).length} bars`);
+    const quote = safeRecord(record.liveQuote);
+    const quality = safeRecord(record.quality);
+    return [
+      typeof record.symbol === "string" ? `${record.symbol} synchronized` : "Data synchronized",
+      windows.join(", "),
+      typeof quote.price === "number" ? `latest ${quote.price}` : "",
+      quality.alignmentOk === true ? "windows aligned" : "",
+    ].filter(Boolean).join(" · ").slice(0, 600);
+  }
+  if (artifact.stage === "data_quality") {
+    const reasons = Array.isArray(record.reasons)
+      ? record.reasons.filter((item): item is string => typeof item === "string")
+      : [];
+    return record.passed === true
+      ? "Data quality passed."
+      : `Data quality blocked${reasons.length ? `: ${reasons.slice(0, 3).join("; ")}` : "."}`;
+  }
+  if (artifact.stage === "analysis") {
+    const diagnostics = Array.isArray(record.diagnostics)
+      ? record.diagnostics
+          .filter((item): item is string => typeof item === "string")
+          .slice(0, 3)
+      : [];
+    return [
+      typeof record.symbol === "string" ? record.symbol : "",
+      typeof record.regime === "string" ? `regime ${record.regime}` : "",
+      typeof record.trend === "string" ? `trend ${record.trend}` : "",
+      typeof record.setup === "string" ? `setup ${record.setup}` : "",
+      typeof record.trigger === "string" ? `trigger ${record.trigger}` : "",
+      ...diagnostics,
+    ].filter(Boolean).join(" · ").slice(0, 600);
+  }
+  if (artifact.stage === "position_monitor" && output === undefined) {
+    return "No structured position-exit proposal was emitted.";
+  }
+  if (artifact.stage === "portfolio" && Array.isArray(output)) {
+    return output.length === 0
+      ? "No portfolio intent was emitted."
+      : `${output.length} portfolio intent${output.length === 1 ? "" : "s"} emitted.`;
+  }
+  if (artifact.stage === "reflection" && output === undefined) {
+    return "No new Lesson Candidate was emitted.";
+  }
   const fragments = semanticFragments(artifact.output);
   return (fragments.length > 0
     ? fragments.slice(0, 8).join(" · ")
@@ -193,6 +262,7 @@ export class RuntimeEvidenceReadModelService {
       )
       .map((artifact) => ({
         artifactId: artifact.artifactId,
+        sourceArtifactIds: [...(artifact.sourceArtifactIds ?? [])],
         traceId: artifact.traceId,
         stage: artifact.stage,
         agent: artifact.agent,

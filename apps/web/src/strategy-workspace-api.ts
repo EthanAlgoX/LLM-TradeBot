@@ -58,6 +58,23 @@ interface ConversationResponse {
     sourceRefs: Array<{ id: string }>;
     presetRef: { id: string };
     agentRefs: Array<{ id: string }>;
+    agentGroups: {
+      inputAgents: Array<{
+        id: string;
+        orchestrationClass: "input_agent";
+        configurationKind: "input_source" | "prompt_strategy" | "controlled_policy";
+      }>;
+      analysisAgents: Array<{
+        id: string;
+        orchestrationClass: "analysis_agent";
+        configurationKind: "input_source" | "prompt_strategy" | "controlled_policy";
+      }>;
+      decisionReflectionAgents: Array<{
+        id: string;
+        orchestrationClass: "decision_reflection_agent";
+        configurationKind: "input_source" | "prompt_strategy" | "controlled_policy";
+      }>;
+    };
     graphRef: { id: string; humanVersion: string; fingerprint: string };
     changes: Array<{
       changeId: string;
@@ -134,6 +151,7 @@ const state: {
   conversationId: string;
   catalog: IntentCatalogEntry[];
   operations: Operation[];
+  composerValue: string;
   currentDraft?: DraftReference;
   errorCode?: string;
 } = {
@@ -143,6 +161,7 @@ const state: {
   conversationId: `conversation.${crypto.randomUUID()}`,
   catalog: [],
   operations: [],
+  composerValue: "",
 };
 
 const copy = {
@@ -369,10 +388,12 @@ function stateLabel(status: ConversationResponse["status"]): string {
   const text = copy[locale()];
   return {
     proposal: text.draftState,
-    validation_failed: "VALIDATION_FAILED",
-    evidence_required: "EVIDENCE_REQUIRED",
+    validation_failed:
+      locale() === "zh-CN" ? "验证失败" : "VALIDATION_FAILED",
+    evidence_required:
+      locale() === "zh-CN" ? "需要证据" : "EVIDENCE_REQUIRED",
     approval_ready: text.approved,
-    unavailable: "UNAVAILABLE",
+    unavailable: locale() === "zh-CN" ? "不可用" : "UNAVAILABLE",
   }[status];
 }
 
@@ -384,7 +405,10 @@ function renderSelection(): string {
     [text.source, selected?.dataSourceIds.join(" / ")],
     [text.preset, selected?.presetId],
     [text.agent, selected?.agentTemplateId],
-    [text.draft, selected?.draftReference?.versionId],
+    [
+      text.draft,
+      selected?.draftReference?.versionId ?? state.currentDraft?.versionId,
+    ],
   ];
   return rows
     .map(
@@ -480,12 +504,27 @@ function renderValidation(response: ConversationResponse): string {
 }
 
 function gateLabel(gate: string): string {
-  return gate
-    .replace("contract_validation", "Contract")
-    .replace("walk_forward", "Walk-Forward")
-    .replace("human_approval", "Approval")
-    .replace("paper_running", "Paper")
-    .replace("backtest", "Backtest");
+  const labels: Record<string, [string, string]> = {
+    contract_validation: ["合同验证", "Contract"],
+    backtest: ["回测", "Backtest"],
+    walk_forward: ["样本外验证", "Walk-Forward"],
+    human_approval: ["人工审批", "Approval"],
+    paper_running: ["模拟运行", "Paper"],
+  };
+  const label = labels[gate];
+  return label ? label[locale() === "zh-CN" ? 0 : 1] : gate;
+}
+
+function gateStatusLabel(status: string): string {
+  if (locale() !== "zh-CN") return status.replaceAll("_", " ");
+  return {
+    passed: "已通过",
+    required: "待完成",
+    blocked: "已阻断",
+    running: "运行中",
+    ready: "已就绪",
+    not_applied: "未应用",
+  }[status] ?? status;
 }
 
 function renderGates(response: ConversationResponse): string {
@@ -499,7 +538,7 @@ function renderGates(response: ConversationResponse): string {
             (gate) => `
               <li class="is-${gate.status}">
                 <span>${gateLabel(gate.gate)}</span>
-                <small>${gate.status.replaceAll("_", " ")}</small>
+                <small>${gateStatusLabel(gate.status)}</small>
               </li>
             `,
           )
@@ -509,59 +548,218 @@ function renderGates(response: ConversationResponse): string {
   `;
 }
 
+function friendlyEntityName(id: string): string {
+  return id
+    .replace(/^(?:agent-template|data-source|market-pack|preset)[:.]/u, "")
+    .replace(/[:.]v\d+$/u, "")
+    .split(/[-_.:]/u)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function renderJourney(): string {
+  const text = copy[locale()];
+  const response = latestResponse();
+  const current = !response?.proposal
+    ? 1
+    : !response.validation.valid
+      ? 2
+      : response.status === "approval_ready"
+        ? 4
+        : 3;
+  const steps = [
+    locale() === "zh-CN" ? "输入需求" : "Describe need",
+    locale() === "zh-CN" ? "确认连接与策略" : "Confirm connections",
+    locale() === "zh-CN" ? "试运行与回测" : "Dry run & backtest",
+    locale() === "zh-CN" ? "审批并上线" : "Approve & release",
+  ];
+  return `
+    <ol class="orchestration-journey">
+      ${steps
+        .map(
+          (step, index) => `
+            <li class="${index + 1 < current ? "is-done" : index + 1 === current ? "is-current" : ""}">
+              <span>0${index + 1}</span>
+              <strong>${step}</strong>
+            </li>
+          `,
+        )
+        .join("")}
+    </ol>
+  `;
+}
+
+function renderWorkflow(response: ConversationResponse): string {
+  const text = copy[locale()];
+  const proposal = response.proposal;
+  if (!proposal) return "";
+  const groupCopy = {
+    input: locale() === "zh-CN" ? "输入 Agent" : "Input Agents",
+    analysis: locale() === "zh-CN" ? "分析 Agent" : "Analysis Agents",
+    decision:
+      locale() === "zh-CN"
+        ? "决策与反思 Agent"
+        : "Decision & Reflection Agents",
+    source: locale() === "zh-CN" ? "数据源与输入处理" : "Sources & ingestion",
+    prompt: locale() === "zh-CN" ? "Prompt / 策略" : "Prompt / strategy",
+    controlled: locale() === "zh-CN" ? "受控策略" : "Controlled policy",
+  };
+  const configurationLabel = (kind: string): string =>
+    kind === "input_source"
+      ? groupCopy.source
+      : kind === "prompt_strategy"
+        ? groupCopy.prompt
+        : groupCopy.controlled;
+  const renderGroup = (
+    label: string,
+    agents: Array<{ id: string; configurationKind: string }>,
+    extra: string[] = [],
+  ): string => `
+    <div class="copilot-workflow__group">
+      <small>${label}</small>
+      <div>
+        ${extra
+          .map(
+            (item) => `<span class="is-source"><strong>${escapeHtml(item)}</strong><small>${groupCopy.source}</small></span>`,
+          )
+          .join("")}
+        ${agents
+          .map(
+            (agent) => `
+              <span>
+                <strong>${escapeHtml(friendlyEntityName(agent.id))}</strong>
+                <small>${configurationLabel(agent.configurationKind)}</small>
+              </span>
+            `,
+          )
+          .join("")}
+      </div>
+    </div>
+  `;
+  return `
+    <section class="copilot-workflow">
+      <header>
+        <div>
+          <span>${locale() === "zh-CN" ? "生成的 Workflow" : "Generated Workflow"}</span>
+          <strong>${escapeHtml(proposal.presetRef.id)}</strong>
+        </div>
+        <mark>${proposal.lifecycleStatus.toUpperCase()}</mark>
+      </header>
+      <div class="copilot-workflow__path">
+        ${renderGroup(
+          groupCopy.input,
+          proposal.agentGroups.inputAgents,
+          proposal.sourceRefs.map((source) => friendlyEntityName(source.id)),
+        )}
+        <i>→</i>
+        ${renderGroup(groupCopy.analysis, proposal.agentGroups.analysisAgents)}
+        <i>→</i>
+        ${renderGroup(
+          groupCopy.decision,
+          proposal.agentGroups.decisionReflectionAgents,
+        )}
+      </div>
+      <details>
+        <summary>${text.graphPreview}</summary>
+        <code>${escapeHtml(proposal.graphRef.id)} · ${escapeHtml(proposal.graphRef.humanVersion)} · ${escapeHtml(proposal.graphRef.fingerprint)}</code>
+      </details>
+    </section>
+  `;
+}
+
 function renderProposal(response: ConversationResponse): string {
   const text = copy[locale()];
   if (!response.proposal) return "";
   const proposal = response.proposal;
   return `
-    <section class="copilot-proposal">
-      <header>
-        <div>
-          <span>${text.proposal}</span>
-          <strong>${escapeHtml(proposal.versionId)}</strong>
-        </div>
-        <mark>${proposal.lifecycleStatus.toUpperCase()}</mark>
-      </header>
-      <dl>
-        <div><dt>fingerprint</dt><dd>${escapeHtml(proposal.fingerprint)}</dd></div>
-        ${
-          proposal.parentFingerprint
-            ? `<div><dt>parent</dt><dd>${escapeHtml(proposal.parentFingerprint)}</dd></div>`
-            : ""
-        }
-        <div><dt>evidence</dt><dd class="is-${proposal.evidenceStatus}">${proposal.evidenceStatus.toUpperCase()}</dd></div>
-      </dl>
-      <details>
-        <summary>${text.graphPreview}</summary>
-        <p>${escapeHtml(proposal.graphRef.id)} · ${escapeHtml(proposal.graphRef.humanVersion)}</p>
-        <div>${proposal.agentRefs
-          .slice(0, 8)
-          .map((agent) => `<code>${escapeHtml(agent.id)}</code>`)
-          .join("<i>→</i>")}</div>
-      </details>
+    ${renderWorkflow(response)}
+    <section class="copilot-proposal-meta">
+      <div>
+        <span>Draft</span>
+        <strong>${escapeHtml(proposal.versionId)}</strong>
+      </div>
+      <div>
+        <span>fingerprint</span>
+        <code>${escapeHtml(proposal.fingerprint)}</code>
+      </div>
+      ${
+        proposal.parentFingerprint
+          ? `<div><span>parent</span><code>${escapeHtml(proposal.parentFingerprint)}</code></div>`
+          : ""
+      }
+      <div>
+        <span>evidence</span>
+        <strong class="is-${proposal.evidenceStatus}">${proposal.evidenceStatus.toUpperCase()}</strong>
+      </div>
+    </section>
+  `;
+}
+
+function renderCompactDetails(response: ConversationResponse): string {
+  const text = copy[locale()];
+  return `
+    <details class="copilot-technical">
+      <summary>${locale() === "zh-CN" ? "查看验证、数据能力与字段 Diff" : "View validation, capabilities, and field Diff"}</summary>
+      ${renderDiff(response)}
+      ${renderCapabilities(response)}
+      ${renderValidation(response)}
+    </details>
+  `;
+}
+
+function renderReleaseActions(response: ConversationResponse): string {
+  const text = copy[locale()];
+  const nextGate = response.evidenceGates.nextGate;
+  const backtestEnabled = nextGate === "backtest";
+  const walkForwardEnabled = nextGate === "walk_forward";
+  const approvalEnabled = nextGate === "human_approval";
+  return `
+    <section class="copilot-release-actions">
+      <div>
+        <span>${locale() === "zh-CN" ? "下一步" : "Next step"}</span>
+        <strong>${
+          response.validation.valid
+            ? locale() === "zh-CN"
+              ? "Draft 试运行检查已通过"
+              : "Draft dry validation passed"
+            : locale() === "zh-CN"
+              ? "先修复验证问题"
+              : "Resolve validation issues first"
+        }</strong>
+      </div>
+      <button type="button" data-copilot-prompt="${locale() === "zh-CN" ? "为当前 Draft 请求回测。" : "Request a backtest for the current Draft."}" ${backtestEnabled ? "" : "disabled"}>${locale() === "zh-CN" ? "请求回测" : "Request backtest"}</button>
+      <button type="button" data-copilot-prompt="${locale() === "zh-CN" ? "为当前 Draft 请求 Walk-Forward。" : "Request Walk-Forward for the current Draft."}" ${walkForwardEnabled ? "" : "disabled"}>Walk-Forward</button>
+      <button type="button" data-copilot-prompt="${locale() === "zh-CN" ? "提交当前 Draft 进行人工审批。" : "Submit the current Draft for human approval."}" ${approvalEnabled ? "" : "disabled"}>${locale() === "zh-CN" ? "提交审批" : "Submit approval"}</button>
+      <button type="button" class="is-release" data-view="lab" ${response.status === "approval_ready" ? "" : "disabled"}>${locale() === "zh-CN" ? "审批与 Paper 上线" : "Approval & Paper release"}</button>
     </section>
   `;
 }
 
 function renderOperation(operation: Operation): string {
   const response = operation.response;
+  const text = copy[locale()];
   return `
     <article class="copilot-operation is-${response.status}">
-      <header>
-        <span>${stateLabel(response.status)}</span>
-        <code>${escapeHtml(operation.id.slice(-8))}</code>
-      </header>
-      <p class="copilot-operation__command">${escapeHtml(operation.message)}</p>
-      <p class="copilot-operation__summary">${escapeHtml(response.assistantMessage)}</p>
-      ${renderProposal(response)}
-      ${renderDiff(response)}
-      ${renderCapabilities(response)}
-      ${renderValidation(response)}
-      ${renderGates(response)}
-      <aside class="copilot-runtime-boundary">
-        <strong>${copy[locale()].runtimeIsolation}</strong>
-        <p>${copy[locale()].runtimeIsolationBody}</p>
-      </aside>
+      <div class="copilot-message is-user">
+        <span>${locale() === "zh-CN" ? "你" : "You"}</span>
+        <p>${escapeHtml(operation.message)}</p>
+      </div>
+      <div class="copilot-message is-assistant">
+        <header>
+          <span>${text.title}</span>
+          <code>${escapeHtml(operation.id.slice(-8))}</code>
+        </header>
+        <p>${escapeHtml(response.assistantMessage)}</p>
+        ${renderProposal(response)}
+        ${renderCompactDetails(response)}
+        ${renderGates(response)}
+        <aside class="copilot-runtime-boundary">
+          <strong>${text.runtimeIsolation}</strong>
+          <p>${text.runtimeIsolationBody}</p>
+        </aside>
+        ${renderReleaseActions(response)}
+      </div>
     </article>
   `;
 }
@@ -569,13 +767,19 @@ function renderOperation(operation: Operation): string {
 function renderOperations(): string {
   const text = copy[locale()];
   if (state.operations.length === 0) {
+    const connectionPrompt =
+      locale() === "zh-CN"
+        ? "让短、中、长周期 Agent 并行分析，结果交给 Decision Agent 汇总。"
+        : "Run short, medium, and long-horizon Agents in parallel, then send their results to the Decision Agent.";
     return `
       <section class="copilot-empty">
-        <span>CONVERSATION → TOOLS → DRAFT</span>
-        <h2>${text.emptyTitle}</h2>
-        <p>${text.emptyBody}</p>
+        <span>YOU → ORCHESTRATION AGENT → WORKFLOW DRAFT</span>
+        <h2>${locale() === "zh-CN" ? "先描述你想要的 Agent 协作方式" : "Describe how the Agents should work together"}</h2>
+        <p>${locale() === "zh-CN"
+          ? "可以说明数据输入、Agent 职责、连接顺序和策略要求。系统只使用已注册能力，不执行用户代码，也不会直接修改运行中的交易 Agent。"
+          : "Include data inputs, Agent responsibilities, connections, and strategy requirements. Only registered capabilities are used; user code is never executed and the running Trading Agent is never changed directly."}</p>
         <div class="copilot-prompts">
-          ${[text.createPrompt, text.invalidPrompt, text.updatePrompt]
+          ${[text.createPrompt, connectionPrompt, text.updatePrompt]
             .map(
               (prompt) =>
                 `<button type="button" data-copilot-prompt="${escapeHtml(prompt)}">${escapeHtml(prompt)}</button>`,
@@ -645,15 +849,26 @@ function render(): void {
     <section class="copilot-drawer is-${currentView}" role="${embedded ? "region" : "dialog"}" aria-modal="${embedded ? "false" : "true"}" aria-labelledby="copilot-title">
       <header class="copilot-header">
         <div>
-          <span>${text.kicker}</span>
+          <span>AGENT WORKFLOW / DRAFT ONLY</span>
           <h1 id="copilot-title">${text.title}</h1>
-          <p>${text.subtitle}</p>
+          <p>${locale() === "zh-CN"
+            ? "说出需求，系统自动组织子 Agent 的连接与策略，并在对话中返回可验证方案。"
+            : "Describe the need. The system organizes sub-Agent connections and strategies, then returns a verifiable plan in the conversation."}</p>
         </div>
         <div>
           <strong class="is-${state.mode}">${statusText()}</strong>
           <button type="button" data-copilot-close aria-label="${text.close}">×</button>
         </div>
       </header>
+      ${renderJourney()}
+      <section class="copilot-context-strip">
+        <div>
+          <span>${locale() === "zh-CN" ? "当前选择" : "Current selection"}</span>
+          <strong>${state.currentDraft?.versionId ?? (locale() === "zh-CN" ? "尚未生成 Draft" : "No Draft yet")}</strong>
+        </div>
+        <dl class="copilot-selection">${renderSelection()}</dl>
+        <mark>runtimeApplied=false</mark>
+      </section>
       ${
         state.mode !== "live"
           ? `
@@ -665,68 +880,38 @@ function render(): void {
           `
           : ""
       }
-      <div class="copilot-layout">
-        <main class="copilot-results" aria-live="polite" aria-busy="${state.busy}">
-          <div class="copilot-results__title">
-            <span>${text.operationLog}</span>
-            <code>${currentView.toUpperCase()}</code>
-          </div>
-          ${renderOperations()}
-          ${
-            state.busy
-              ? `<div class="copilot-loading"><i></i><span>${text.sending}</span></div>`
-              : ""
-          }
-          ${
-            state.errorCode
-              ? `<p class="copilot-api-error"><code>${escapeHtml(state.errorCode)}</code></p>`
-              : ""
-          }
-        </main>
-        <aside class="copilot-inspector">
-          <section>
-            <h2>${text.currentSelection}</h2>
-            <dl class="copilot-selection">${renderSelection()}</dl>
-          </section>
-          <section>
-            <h2>${text.directEdit}</h2>
-            <form class="copilot-edit" data-copilot-edit>
-              <label>${text.field}
-                <select name="field" ${state.currentDraft ? "" : "disabled"}>
-                  <option value="confidenceThreshold">confidenceThreshold</option>
-                  <option value="lookbackPeriods">lookbackPeriods</option>
-                  <option value="minimumSignalScore">minimumSignalScore</option>
-                </select>
-              </label>
-              <label>${text.value}
-                <input name="value" value="0.72" ${state.currentDraft ? "" : "disabled"} required>
-              </label>
-              <button type="submit" ${state.currentDraft && canSend ? "" : "disabled"}>${text.applyEdit}</button>
-              ${state.currentDraft ? "" : `<small>${text.editNeedsDraft}</small>`}
-            </form>
-          </section>
-          <section>
-            <h2>${text.presets}</h2>
-            <div class="copilot-presets">${renderCatalog()}</div>
-          </section>
-          <section>
-            <h2>${text.stateLegend}</h2>
-            <div class="copilot-state-legend">
-              <span>${text.mock}</span>
-              <span>${text.draftState}</span>
-              <span>${text.validated}</span>
-              <span>${text.approved}</span>
-              <span class="is-external">${text.activeRuntime}<small>${text.externalControl}</small></span>
-              <span class="is-external">${text.terminalRun}<small>${text.externalControl}</small></span>
-            </div>
-          </section>
-        </aside>
-      </div>
+      <main class="copilot-results" aria-live="polite" aria-busy="${state.busy}">
+        ${renderOperations()}
+        ${state.busy ? `<div class="copilot-loading"><i></i><span>${text.sending}</span></div>` : ""}
+        ${state.errorCode ? `<p class="copilot-api-error"><code>${escapeHtml(state.errorCode)}</code></p>` : ""}
+      </main>
+      <details class="copilot-strategy-editor">
+        <summary>
+          <strong>${locale() === "zh-CN" ? "策略配置" : "Strategy configuration"}</strong>
+          <span>${locale() === "zh-CN"
+            ? "策略与 Prompt 要求通过对话描述；只有注册模板允许的字段会进入 Draft。"
+            : "Describe strategy and Prompt requirements in conversation; only fields allowed by registered templates enter the Draft."}</span>
+        </summary>
+        <form class="copilot-edit" data-copilot-edit>
+          <label>${text.field}
+            <select name="field" ${state.currentDraft ? "" : "disabled"}>
+              <option value="confidenceThreshold">confidenceThreshold</option>
+              <option value="lookbackPeriods">lookbackPeriods</option>
+              <option value="minimumSignalScore">minimumSignalScore</option>
+            </select>
+          </label>
+          <label>${text.value}
+            <input name="value" value="0.72" ${state.currentDraft ? "" : "disabled"} required>
+          </label>
+          <button type="submit" ${state.currentDraft && canSend ? "" : "disabled"}>${text.applyEdit}</button>
+          ${state.currentDraft ? "" : `<small>${text.editNeedsDraft}</small>`}
+        </form>
+      </details>
       <form class="copilot-composer" data-copilot-form>
-        <label for="copilot-input">${text.input}</label>
+        <label for="copilot-input">${locale() === "zh-CN" ? "告诉编排 Agent 你想怎么做" : "Tell the Orchestration Agent what you need"}</label>
         <div>
-          <textarea id="copilot-input" name="message" rows="2" maxlength="2000" placeholder="${text.inputPlaceholder}" required ${canSend ? "" : "disabled"}></textarea>
-          <button type="submit" ${canSend ? "" : "disabled"}>${state.busy ? text.sending : text.send}</button>
+          <textarea id="copilot-input" name="message" rows="3" maxlength="2000" placeholder="${locale() === "zh-CN" ? "例如：使用 5m、15m、1h 数据，让三个分析 Agent 并行判断，再交给 Decision Agent 汇总。" : "Example: use 5m, 15m, and 1h data; run three analysis Agents in parallel, then send results to Decision."}" required ${canSend ? "" : "disabled"}>${escapeHtml(state.composerValue)}</textarea>
+          <button type="submit" ${canSend ? "" : "disabled"}>${state.busy ? text.sending : locale() === "zh-CN" ? "生成方案" : "Generate plan"}</button>
         </div>
         <small>${text.footer}</small>
       </form>
@@ -773,6 +958,7 @@ function close(): void {
 async function sendMessage(message: string): Promise<void> {
   const normalized = message.trim();
   if (!normalized || state.mode !== "live" || state.busy) return;
+  state.composerValue = normalized;
   state.busy = true;
   state.errorCode = undefined;
   render();
@@ -803,7 +989,9 @@ async function sendMessage(message: string): Promise<void> {
       message: normalized,
       response,
     });
+    state.composerValue = "";
   } catch (error) {
+    state.composerValue = normalized;
     state.errorCode =
       error instanceof Error ? error.message : "COPILOT_MESSAGE_FAILED";
   } finally {
@@ -848,6 +1036,17 @@ document.addEventListener(
 );
 
 document.addEventListener(
+  "input",
+  (event) => {
+    const input = event.target;
+    if (input instanceof HTMLTextAreaElement && input.id === "copilot-input") {
+      state.composerValue = input.value;
+    }
+  },
+  true,
+);
+
+document.addEventListener(
   "submit",
   (event) => {
     const form = event.target;
@@ -873,7 +1072,6 @@ document.addEventListener(
     if (form.matches("[data-copilot-form]")) {
       event.preventDefault();
       const message = String(new FormData(form).get("message") ?? "");
-      form.reset();
       void sendMessage(message);
     }
   },

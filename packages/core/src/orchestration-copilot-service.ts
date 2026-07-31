@@ -50,6 +50,22 @@ export interface RegisteredCopilotIntentRecipe {
   editableParameters: Readonly<Record<string, unknown>>;
 }
 
+export interface ConversationReplayKey {
+  actorId: string;
+  conversationId: string;
+  idempotencyKey: string;
+}
+
+export interface ConversationReplayRecord {
+  command: ConversationCommand;
+  response: ConversationAssistantResponse;
+}
+
+export interface ConversationReplayRepository {
+  get(key: ConversationReplayKey): ConversationReplayRecord | undefined;
+  save(key: ConversationReplayKey, record: ConversationReplayRecord): void;
+}
+
 export interface OrchestrationCopilotServiceDependencies {
   intentDraftService: OrchestrationIntentDraftService;
   configurationDraftService: ConfigurationDraftService;
@@ -57,6 +73,7 @@ export interface OrchestrationCopilotServiceDependencies {
   evidenceWorkflow: PipelineEvidenceWorkflow;
   registry: ImmutablePipelineRegistry;
   recipes: readonly RegisteredCopilotIntentRecipe[];
+  replayRepository?: ConversationReplayRepository;
   now?: () => Date;
 }
 
@@ -362,7 +379,7 @@ function gateSummary(
 
 export class OrchestrationCopilotService {
   readonly tools = new RegisteredCopilotToolRegistry();
-  private readonly replay = new Map<string, ConversationAssistantResponse>();
+  private readonly replay = new Map<string, ConversationReplayRecord>();
   private readonly pipelineDraftByConfigurationDraft = new Map<string, string>();
   private readonly now: () => Date;
 
@@ -391,9 +408,28 @@ export class OrchestrationCopilotService {
         "Credentials and secrets are not accepted by the orchestration conversation.",
       );
     }
-    const replayKey = `${actor.actorId}:${command.conversationId}:${command.idempotencyKey}`;
-    const replay = this.replay.get(replayKey);
-    if (replay) return replay;
+    const replayKey = {
+      actorId: actor.actorId,
+      conversationId: command.conversationId,
+      idempotencyKey: command.idempotencyKey,
+    };
+    const memoryKey = `${replayKey.actorId}:${replayKey.conversationId}:${replayKey.idempotencyKey}`;
+    const replay = this.dependencies.replayRepository?.get(replayKey) ??
+      this.replay.get(memoryKey);
+    if (replay) {
+      if (stableJson(replay.command) !== stableJson(command)) {
+        throw new OrchestrationCopilotError(
+          "COPILOT_IDEMPOTENCY_CONFLICT",
+          "The idempotency key is already bound to a different Conversation command.",
+          {
+            conversationId: command.conversationId,
+            idempotencyKey: command.idempotencyKey,
+          },
+        );
+      }
+      this.restorePipelineDraftMapping(replay.response);
+      return replay.response;
+    }
 
     const explicitTool = command.message.match(
       /(?:tool|工具)\s*[:：]?\s*([a-z][a-z0-9_]*)/iu,
@@ -412,8 +448,33 @@ export class OrchestrationCopilotService {
               ? this.requestEvidence(command, actor, "backtest")
               : this.createDraft(command, actor));
     const parsedResponse = ConversationAssistantResponseSchema.parse(response);
-    this.replay.set(replayKey, parsedResponse);
+    const record = { command, response: parsedResponse };
+    if (this.dependencies.replayRepository) {
+      this.dependencies.replayRepository.save(replayKey, record);
+    } else {
+      this.replay.set(memoryKey, record);
+    }
+    this.restorePipelineDraftMapping(parsedResponse);
     return parsedResponse;
+  }
+
+  private restorePipelineDraftMapping(
+    response: ConversationAssistantResponse,
+  ): void {
+    const configurationDraftId =
+      response.context.selected.draftReference?.draftId;
+    const pipelineResult = response.toolResults.find(
+      (result) =>
+        result.toolName === "create_pipeline_draft" &&
+        result.lifecycleStatus === "succeeded",
+    );
+    const pipelineDraftId = pipelineResult?.output.draftId;
+    if (configurationDraftId && typeof pipelineDraftId === "string") {
+      this.pipelineDraftByConfigurationDraft.set(
+        configurationDraftId,
+        pipelineDraftId,
+      );
+    }
   }
 
   private createDraft(
@@ -693,6 +754,9 @@ export class OrchestrationCopilotService {
           humanVersion: item.version,
           fingerprint: item.fingerprint,
         })),
+        agentGroups: this.agentGroups(
+          pipeline.intent.agentTemplateRefs.map((item) => item.id),
+        ),
         graphRef: {
           id: pipeline.draft.graphId,
           humanVersion: pipeline.draft.humanVersion,
@@ -1031,6 +1095,7 @@ export class OrchestrationCopilotService {
         agentRefs: [
           this.agentRef(agentPayload.agentTemplateId),
         ],
+        agentGroups: this.agentGroups([agentPayload.agentTemplateId]),
         graphRef: {
           id: graph?.pipelineGraphId ?? preset.graphVersionRef.id,
           humanVersion:
@@ -1535,6 +1600,75 @@ export class OrchestrationCopilotService {
       id: agent.templateId,
       humanVersion: agent.humanReadableVersion,
       fingerprint: agent.fingerprint,
+    };
+  }
+
+  private agentGroups(ids: readonly string[]) {
+    const groups: {
+      inputAgents: Array<ReturnType<OrchestrationCopilotService["categorizedAgentRef"]>>;
+      analysisAgents: Array<ReturnType<OrchestrationCopilotService["categorizedAgentRef"]>>;
+      decisionReflectionAgents: Array<ReturnType<OrchestrationCopilotService["categorizedAgentRef"]>>;
+    } = {
+      inputAgents: [],
+      analysisAgents: [],
+      decisionReflectionAgents: [],
+    };
+    for (const id of ids) {
+      const reference = this.categorizedAgentRef(id);
+      if (reference.orchestrationClass === "input_agent") {
+        groups.inputAgents.push(reference);
+      } else if (reference.orchestrationClass === "analysis_agent") {
+        groups.analysisAgents.push(reference);
+      } else {
+        groups.decisionReflectionAgents.push(reference);
+      }
+    }
+    return groups;
+  }
+
+  private categorizedAgentRef(id: string) {
+    const agent = this.dependencies.registry.agentTemplates.get(id);
+    if (!agent) {
+      throw new OrchestrationIntentError(
+        "AGENT_TEMPLATE_NOT_REGISTERED",
+        "Agent Template is not registered.",
+        { templateId: id },
+      );
+    }
+    const inputRoles = new Set([
+      "selector",
+      "data_sync",
+      "data_quality",
+      "processing",
+    ]);
+    const analysisRoles = new Set([
+      "analysis",
+      "bull_case",
+      "bear_case",
+      "context",
+    ]);
+    const orchestrationClass = inputRoles.has(agent.role)
+      ? "input_agent" as const
+      : analysisRoles.has(agent.role)
+        ? "analysis_agent" as const
+        : "decision_reflection_agent" as const;
+    const promptRoles = new Set([
+      "analysis",
+      "bull_case",
+      "bear_case",
+      "context",
+      "decision",
+      "reflection",
+    ]);
+    return {
+      ...this.agentRef(id),
+      orchestrationClass,
+      configurationKind:
+        orchestrationClass === "input_agent"
+          ? "input_source" as const
+          : promptRoles.has(agent.role)
+            ? "prompt_strategy" as const
+            : "controlled_policy" as const,
     };
   }
 

@@ -877,3 +877,605 @@ body.orchestration-copilot-open {
     min-height: 0;
   }
 }
+
+/* Conversation-first orchestration: one readable flow, progressive technical detail. */
+#orchestration-copilot-root.is-embedded {
+  min-height: 760px;
+}
+
+#orchestration-copilot-root.is-embedded .copilot-drawer {
+  grid-template-rows: auto auto auto auto minmax(420px, 1fr) auto auto;
+  min-height: 760px;
+  background: #0b0e10;
+}
+
+.orchestration-journey {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  margin: 0;
+  padding: 0;
+  border-bottom: 1px solid var(--line-strong);
+  background: #090c0e;
+  list-style: none;
+}
+
+.orchestration-journey li {
+  display: grid;
+  grid-template-columns: 34px 1fr;
+  align-items: center;
+  gap: 10px;
+  min-height: 58px;
+  padding: 10px 16px;
+  border-right: 1px solid var(--line);
+  color: var(--muted);
+}
+
+.orchestration-journey li:last-child {
+  border-right: 0;
+}
+
+.orchestration-journey span {
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.orchestration-journey strong {
+  font-size: 13px;
+}
+
+.orchestration-journey li.is-current {
+  background: #15190f;
+  color: var(--text);
+  box-shadow: inset 0 -3px var(--accent);
+}
+
+.orchestration-journey li.is-current span {
+  color: var(--accent);
+}
+
+.orchestration-journey li.is-done {
+  color: var(--success);
+}
+
+.copilot-context-strip {
+  display: grid;
+  grid-template-columns: minmax(190px, 0.7fr) minmax(0, 2fr) auto;
+  align-items: stretch;
+  border-bottom: 1px solid var(--line);
+  background: #0d1012;
+}
+
+.copilot-context-strip > div {
+  display: grid;
+  align-content: center;
+  gap: 2px;
+  padding: 11px 16px;
+  border-right: 1px solid var(--line);
+}
+
+.copilot-context-strip > div span {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.copilot-context-strip > div strong {
+  overflow: hidden;
+  color: var(--text-soft);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.copilot-context-strip .copilot-selection {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  padding: 8px 14px;
+}
+
+.copilot-context-strip .copilot-selection > div {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 2px;
+  min-width: 0;
+  padding: 3px 9px;
+  border: 0;
+  border-right: 1px solid var(--line);
+}
+
+.copilot-context-strip .copilot-selection > div:last-child {
+  border-right: 0;
+}
+
+.copilot-context-strip .copilot-selection dd {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.copilot-context-strip mark {
+  display: grid;
+  place-items: center;
+  padding: 10px 14px;
+  border-left: 1px solid rgb(219 183 111 / 0.28);
+  background: rgb(219 183 111 / 0.05);
+  color: var(--warning);
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+
+#orchestration-copilot-root.is-embedded .copilot-results {
+  padding: 0 max(24px, calc((100% - 920px) / 2)) 30px;
+  background:
+    linear-gradient(rgb(255 255 255 / 0.018) 1px, transparent 1px) 0 0 / 100% 48px,
+    #0b0e10;
+}
+
+#orchestration-copilot-root.is-embedded .copilot-empty {
+  min-height: 420px;
+  align-content: center;
+}
+
+.copilot-operation {
+  display: grid;
+  gap: 18px;
+  padding: 30px 0 34px;
+}
+
+.copilot-operation > header,
+.copilot-operation > .copilot-operation__command,
+.copilot-operation > .copilot-operation__summary {
+  display: none;
+}
+
+.copilot-message {
+  display: grid;
+  gap: 8px;
+}
+
+.copilot-message.is-user {
+  justify-items: end;
+}
+
+.copilot-message.is-user > span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.copilot-message.is-user > p {
+  width: fit-content;
+  max-width: min(72ch, 88%);
+  padding: 12px 15px;
+  border: 1px solid var(--line-strong);
+  background: var(--surface-raised);
+  color: var(--text);
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.copilot-message.is-assistant > header {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.copilot-message.is-assistant > header span {
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.copilot-message.is-assistant > header code {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.copilot-message.is-assistant > p {
+  max-width: 75ch;
+  color: var(--text-soft);
+  font-size: 16px;
+  line-height: 1.7;
+}
+
+.copilot-workflow {
+  margin-top: 10px;
+  border: 1px solid rgb(183 217 121 / 0.3);
+  background: #0d100d;
+}
+
+.copilot-workflow > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 13px 15px;
+  border-bottom: 1px solid rgb(183 217 121 / 0.22);
+}
+
+.copilot-workflow header div {
+  display: grid;
+  gap: 3px;
+}
+
+.copilot-workflow header span {
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.copilot-workflow header strong {
+  color: var(--text-soft);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.copilot-workflow header mark {
+  padding: 5px 8px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.copilot-workflow__path {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 18px 15px;
+}
+
+.copilot-workflow__path > i {
+  display: grid;
+  flex: none;
+  place-items: center;
+  color: var(--accent);
+  font-style: normal;
+}
+
+.copilot-workflow__node,
+.copilot-workflow__cluster {
+  display: grid;
+  min-width: 125px;
+  align-content: center;
+  gap: 5px;
+  padding: 11px;
+  border: 1px solid var(--line-strong);
+  background: var(--surface-raised);
+}
+
+.copilot-workflow__node small,
+.copilot-workflow__cluster > small,
+.copilot-workflow__cluster span small {
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 9px;
+}
+
+.copilot-workflow__node strong,
+.copilot-workflow__cluster strong {
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.copilot-workflow__cluster {
+  min-width: 180px;
+}
+
+.copilot-workflow__cluster > div {
+  display: grid;
+  gap: 4px;
+}
+
+.copilot-workflow__cluster span {
+  display: grid;
+  gap: 2px;
+  padding: 7px;
+  border-left: 2px solid var(--context);
+  background: #101519;
+}
+
+.copilot-workflow__node.is-risk {
+  border-color: rgb(219 183 111 / 0.5);
+}
+
+.copilot-workflow__node.is-paper {
+  border-color: rgb(148 201 170 / 0.5);
+}
+
+.copilot-workflow__group {
+  display: grid;
+  min-width: 220px;
+  flex: 1 0 220px;
+  gap: 8px;
+  padding: 11px;
+  border: 1px solid var(--line-strong);
+  background: var(--surface-raised);
+}
+
+.copilot-workflow__group > small {
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.copilot-workflow__group > div {
+  display: grid;
+  gap: 5px;
+}
+
+.copilot-workflow__group span {
+  display: grid;
+  gap: 2px;
+  padding: 8px;
+  border-left: 2px solid var(--context);
+  background: #101519;
+}
+
+.copilot-workflow__group span.is-source {
+  border-left-color: var(--accent);
+  background: #14190f;
+}
+
+.copilot-workflow__group span strong {
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.copilot-workflow__group span small {
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 9px;
+}
+
+.copilot-workflow > details {
+  padding: 10px 15px;
+  border-top: 1px solid var(--line);
+}
+
+.copilot-workflow details code {
+  display: block;
+  margin-top: 8px;
+  overflow-wrap: anywhere;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.copilot-proposal-meta {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  border: 1px solid var(--line);
+  border-top: 0;
+}
+
+.copilot-proposal-meta > div {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+  padding: 9px 11px;
+  border-right: 1px solid var(--line);
+}
+
+.copilot-proposal-meta > div:last-child {
+  border-right: 0;
+}
+
+.copilot-proposal-meta span {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.copilot-proposal-meta strong,
+.copilot-proposal-meta code {
+  overflow: hidden;
+  color: var(--text-soft);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.copilot-proposal-meta strong.is-stale {
+  color: var(--warning);
+}
+
+.copilot-technical {
+  border-top: 1px solid var(--line);
+}
+
+.copilot-technical > summary {
+  padding: 13px 0;
+  color: var(--text-soft);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.copilot-technical > .copilot-result__section {
+  padding-inline: 0;
+}
+
+.copilot-release-actions {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) repeat(4, auto);
+  margin-top: 12px;
+  border: 1px solid var(--line-strong);
+}
+
+.copilot-release-actions > div {
+  display: grid;
+  align-content: center;
+  gap: 3px;
+  padding: 10px 13px;
+}
+
+.copilot-release-actions > div span {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.copilot-release-actions > div strong {
+  color: var(--text-soft);
+  font-size: 12px;
+}
+
+.copilot-release-actions button {
+  min-height: 52px;
+  padding: 0 12px;
+  border: 0;
+  border-left: 1px solid var(--line);
+  background: transparent;
+  color: var(--text-soft);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.copilot-release-actions button:hover:not(:disabled) {
+  background: var(--surface-active);
+}
+
+.copilot-release-actions button.is-release:not(:disabled) {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+.copilot-release-actions button:disabled {
+  color: #657078;
+  cursor: not-allowed;
+}
+
+.copilot-strategy-editor {
+  border-top: 1px solid var(--line-strong);
+  background: #090c0e;
+}
+
+.copilot-strategy-editor > summary {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 14px;
+  padding: 12px max(24px, calc((100% - 920px) / 2));
+  cursor: pointer;
+}
+
+.copilot-strategy-editor summary strong {
+  font-size: 13px;
+}
+
+.copilot-strategy-editor summary span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.copilot-strategy-editor .copilot-edit {
+  grid-template-columns: 1fr 1fr auto;
+  align-items: end;
+  padding: 4px max(24px, calc((100% - 920px) / 2)) 16px;
+}
+
+#orchestration-copilot-root.is-embedded .copilot-composer {
+  padding: 14px max(24px, calc((100% - 920px) / 2)) 16px;
+}
+
+#orchestration-copilot-root.is-embedded .copilot-composer textarea {
+  min-height: 76px;
+}
+
+@media (max-width: 760px) {
+  #orchestration-copilot-root.is-embedded,
+  #orchestration-copilot-root.is-embedded .copilot-drawer {
+    min-height: 0;
+  }
+
+  .orchestration-journey {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .orchestration-journey li:nth-child(2) {
+    border-right: 0;
+  }
+
+  .orchestration-journey li:nth-child(-n + 2) {
+    border-bottom: 1px solid var(--line);
+  }
+
+  .copilot-context-strip {
+    grid-template-columns: 1fr auto;
+  }
+
+  .copilot-context-strip .copilot-selection {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    border-top: 1px solid var(--line);
+  }
+
+  .copilot-context-strip mark {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  #orchestration-copilot-root.is-embedded .copilot-results {
+    min-height: 520px;
+    padding-inline: 18px;
+  }
+
+  .copilot-workflow__path {
+    align-items: stretch;
+    flex-direction: column;
+    overflow: visible;
+  }
+
+  .copilot-workflow__path > i {
+    height: 20px;
+    transform: rotate(90deg);
+  }
+
+  .copilot-workflow__node,
+  .copilot-workflow__cluster,
+  .copilot-workflow__group {
+    min-width: 0;
+  }
+
+  .copilot-proposal-meta {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .copilot-proposal-meta > div {
+    border-bottom: 1px solid var(--line);
+  }
+
+  .copilot-release-actions {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .copilot-release-actions > div {
+    grid-column: 1 / -1;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .copilot-strategy-editor > summary,
+  .copilot-strategy-editor .copilot-edit,
+  #orchestration-copilot-root.is-embedded .copilot-composer {
+    padding-inline: 18px;
+  }
+
+  .copilot-strategy-editor .copilot-edit {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .copilot-context-strip .copilot-selection,
+  .copilot-proposal-meta,
+  .copilot-release-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .copilot-message.is-user > p {
+    max-width: 96%;
+  }
+}

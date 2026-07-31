@@ -135,6 +135,31 @@ const VersionedReferenceSchema = z
   })
   .strict();
 
+export const AgentOrchestrationClassSchema = z.enum([
+  "input_agent",
+  "analysis_agent",
+  "decision_reflection_agent",
+]);
+
+export const AgentConfigurationKindSchema = z.enum([
+  "input_source",
+  "prompt_strategy",
+  "controlled_policy",
+]);
+
+const CategorizedAgentReferenceSchema = VersionedReferenceSchema.extend({
+  orchestrationClass: AgentOrchestrationClassSchema,
+  configurationKind: AgentConfigurationKindSchema,
+}).strict();
+
+export const AgentOrchestrationGroupsSchema = z
+  .object({
+    inputAgents: z.array(CategorizedAgentReferenceSchema),
+    analysisAgents: z.array(CategorizedAgentReferenceSchema),
+    decisionReflectionAgents: z.array(CategorizedAgentReferenceSchema),
+  })
+  .strict();
+
 export const DraftProposalSchema = z
   .object({
     schemaVersion: z.literal("1.0.0"),
@@ -151,6 +176,7 @@ export const DraftProposalSchema = z
     sourceRefs: z.array(VersionedReferenceSchema),
     presetRef: VersionedReferenceSchema,
     agentRefs: z.array(VersionedReferenceSchema).min(1),
+    agentGroups: AgentOrchestrationGroupsSchema,
     graphRef: VersionedReferenceSchema,
     schemaRefs: z.array(z.string().min(1)).min(1),
     changes: z.array(DraftChangeSchema),
@@ -286,6 +312,7 @@ export const OrchestrationCopilotErrorCodeSchema = z.enum([
   "COPILOT_TOOL_NOT_REGISTERED",
   "COPILOT_DRAFT_REFERENCE_REQUIRED",
   "COPILOT_DRAFT_NOT_FOUND",
+  "COPILOT_IDEMPOTENCY_CONFLICT",
   "COPILOT_PARENT_FINGERPRINT_CONFLICT",
   "COPILOT_AGENT_FIELD_NOT_ALLOWED",
 ]);
@@ -305,6 +332,15 @@ export type RegisteredCopilotToolName = z.infer<
 export type RegisteredToolCall = z.infer<typeof RegisteredToolCallSchema>;
 export type RegisteredToolResult = z.infer<typeof RegisteredToolResultSchema>;
 export type DraftChange = z.infer<typeof DraftChangeSchema>;
+export type AgentOrchestrationClass = z.infer<
+  typeof AgentOrchestrationClassSchema
+>;
+export type AgentConfigurationKind = z.infer<
+  typeof AgentConfigurationKindSchema
+>;
+export type AgentOrchestrationGroups = z.infer<
+  typeof AgentOrchestrationGroupsSchema
+>;
 export type DraftProposal = z.infer<typeof DraftProposalSchema>;
 export type ValidationSummary = z.infer<typeof ValidationSummarySchema>;
 export type EvidenceGateSummary = z.infer<typeof EvidenceGateSummarySchema>;
