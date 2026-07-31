@@ -472,7 +472,20 @@ export async function createCurrentCryptoPaperRuntimeBinding(
           },
         );
         const market = marketDataFactory();
-        const reflection = new RuleReflectionAgent();
+        const reflection = new RuleReflectionAgent({
+          semanticCandidate: {
+            marketPackRef: {
+              id: "market-pack:crypto:v1",
+              version: "1.0.0",
+              fingerprint: "sha256:e0f5f3522ac99c6598eebc0693162aa62d9f5f674a590e9404c6c7118d15bdf7",
+            },
+            reflectionAgentConfigRef: {
+              id: "agent-config:rule-reflection:v1",
+              version: "1.0.0",
+              fingerprint: "sha256:de2e927d143973643bce184231a844c25eaefa77476981e5853321e4b12c88ae",
+            },
+          },
+        });
         const application = new DecisionPipeline({
           selector: new MarketOpportunitySelectorAgent(market, {
             candidates: symbols,

@@ -252,6 +252,7 @@ if (root) {
   };
 
   let latestRetentionResult: RetentionPreviewResult | null = null;
+  let latestPayload: OutboxPayload | null = null;
 
   const renderRetention = (payload: OutboxPayload): void => {
     const text = copy[locale()];
@@ -335,6 +336,7 @@ if (root) {
   };
 
   const render = (payload: OutboxPayload): void => {
+    latestPayload = payload;
     const text = copy[locale()];
     health.textContent = `${payload.state.registeredTemplateIds.length} TEMPLATES · 0 NETWORK`;
     status.textContent = `${text.external}. ${text.zeroNetwork}.`;
@@ -474,6 +476,25 @@ if (root) {
     renderRetention(payload);
   };
 
+  const syncLocale = (): void => {
+    const text = copy[locale()];
+    titleStrong.textContent = text.title;
+    titleSmall.textContent = text.summary;
+    const apiLabelText = apiLabel.querySelector("span");
+    const tokenLabelText = tokenLabel.querySelector("span");
+    if (apiLabelText) apiLabelText.textContent = text.api;
+    if (tokenLabelText) tokenLabelText.textContent = text.token;
+    refreshButton.textContent = text.refresh;
+    dispatchButton.textContent = text.dispatch;
+    retentionPreviewButton.textContent = text.dryRun;
+    retentionExecuteButton.textContent = text.execute;
+    if (latestPayload) {
+      render(latestPayload);
+    } else {
+      status.textContent = text.locked;
+    }
+  };
+
   const load = async (): Promise<void> => {
     const text = copy[locale()];
     status.textContent = text.loading;
@@ -494,6 +515,21 @@ if (root) {
   };
 
   refreshButton.addEventListener("click", () => void load());
+  const localeObserver = new MutationObserver((records) => {
+    if (
+      records.some(
+        (record) =>
+          record.type === "attributes" &&
+          record.attributeName === "lang",
+      )
+    ) {
+      syncLocale();
+    }
+  });
+  localeObserver.observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ["lang"],
+  });
   dispatchButton.addEventListener("click", async () => {
     dispatchButton.disabled = true;
     try {

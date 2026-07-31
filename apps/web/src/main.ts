@@ -1,5 +1,13 @@
 import "./style.css";
 import "./orchestration-api.js";
+import "./runtime-evidence-api.js";
+import "./causal-review-api.js";
+import "./comparative-trade-review-api.js";
+import "./strategy-workspace-api.js";
+import "./runtime-dashboard.css";
+import type {
+  RuntimeDashboardSnapshot,
+} from "./runtime-operation-session.js";
 
 type Locale = "zh-CN" | "en";
 type ViewId = "overview" | "orchestration" | "lab" | "activity" | "connections";
@@ -173,9 +181,16 @@ function initialLocale(): Locale {
   return navigator.language.toLowerCase().startsWith("zh") ? "zh-CN" : "en";
 }
 
+function initialView(): ViewId {
+  const hashView = window.location.hash.slice(1);
+  return ["overview", "orchestration", "lab", "activity", "connections"].includes(hashView)
+    ? hashView as ViewId
+    : "overview";
+}
+
 const state: AppState = {
   locale: initialLocale(),
-  view: "overview",
+  view: initialView(),
   mode: "paper",
   copilotOpen: false,
   panel: null,
@@ -206,8 +221,135 @@ const state: AppState = {
   },
 };
 
+let runtimeDashboard: RuntimeDashboardSnapshot = {
+  connectionMode: "connecting",
+  uiState: "connecting",
+  activeRun: false,
+  canPause: false,
+  canResume: false,
+  canStop: false,
+  controlMode: "normal",
+  eventCount: 0,
+};
+
+window.addEventListener("tradebot:runtime-context", (event) => {
+  runtimeDashboard = (
+    event as CustomEvent<RuntimeDashboardSnapshot>
+  ).detail;
+  applyRuntimeDashboardToDom();
+});
+
 function tr(zh: string, en: string): string {
   return state.locale === "zh-CN" ? zh : en;
+}
+
+function runtimeStatusLabel(): string {
+  switch (runtimeDashboard.uiState) {
+    case "running":
+      return tr("模拟运行中", "Paper Running");
+    case "only_close":
+      return tr("仅允许平仓", "Only Close");
+    case "draining":
+      return tr("安全停止中", "Safe stop in progress");
+    case "ready":
+      return tr("已就绪", "Ready");
+    case "preflight":
+      return tr("等待运行预检", "Preflight required");
+    case "blocked":
+      return tr("运行已阻止", "Runtime blocked");
+    case "auth_required":
+      return tr("需要认证", "Authentication required");
+    case "offline":
+      return tr("Runtime 离线", "Runtime offline");
+    case "connecting":
+      return tr("正在连接 Runtime", "Connecting to Runtime");
+    default:
+      return tr("已停止", "Stopped");
+  }
+}
+
+function runtimeHeartbeatLabel(): string {
+  if (!runtimeDashboard.heartbeatAt) return "-";
+  return new Date(runtimeDashboard.heartbeatAt).toLocaleTimeString(
+    state.locale === "zh-CN" ? "zh-CN" : "en-US",
+    { hour12: false },
+  );
+}
+
+function runtimeEvidenceBoundaryLabel(): string {
+  if (runtimeDashboard.activeRun) {
+    const latest = runtimeDashboard.latestEvent
+      ? ` · ${runtimeDashboard.latestEvent.eventType}`
+      : "";
+    return tr(
+      `真实 Paper Runtime 已连接。下方策略证据用于解释当前受控运行${latest}。`,
+      `The real Paper Runtime is connected. The strategy evidence below explains the controlled run${latest}.`,
+    );
+  }
+  return tr(
+    "下方 Atlas、持仓与周期数据是产品示例证据，不代表 Runtime 正在运行；真实状态以上方运行控制台为准。",
+    "The Atlas, position, and cycle data below are sample evidence, not an active Runtime. The Runtime control above is authoritative.",
+  );
+}
+
+function applyRuntimeDashboardToDom(): void {
+  const setText = (selector: string, value: string): void => {
+    const element = document.querySelector<HTMLElement>(selector);
+    if (element) element.textContent = value;
+  };
+  setText("[data-runtime-status-label]", runtimeStatusLabel());
+  setText("[data-runtime-run-id]", runtimeDashboard.runId ?? "-");
+  setText(
+    "[data-runtime-cycle]",
+    runtimeDashboard.activeRun
+      ? `${runtimeDashboard.processedCycles ?? 0}/${runtimeDashboard.plannedCycles ?? 0}`
+      : "-",
+  );
+  setText("[data-runtime-heartbeat]", runtimeHeartbeatLabel());
+  setText(
+    "[data-runtime-control-mode]",
+    runtimeDashboard.controlMode === "pause_new_openings_close_only"
+      ? "ONLY CLOSE"
+      : "NORMAL",
+  );
+  setText("[data-runtime-evidence-boundary]", runtimeEvidenceBoundaryLabel());
+
+  document
+    .querySelector<HTMLElement>(".live-state")
+    ?.classList.toggle("is-inactive", !runtimeDashboard.activeRun);
+  document
+    .querySelector<HTMLElement>("[data-runtime-evidence-boundary]")
+    ?.classList.toggle("is-live", runtimeDashboard.activeRun);
+
+  const emergency = document.querySelector<HTMLButtonElement>(
+    "[data-runtime-emergency]",
+  );
+  const mobile = document.querySelector<HTMLButtonElement>(
+    "[data-runtime-mobile-control]",
+  );
+  const canControl =
+    runtimeDashboard.canPause || runtimeDashboard.canResume;
+  for (const button of [emergency, mobile]) {
+    if (button) button.disabled = !canControl;
+  }
+  setText(
+    "[data-runtime-emergency-label]",
+    runtimeDashboard.canResume
+      ? tr("恢复新开仓", "RESUME OPENINGS")
+      : tr("暂停新开仓", "PAUSE OPENINGS"),
+  );
+  setText(
+    "[data-runtime-emergency-mobile-label]",
+    runtimeDashboard.canResume
+      ? tr("恢复开仓", "RESUME")
+      : tr("暂停开仓", "PAUSE"),
+  );
+  setText(
+    "[data-runtime-mobile-control]",
+    runtimeDashboard.canResume
+      ? tr("恢复新开仓", "Resume openings")
+      : tr("暂停新开仓", "Pause openings"),
+  );
 }
 
 function localized(value: LocalizedText): string {
@@ -817,8 +959,7 @@ function renderHeader(): string {
       <nav class="primary-nav" aria-label="${tr("主要导航", "Primary navigation")}">
         ${[
           ["overview", tr("交易 Agent", "Trading Agent")],
-          ["orchestration", tr("系统编排", "Orchestration")],
-          ["lab", tr("Agent 实验室", "Agent Lab")],
+          ["lab", tr("编排 Agent", "Orchestration Agent")],
           ["activity", tr("审计记录", "Audit Log")],
           ["connections", tr("连接配置", "Connections")],
         ].map(([id, label]) => `
@@ -831,11 +972,11 @@ function renderHeader(): string {
           ${state.locale === "zh-CN" ? "英文" : "ZH"}
         </button>
         <button class="copilot-trigger ${state.copilotOpen ? "is-active" : ""}" type="button" id="open-copilot">
-          ${tr("副驾驶", "Copilot")} <kbd>⌘K</kbd>
+          ${tr("编排 Copilot", "Orchestration Copilot")} <kbd>⌘K</kbd>
         </button>
-        <button class="risk-control ${state.mode === "only-close" ? "is-armed" : ""}" type="button" id="pause-openings">
-          <span class="risk-control__desktop">${state.mode === "only-close" ? tr("仅允许平仓", "ONLY CLOSE") : tr("暂停新开仓", "PAUSE OPENINGS")}</span>
-          <span class="risk-control__mobile">${state.mode === "only-close" ? tr("仅平仓", "CLOSE ONLY") : tr("暂停开仓", "PAUSE")}</span>
+        <button class="risk-control ${runtimeDashboard.canResume ? "is-armed" : ""}" type="button" id="pause-openings" data-runtime-emergency ${runtimeDashboard.canPause || runtimeDashboard.canResume ? "" : "disabled"}>
+          <span class="risk-control__desktop" data-runtime-emergency-label>${runtimeDashboard.canResume ? tr("恢复新开仓", "RESUME OPENINGS") : tr("暂停新开仓", "PAUSE OPENINGS")}</span>
+          <span class="risk-control__mobile" data-runtime-emergency-mobile-label>${runtimeDashboard.canResume ? tr("恢复开仓", "RESUME") : tr("暂停开仓", "PAUSE")}</span>
           <small>${tr("紧急风险控制", "Emergency risk control")}</small>
         </button>
       </div>
@@ -847,19 +988,20 @@ function renderAgentIdentity(): string {
   return `
     <section class="agent-identity" aria-labelledby="agent-title">
       <div class="agent-identity__main">
-        <span class="live-state"><i aria-hidden="true"></i>${state.mode === "only-close" ? tr("仅允许平仓", "Only Close") : tr("模拟运行中", "Paper Running")}</span>
+        <span class="live-state ${runtimeDashboard.activeRun ? "" : "is-inactive"}"><i aria-hidden="true"></i><span data-runtime-status-label>${runtimeStatusLabel()}</span></span>
         <div>
           <h1 id="agent-title">${tr("Atlas 交易 Agent", "Atlas Trading Agent")}</h1>
           <p>${tr("从市场候选池中只选择一个标的，完成可审计的分析、决策与风险控制。", "Select exactly one symbol from the market universe, then run an auditable decision and risk chain.")}</p>
         </div>
       </div>
       <dl class="agent-provenance">
-        <div><dt>${tr("策略配置", "Strategy Profile")}</dt><dd>rule-multi-agent / 3.8.0</dd></div>
-        <div><dt>${tr("指纹", "Fingerprint")}</dt><dd>9a1dcbc6b5b73746</dd></div>
-        <div><dt>${tr("运行版本阶段", "Running release")}</dt><dd>${tr("模拟运行", "Paper Running")}</dd></div>
-        <div><dt>${tr("当前周期", "Current cycle")}</dt><dd>cycle_20260726_143620</dd></div>
+        <div><dt>Run ID</dt><dd data-runtime-run-id>${runtimeDashboard.runId ?? "-"}</dd></div>
+        <div><dt>${tr("控制模式", "Control mode")}</dt><dd data-runtime-control-mode>${runtimeDashboard.controlMode === "pause_new_openings_close_only" ? "ONLY CLOSE" : "NORMAL"}</dd></div>
+        <div><dt>${tr("当前周期", "Current cycle")}</dt><dd data-runtime-cycle>${runtimeDashboard.activeRun ? `${runtimeDashboard.processedCycles ?? 0}/${runtimeDashboard.plannedCycles ?? 0}` : "-"}</dd></div>
+        <div><dt>${tr("最后心跳", "Last heartbeat")}</dt><dd data-runtime-heartbeat>${runtimeHeartbeatLabel()}</dd></div>
       </dl>
     </section>
+    <p class="runtime-evidence-boundary ${runtimeDashboard.activeRun ? "is-live" : ""}" data-runtime-evidence-boundary>${runtimeEvidenceBoundaryLabel()}</p>
   `;
 }
 
@@ -1050,7 +1192,7 @@ function renderMobilePriority(): string {
         <strong>${tr("复核候选策略 3.9", "Review candidate 3.9")}</strong>
         <button type="button" data-view="lab">${tr("打开", "Open")}</button>
       </div>
-      <button type="button" class="mobile-pause" data-open-pause>${state.mode === "only-close" ? tr("仅允许平仓", "Only Close") : tr("暂停新开仓", "Pause openings")}</button>
+      <button type="button" class="mobile-pause" data-open-pause data-runtime-mobile-control ${runtimeDashboard.canPause || runtimeDashboard.canResume ? "" : "disabled"}>${runtimeDashboard.canResume ? tr("恢复新开仓", "Resume openings") : tr("暂停新开仓", "Pause openings")}</button>
     </section>
   `;
 }
@@ -1221,31 +1363,137 @@ function renderValidationPreview(): string {
   `;
 }
 
+function renderProductLoop(): string {
+  return `
+    <section class="product-loop" aria-labelledby="product-loop-title">
+      <header>
+        <div>
+          <span>${tr("基础版本产品闭环", "Foundation product loop")}</span>
+          <h2 id="product-loop-title">${tr("数据进入，语义交接，受控资金化", "Data in, semantic handoff, controlled capital")}</h2>
+        </div>
+        <div class="product-loop__boundary">
+          <strong>${tr("当前边界", "Current boundary")}</strong>
+          <span>${tr("Crypto + Paper + 部分真实 API", "Crypto + Paper + partial real APIs")}</span>
+        </div>
+      </header>
+      <div class="product-loop__rail">
+        <article class="product-loop__stage">
+          <span class="product-loop__index">01</span>
+          <div>
+            <small>${tr("市场与数据", "Market and data")}</small>
+            <h3>${tr("能力先于编排", "Capability before orchestration")}</h3>
+            <p>${tr("Crypto 24x7 已登记；A 股、港股和美股等待真实 Market Pack 与 Adapter。", "Crypto 24x7 is registered. A-share, Hong Kong, and US markets still need real Market Packs and adapters.")}</p>
+          </div>
+          <code>DataSourceCapability</code>
+        </article>
+        <article class="product-loop__stage">
+          <span class="product-loop__index">02</span>
+          <div>
+            <small>${tr("观察窗口", "Observation windows")}</small>
+            <h3>${tr("结构化数据拆分", "Structured data fan-out")}</h3>
+            <p>${tr("K 线按可用窗口分发给子 Agent；事件流可独立运行，不从日线伪造分钟线。", "Bars are distributed by available windows. Event streams can run independently, and daily data never fabricates minute bars.")}</p>
+          </div>
+          <code>5m · 15m · 1h · event</code>
+        </article>
+        <article class="product-loop__stage is-semantic">
+          <span class="product-loop__index">03</span>
+          <div>
+            <small>${tr("语义 Agent 交接", "Semantic Agent handoff")}</small>
+            <h3>${tr("判断，而不是裸信号", "Judgment, not bare signals")}</h3>
+            <div class="semantic-samples">
+              <p><b>Regime / 1h</b><span>${tr("下行结构仍然有效", "Downtrend structure remains valid")}</span></p>
+              <p><b>Trigger / 5m</b><span>${tr("量能确认出现延迟", "Volume confirmation arrived late")}</span></p>
+              <p><b>Reflection</b><span>${tr("候选经验：避免峰值后追单", "Lesson candidate: avoid entries after peak volume")}</span></p>
+            </div>
+          </div>
+          <code>SemanticArtifact[]</code>
+        </article>
+        <article class="product-loop__stage">
+          <span class="product-loop__index">04</span>
+          <div>
+            <small>${tr("综合决策", "Synthesis")}</small>
+            <h3>Decision → Portfolio → Risk</h3>
+            <p>${tr("Decision 汇总各 Agent 语义、账户状态与已批准经验；Risk 保留独立否决权。", "Decision combines Agent semantics, account state, and approved lessons. Risk keeps independent veto authority.")}</p>
+          </div>
+          <code>${tr("唯一动作权限链", "Sole action authority")}</code>
+        </article>
+        <article class="product-loop__stage">
+          <span class="product-loop__index">05</span>
+          <div>
+            <small>${tr("资金化与反思", "Capital and reflection")}</small>
+            <h3>${tr("Paper 结果回到慢循环", "Paper outcomes return to the slow loop")}</h3>
+            <p>${tr("Paper Execution、持仓监控和交易结果进入 Reflection；只创建 Lesson Candidate，不回写运行策略。", "Paper execution, position monitoring, and outcomes feed Reflection. It creates Lesson Candidates and never rewrites the running strategy.")}</p>
+          </div>
+          <code>${tr("无交易所写入", "No exchange writes")}</code>
+        </article>
+      </div>
+    </section>
+  `;
+}
+
 function renderOrchestration(): string {
   const template = selectedPipelineTemplate();
   const selectedNode = selectedOrchestrationNode();
   return `
     <section class="page-intro orchestration-intro">
       <div>
-        <h1>${tr("系统编排", "System Orchestration")}</h1>
-        <p>${tr("检查已注册能力、版本化 Graph 和发布门禁。这里创建的内容只是 Draft，不会修改运行中的 Pipeline。", "Inspect registered capabilities, versioned Graphs, and release gates. Everything created here is a Draft and cannot mutate the running Pipeline.")}</p>
+        <h1>${tr("编排 Agent", "Orchestration Agent")}</h1>
+        <p>${tr("在一个对话框里描述数据输入、子 Agent 能力和 Workflow 连接关系。系统会调用已注册接口，自动生成可确认、可验证的编排草案。", "Describe data inputs, sub-Agent capabilities, and Workflow relationships in one conversation. The system calls registered interfaces and automatically produces a reviewable, validatable orchestration draft.")}</p>
       </div>
-      <div class="orchestration-version">
-        <span>${tr("当前 Graph", "Current Graph")}</span>
-        <strong>current-crypto-fixed@1.0.0</strong>
-        <small>sha256:current-fixed-crypto</small>
+      <div class="orchestration-intro-actions">
+        <button type="button" class="secondary-action" data-view="connections">${tr("数据输入与接口", "Data inputs & interfaces")}</button>
+        <div class="orchestration-version">
+          <span>${tr("运行时边界", "Runtime boundary")}</span>
+          <strong>${tr("草案未应用", "Draft not applied")}</strong>
+          <small>runtimeApplied=false</small>
+        </div>
       </div>
     </section>
 
     <section class="orchestration-status">
       <div><span>${tr("Market Pack", "Market Pack")}</span><strong>Crypto 24x7 / v1</strong></div>
       <div><span>${tr("生命周期", "Lifecycle")}</span><strong>${tr("已验证，运行时未迁移", "Validated, Runtime not migrated")}</strong></div>
-      <div><span>${tr("配置来源", "Configuration source")}</span><strong>${tr("浏览器 Mock Manifest", "Browser mock manifest")}</strong></div>
+      <div><span>${tr("编排方式", "Orchestration mode")}</span><strong>${tr("真实 Conversation API + 注册工具", "Live Conversation API + registered tools")}</strong></div>
     </section>
+
+    <section class="orchestration-workbench-shell" aria-labelledby="orchestration-workbench-title">
+      <header class="orchestration-workbench-heading">
+        <div>
+          <span>CONVERSATION-FIRST WORKFLOW</span>
+          <h2 id="orchestration-workbench-title">${tr("说出需求，系统完成结构化编排", "State the need; the system builds the structured workflow")}</h2>
+          <p>${tr("对话结果不是聊天摘要，而是持久化 Draft、字段级 Diff、接口能力检查和下一道发布门禁。", "The result is not a chat summary. It is a persisted draft, field-level diff, interface capability check, and the next release gate.")}</p>
+        </div>
+        <ol class="orchestration-delivery-rail">
+          <li class="is-current"><span>01</span><strong>${tr("描述连接", "Describe")}</strong></li>
+          <li><span>02</span><strong>${tr("确认编排", "Confirm")}</strong></li>
+          <li><span>03</span><strong>${tr("验证开发", "Validate")}</strong></li>
+          <li><span>04</span><strong>${tr("发布 Paper", "Release Paper")}</strong></li>
+        </ol>
+      </header>
+      <div id="orchestration-workspace-host" class="orchestration-workspace-host"></div>
+    </section>
+
+    <header class="advanced-orchestration-heading">
+      <div><span>${tr("高级检查", "ADVANCED INSPECTION")}</span><h2>${tr("能力目录与 Workflow Graph", "Capability catalog & Workflow Graph")}</h2></div>
+      <p>${tr("Graph 只用于检查自动编排结果，不是普通用户的必经入口。", "The graph is an inspection view for generated workflows, not a required authoring step.")}</p>
+    </header>
+    ${renderProductLoop()}
 
     <div class="orchestration-layout">
       <aside class="orchestration-catalog" aria-label="${tr("能力目录", "Capability catalog")}">
         <header><h2>${tr("能力目录", "Capability Catalog")}</h2><span>2 / 12</span></header>
+        <section>
+          <h3>Market Pack</h3>
+          <button type="button" data-orchestration-node="selector">
+            <strong>Crypto 24x7</strong>
+            <small>${tr("已注册 · 当前可验证", "Registered · currently validatable")}</small>
+            <span><b>${tr("规则", "Rules")}</b> UTC · 24/7 · perpetual</span>
+          </button>
+          <div class="market-pack-plan">
+            <span>A Shares</span><span>Hong Kong</span><span>US Equities</span>
+            <small>${tr("Planned：尚无真实 Adapter，不宣称可运行", "Planned: no real adapters, not claimed as runnable")}</small>
+          </div>
+        </section>
         <section>
           <h3>Data Source</h3>
           <button type="button" data-orchestration-node="data-sync">
@@ -1320,6 +1568,12 @@ function renderOrchestration(): string {
             <div><dt>${tr("输出", "Output")}</dt><dd>${localized(selectedNode.output)}</dd></div>
           </dl>
           <p>${localized(selectedNode.permission)}</p>
+          <div class="direct-draft-edit">
+            <button type="button" class="secondary-action" id="create-direct-edit-draft">
+              ${tr("创建可编辑 Draft 副本", "Create editable Draft copy")}
+            </button>
+            <small>${tr("直接编辑与 Copilot 共用同一结构化 Draft，不修改 Runtime。", "Direct editing and Copilot share the same structured Draft and never mutate Runtime.")}</small>
+          </div>
         </section>
 
         <section class="orchestration-copilot">
@@ -1468,7 +1722,25 @@ function renderActivity(): string {
       </div>
       <button type="button" class="secondary-action" id="activity-ask">${tr("询问副驾驶", "Ask Copilot")}</button>
     </section>
-    <section class="activity-console">
+    <section class="audit-guide" aria-labelledby="audit-guide-title">
+      <div class="audit-guide__intro">
+        <span>${tr("如何阅读", "HOW TO READ")}</span>
+        <h2 id="audit-guide-title">${tr("一笔交易为什么发生？", "Why did a trade happen?")}</h2>
+        <p>${tr("从标的选择开始，沿着决策、风险检查和执行结果逐步查看。点击术语可了解它在交易链路中的作用。", "Start with symbol selection, then follow the decision, risk check, and execution result. Open a term to understand its role in the trading chain.")}</p>
+      </div>
+      <div class="audit-guide__terms">
+        <details><summary>Trace</summary><p>${tr("贯穿一次完整决策链的追踪编号，用于把各个 Agent 的输入输出关联起来。", "The identifier linking every Agent input and output in one decision chain.")}</p></details>
+        <details><summary>Decision</summary><p>${tr("决策 Agent 给出的方向、置信度和原因；它本身不能直接下单。", "Direction, confidence, and rationale from the Decision Agent; it cannot place an order directly.")}</p></details>
+        <details><summary>Risk Gate</summary><p>${tr("订单进入执行前的强制风险检查，可拒绝或缩减决策。", "The mandatory risk check before execution; it can reject or reduce a decision.")}</p></details>
+        <details><summary>Execution</summary><p>${tr("Paper 账户中的最终执行结果，包括成交、拒绝或未成交。", "The final Paper-account result: filled, rejected, or unfilled.")}</p></details>
+      </div>
+    </section>
+    <div class="causal-review-mount" data-causal-review-root></div>
+    <section class="activity-console activity-sample-console">
+      <div class="activity-sample-label">
+        <strong>SAMPLE FALLBACK</strong>
+        <span>${tr("非 Runtime 事实，仅用于离线界面示例", "Not Runtime facts; offline UI examples only")}</span>
+      </div>
       <div class="activity-toolbar">
         <div class="activity-filters">
           ${filters.map(([id, label]) => `<button type="button" data-activity-filter="${id}" class="${state.activityFilter === id ? "is-active" : ""}" aria-pressed="${state.activityFilter === id}">${localized(label)}</button>`).join("")}
@@ -1895,7 +2167,7 @@ function renderProposalPanel(): string {
 }
 
 function renderPausePanel(): string {
-  const enabling = state.mode !== "only-close";
+  const enabling = !runtimeDashboard.canResume;
   return `
     <header class="panel-header">
       <div><span>${tr("紧急风险控制", "Emergency risk control")}</span><h2 id="panel-title">${enabling ? tr("暂停所有新开仓？", "Pause all new openings?") : tr("恢复新开仓权限？", "Resume new openings?")}</h2></div>
@@ -1958,7 +2230,7 @@ function render(): void {
     : state.view === "orchestration"
       ? renderOrchestration()
     : state.view === "lab"
-      ? renderLab()
+      ? renderOrchestration()
       : state.view === "activity"
         ? renderActivity()
         : renderConnections();
@@ -1980,6 +2252,9 @@ function render(): void {
     ${renderPanel()}
     ${renderToast()}
   `;
+  window.dispatchEvent(
+    new CustomEvent("tradebot:runtime-evidence-remount"),
+  );
   bindEvents();
   syncOverlayState();
 }
@@ -2103,6 +2378,7 @@ function bindEvents(): void {
   document.querySelectorAll<HTMLElement>("[data-view]").forEach((element) => {
     element.addEventListener("click", () => {
       state.view = element.dataset.view as ViewId;
+      window.history.replaceState(null, "", `#${state.view}`);
       state.panel = null;
       state.copilotOpen = false;
       render();
@@ -2156,6 +2432,7 @@ function bindEvents(): void {
     showToast("结构化 Draft 已创建，Runtime 未修改", "Structured Draft created. Runtime unchanged");
   };
   document.querySelector("#create-orchestration-draft")?.addEventListener("click", createOrchestrationDraft);
+  document.querySelector("#create-direct-edit-draft")?.addEventListener("click", createOrchestrationDraft);
   document.querySelector<HTMLFormElement>("#orchestration-copilot-form")?.addEventListener("submit", (event) => {
     event.preventDefault();
     createOrchestrationDraft();
@@ -2244,27 +2521,18 @@ function bindEvents(): void {
   document.querySelector("#pause-openings")?.addEventListener("click", () => openPanel("pause"));
   document.querySelector("[data-open-pause]")?.addEventListener("click", () => openPanel("pause"));
   document.querySelector("#confirm-pause")?.addEventListener("click", () => {
-    state.mode = state.mode === "paper" ? "only-close" : "paper";
-    const now = new Date().toLocaleTimeString(state.locale === "zh-CN" ? "zh-CN" : "en-US", { hour12: false });
-    activityEvents.unshift({
-      id: `activity-risk-mode-${Date.now()}`,
-      kind: "exception",
-      time: { zh: now, en: now },
-      title: {
-        zh: state.mode === "only-close" ? "操作员暂停新开仓" : "操作员恢复模拟新开仓",
-        en: state.mode === "only-close" ? "Operator paused new openings" : "Operator resumed Paper openings",
-      },
-      summary: {
-        zh: state.mode === "only-close" ? "模式从 Paper Running 切换为 Only Close；平仓与 Position Monitor 保持运行。" : "模式从 Only Close 恢复为 Paper Running；风险门禁保持生效。",
-        en: state.mode === "only-close" ? "Mode changed from Paper Running to Only Close; exits and Position Monitor remain active." : "Mode changed from Only Close to Paper Running; all Risk Gates remain active.",
-      },
-      meta: `operator:local / ${state.mode === "only-close" ? "paper→only-close" : "only-close→paper"} / emergency-control`,
-      status: "review",
-    });
+    const action = runtimeDashboard.canResume
+      ? "resume-normal"
+      : "close-only";
+    window.dispatchEvent(
+      new CustomEvent("tradebot:runtime-action-request", {
+        detail: { action },
+      }),
+    );
     state.panel = null;
     showToast(
-      state.mode === "only-close" ? "已切换为仅允许平仓" : "已恢复模拟新开仓",
-      state.mode === "only-close" ? "Only Close is active" : "Paper openings resumed",
+      action === "close-only" ? "暂停请求已提交" : "恢复请求已提交",
+      action === "close-only" ? "Pause request submitted" : "Resume request submitted",
     );
   });
 
@@ -2389,6 +2657,15 @@ document.addEventListener("keydown", (event) => {
   if (event.key === "Escape" && (state.copilotOpen || state.panel)) {
     closeOverlay();
   }
+});
+
+window.addEventListener("hashchange", () => {
+  const nextView = initialView();
+  if (nextView === state.view) return;
+  state.view = nextView;
+  state.panel = null;
+  state.copilotOpen = false;
+  render();
 });
 
 render();

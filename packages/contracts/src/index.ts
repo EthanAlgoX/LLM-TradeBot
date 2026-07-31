@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ReflectionLessonCandidateSchema } from "./semantic-agent-artifacts.js";
 
 export const SCHEMA_VERSION = "v1" as const;
 
@@ -193,6 +194,8 @@ export const RiskDecisionSchema = z.object({
 export type RiskDecision = z.infer<typeof RiskDecisionSchema>;
 
 export const OpenPositionSchema = z.object({
+  positionId: z.string().min(1).optional(),
+  tradeId: z.string().min(1).optional(),
   symbol: z.string().min(1),
   side: z.enum(["long", "short"]),
   qty: z.number().positive(),
@@ -204,10 +207,19 @@ export const OpenPositionSchema = z.object({
   openedAt: z.coerce.date(),
   openingFee: z.number().nonnegative(),
   entryConfidence: z.number().min(0).max(100).optional(),
+  entryOrderId: z.string().min(1).optional(),
+  entryTraceId: z.string().min(1).optional(),
+  entryDecisionArtifactId: z.string().min(1).optional(),
+  entryPortfolioArtifactId: z.string().min(1).optional(),
+  entryRiskArtifactId: z.string().min(1).optional(),
+  entryExecutionArtifactId: z.string().min(1).optional(),
+  entryFillId: z.string().min(1).optional(),
 });
 export type OpenPosition = z.infer<typeof OpenPositionSchema>;
 
 export const ClosedTradeSchema = z.object({
+  tradeId: z.string().min(1).optional(),
+  positionId: z.string().min(1).optional(),
   symbol: z.string().min(1),
   side: z.enum(["long", "short"]),
   qty: z.number().positive(),
@@ -219,6 +231,20 @@ export const ClosedTradeSchema = z.object({
   realizedPnl: z.number(),
   fees: z.number().nonnegative(),
   entryConfidence: z.number().min(0).max(100).optional(),
+  entryOrderId: z.string().min(1).optional(),
+  entryTraceId: z.string().min(1).optional(),
+  entryDecisionArtifactId: z.string().min(1).optional(),
+  entryPortfolioArtifactId: z.string().min(1).optional(),
+  entryRiskArtifactId: z.string().min(1).optional(),
+  entryExecutionArtifactId: z.string().min(1).optional(),
+  entryFillId: z.string().min(1).optional(),
+  exitOrderId: z.string().min(1).optional(),
+  exitTraceId: z.string().min(1).optional(),
+  exitDecisionArtifactId: z.string().min(1).optional(),
+  exitPortfolioArtifactId: z.string().min(1).optional(),
+  exitRiskArtifactId: z.string().min(1).optional(),
+  exitExecutionArtifactId: z.string().min(1).optional(),
+  exitFillId: z.string().min(1).optional(),
 });
 export type ClosedTrade = z.infer<typeof ClosedTradeSchema>;
 
@@ -263,6 +289,14 @@ export const LocalOrderSnapshotSchema = z.object({
   executedQty: z.number().nonnegative(),
   requestedPrice: z.number().positive(),
   createdAt: z.coerce.date(),
+  traceId: z.string().min(1).optional(),
+  tradeId: z.string().min(1).optional(),
+  positionId: z.string().min(1).optional(),
+  riskArtifactId: z.string().min(1).optional(),
+  executionArtifactId: z.string().min(1).optional(),
+  fillId: z.string().min(1).optional(),
+  fee: z.number().nonnegative().optional(),
+  realizedPnl: z.number().optional(),
 });
 export type LocalOrderSnapshot = z.infer<typeof LocalOrderSnapshotSchema>;
 
@@ -366,8 +400,10 @@ export const ReflectionReportSchema = z.object({
   confidenceCalibration: z.enum(["unavailable", "aligned", "overconfident_losses"]),
   recommendations: z.array(z.string()),
   adjustments: z.array(PolicyAdjustmentSchema),
+  sourceTradeIds: z.array(z.string().min(1)).optional(),
+  semanticLessonCandidates: z.array(ReflectionLessonCandidateSchema).optional(),
   llmAudit: LlmReflectionAuditSchema.optional(),
-});
+}).strict();
 export type ReflectionReport = z.infer<typeof ReflectionReportSchema>;
 
 export const AgentRuntimeConfigSchema = z.object({
@@ -393,6 +429,10 @@ export const ExecutionResultSchema = z.object({
   realizedPnl: z.number().default(0),
   closedTrade: ClosedTradeSchema.optional(),
   localOrderId: z.string().min(1).optional(),
+  tradeId: z.string().min(1).optional(),
+  positionId: z.string().min(1).optional(),
+  fillId: z.string().min(1).optional(),
+  executionArtifactId: z.string().min(1).optional(),
 });
 export type ExecutionResult = z.infer<typeof ExecutionResultSchema>;
 
@@ -680,9 +720,10 @@ export const AgentArtifactSchema = z.object({
   stage: z.string().min(1), agent: z.string().min(1), agentVersion: z.string().min(1), status: z.enum(["success", "fallback", "error"]),
   startedAt: z.coerce.date(), completedAt: z.coerce.date(), durationMs: z.number().nonnegative(),
   input: z.unknown(), output: z.unknown().optional(), error: z.string().min(1).optional(), orderId: z.string().min(1).optional(), tradeId: z.string().min(1).optional(),
+  sourceArtifactIds: z.array(z.string().min(1)).max(100).optional(),
 }).strict();
 export type AgentArtifact = z.infer<typeof AgentArtifactSchema>;
-export const AgentArtifactQuerySchema = z.object({ traceId: TraceIdSchema.optional(), orderId: z.string().min(1).optional(), symbol: z.string().min(1).optional(), stage: z.string().min(1).optional(), limit: z.number().int().positive().max(500).default(100) }).strict().refine((value) => Boolean(value.traceId || value.orderId), "traceId or orderId is required");
+export const AgentArtifactQuerySchema = z.object({ traceId: TraceIdSchema.optional(), orderId: z.string().min(1).optional(), tradeId: z.string().min(1).optional(), symbol: z.string().min(1).optional(), stage: z.string().min(1).optional(), limit: z.number().int().positive().max(500).default(100) }).strict().refine((value) => Boolean(value.traceId || value.orderId || value.tradeId), "traceId, orderId, or tradeId is required");
 export type AgentArtifactQuery = z.infer<typeof AgentArtifactQuerySchema>;
 
 export const TradeReviewSchema = z.object({ traceId: TraceIdSchema, symbol: z.string().min(1).optional(), orderId: z.string().min(1).optional(), artifactCount: z.number().int().nonnegative(), fallbackCount: z.number().int().nonnegative(), errorCount: z.number().int().nonnegative(), timeline: z.array(z.object({ artifactId: z.string().min(1), stage: z.string().min(1), agent: z.string().min(1), agentVersion: z.string().min(1), status: z.enum(["success", "fallback", "error"]), symbol: z.string().min(1).optional(), startedAt: z.coerce.date(), durationMs: z.number().nonnegative(), summary: z.string().min(1) })), decision: z.object({ action: z.string().optional(), confidence: z.number().optional() }).optional(), risk: z.object({ passed: z.boolean().optional(), blockedReason: z.string().optional() }).optional(), execution: z.object({ status: z.string().optional(), orderId: z.string().optional(), message: z.string().optional() }).optional() }).strict();
@@ -1049,8 +1090,27 @@ export * from "./historical-evidence-artifact.js";
 export * from "./approved-paper-plan.js";
 export * from "./paper-runtime-run.js";
 export * from "./paper-runtime-operations.js";
+export * from "./paper-runtime-launch.js";
+export * from "./runtime-evidence-read-model.js";
+export * from "./causal-trade-review.js";
+export * from "./trade-lineage.js";
+export * from "./comparative-trade-evidence.js";
+export * from "./lesson-candidate-validation-handoff.js";
+export * from "./lesson-evidence-gate.js";
+export * from "./lesson-human-approval.js";
+export * from "./approved-lesson-materialization.js";
+export * from "./shadow-replay-audit.js";
 export * from "./paper-runtime-supervision.js";
 export * from "./operational-delivery.js";
 export * from "./operational-retention.js";
 export * from "./semantic-agent-artifacts.js";
 export * from "./semantic-pipeline-preset.js";
+export * from "./orchestration-intent.js";
+export * from "./orchestration-copilot.js";
+export * from "./historical-graph-execution.js";
+export * from "./graph-backtest-evidence.js";
+export * from "./configuration-drafts.js";
+export * from "./strategy-evidence-approval.js";
+export * from "./executable-strategy-configuration.js";
+export * from "./configurable-semantic-pipeline.js";
+export * from "./historical-semantic-evaluation.js";

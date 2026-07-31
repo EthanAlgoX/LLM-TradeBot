@@ -1,556 +1,204 @@
-# TradeBot 产品路线图与实施进度
+# TradeBot 产品路线图与当前进度
 
-> 状态日期：2026-07-26  
-> 文档角色：当前产品范围、实施顺序、完成度和验收标准的统一入口  
-> 产品定位：跨市场、可编排、可回测、可审计、可受控进化的 Human-in-the-loop Multi-Agent 交易系统
+> 文档角色：当前完成度、剩余缺口和交付顺序的权威快照
+> 最后更新：2026-07-31
+> 产品基线：[`../PRODUCT.md`](../PRODUCT.md)
+> 架构基线：[`architecture-and-delivery-plan.md`](architecture-and-delivery-plan.md)
+> 当前交接：[`project-status-and-handoff.md`](project-status-and-handoff.md)
+> 历史记录：[`archive/product-roadmap-and-progress-through-2026-07-29.md`](archive/product-roadmap-and-progress-through-2026-07-29.md)
 
-## 1. 文档使用约定
+## 1. 当前结论
 
-本文件负责回答四个问题：
+TradeBot 已从固定 Crypto Paper Pipeline 扩展出真实的 Registry、Capability、Graph Validation、Configuration Draft、Historical Evidence、Strategy Evidence、Approval、受控 Paper Runtime、Conversation-first Copilot、Causal Review 和 Human Lesson Candidate Review 垂直切片。产品一级抽象已经校正为“通用注册输入 + 可配置多 Agent”，具体市场只作为 Market Pack 元数据和执行约束。
 
-1. TradeBot 最终要形成什么产品能力。
-2. 当前仓库已经具备什么，哪些只是局部实现。
-3. 后续阶段应按什么依赖顺序推进。
-4. 每个阶段达到什么标准才算完成。
+当前不是多市场生产系统，也不是通用 Graph Runtime。生产可运行范围仍是服务端注册的 Current Crypto Paper Binding；Draft、Approval、Lesson Candidate 和 Validation Handoff 均不会自动修改正在运行的 Runtime。
 
-状态定义：
+当前验证基线：
 
-| 状态 | 含义 |
-| --- | --- |
-| 已完成 | 已有可运行代码和自动化测试，且已接入当前组合根或明确可被调用 |
-| 部分完成 | 已有合同、局部实现或固定路径，但尚未形成完整产品闭环 |
-| 计划中 | 已确定边界和依赖，尚未实现 |
-| Mock | 仅用于界面表达或接口占位，不代表 Runtime 已支持 |
-| 暂缓 | 当前已有足够基础，不应继续抢占产品主线优先级 |
+```text
+npm run check       PASS
+npm run test:ts     PASS (319/319)
+npm run build:web   PASS (31 modules, 70ms)
+git diff --check    PASS
+npm run dev:paper   STARTED
+```
 
-文档优先级：
+当前宿主的内置浏览器列表为空，因此 Approved Lesson Semantic Materialization 的桌面/窄屏、中英文、语义状态展示和 Console 仍未完成浏览器复核。
 
-1. `PRODUCT.md` 定义长期产品原则和不可突破的安全边界。
-2. `docs/architecture-and-delivery-plan.md` 保存架构推导和交付历史。
-3. 本文件定义当前阶段的实施顺序与完成度。
-4. `docs/project-status-and-handoff.md` 保存最近一次可继续开发的工程交接信息。
-5. 其他专题文档说明具体模块，不单独改变路线图优先级。
+## 2. 能力进度
 
-## 2. 已重新对齐的产品需求
-
-### 2.1 市场配置
-
-TradeBot 需要允许用户基于后端已注册能力创建不同市场的配置草案，包括 Market Pack、交易日历、时区、标的规则、Data Source、Observation Window、Agent Template 和风险约束。
-
-“自由配置市场”不等于客户端可以注入任意代码、模块、Provider、URL、SQL、文件路径或交易所写接口。所有可执行能力必须由后端预先实现、注册、版本化并经过合同校验。
-
-### 2.2 Agent 编排
-
-用户需要能够针对不同市场编排单周期、双周期、任意多周期或完全事件驱动的 Multi-Agent Pipeline。
-
-Pipeline 不得写死固定拓扑，也不得把 5m、15m、1h 当成系统级约束。默认 Crypto Preset 可以继续声明当前真实支持的 5m、15m、1h，但其他 Preset 应由 Data Source Capability 和 Agent 合同决定可用窗口。
-
-系统应提供从旧 LM Multi-Agent 系统迁移而来的预设方案。当前固定 Crypto Pipeline 已有等价 Graph Manifest，但“旧系统语义交接行为的完整迁移”仍未完成，不能把 Graph 外形等价当成行为等价。
-
-### 2.3 语义交接
-
-旧 LM Multi-Agent 系统的关键不是简单数值信号，而是受控的语义交接：
-
-1. DataSync 提供完整、结构化、带 lineage 的 K 线或事件数据。
-2. 数据按 Observation Window 分发给对应的 Analysis Agent。
-3. 每个 Agent 对自己的窗口输出自然语言判断，同时附带可验证的结构化字段和证据引用。
-4. Bull、Bear 或其他研究 Agent 继续输出带立场、信心和证据的语义判断。
-5. Decision 汇总所有 Agent 判断、已批准反思经验、当前持仓、Portfolio 状态、Risk 预算、Data Quality 和 lineage，形成综合决策。
-6. 只有 Decision → Portfolio → Risk → Execution 可以形成执行动作。
-
-语义内容必须装在严格合同中。系统既不能把语义压缩成单一分数，也不能允许没有 Schema、证据和 lineage 的任意文本在执行链路中传播。
-
-### 2.4 策略与回测
-
-完整回测能力最终必须以“已版本化、已校验、已编译的 Pipeline Graph”为运行对象，而不是只支持当前固定 DecisionPipeline。
-
-回测、Walk-Forward 和 Paper Running 必须使用同一组核心 Agent 合同、语义 Artifact、Decision 边界、Portfolio/Risk 规则和数据闭合原则。允许执行环境不同，但不得出现回测路径绕开 Runtime 风险边界的情况。
-
-### 2.5 对话式操作
-
-Copilot 最终应通过后端工具完成以下受控操作：
-
-- 创建或修改策略 Draft。
-- 选择已注册 Market Pack 和 Data Source。
-- 配置 Observation Window。
-- 选择已注册 Agent Template 并创建 AgentConfig Draft。
-- 修改允许编辑的 Prompt、策略参数、阈值、权重和依赖关系。
-- 发起 Contract Validation、Backtest 和 Walk-Forward。
-- 汇总验证错误和证据结果。
-- 提交 Human Approval。
-
-Copilot 不能动态执行任意代码，不能直接修改运行中的 Pipeline，不能直接下单，不能绕过 Risk，不能把 Draft 表现为已部署状态。
-
-### 2.6 Reflection
-
-Reflection 只允许在交易后产生 `Lesson Candidate`。Candidate 应包含失败交易引用、语义经验、失败模式、适用市场或 regime、置信度、证据和生命周期状态。
-
-未经人工批准的 Candidate 不得进入 Decision Context。Reflection 不得直接修改 Decision Prompt、Agent 权重、仓位、Risk 参数或运行中的 Pipeline。
-
-## 3. 当前进度总览
-
-### 3.1 已完成的基础能力
-
-| 能力 | 状态 | 当前实现 |
+| 能力 | 状态 | 当前事实 |
 | --- | --- | --- |
-| 架构合同 | 已完成 | Market Pack、Data Source、Capability、Observation Window、Data Lineage、Agent Template/Config、Pipeline Graph 及验证结果均已有 Zod 合同 |
-| Pipeline Graph Validator | 已完成 | 覆盖节点/边、Schema、市场、数据源、窗口能力、聚合方向、必需输入、悬空节点、循环、权限边界和 Required/Optional/Fallback |
-| Data Source Capability | 已完成 | Binance Futures Public 与 CSV Historical Source 可声明真实能力 |
-| 当前 Crypto Graph Manifest | 已完成 | 已描述 Selector、DataSync、DataQuality、Analysis、Bull/Bear、Decision、Portfolio、Risk、Execution、Position Monitor、Reflection |
-| Graph Registry 与 Compiler | 已完成 | 后端注册、版本化 Draft、校验、编译和受控 promotion gate 已具备 |
-| Draft 持久化与 HTTP | 已完成 | SQLite Draft、严格请求校验、Bearer Auth 和服务端身份派生已具备 |
-| 固定路径历史证据 | 已完成 | CSV Backtest、Walk-Forward、Evidence Job 和 Artifact Ledger 已具备 |
-| Paper Plan 与 Runtime Safety | 已完成 | 审批、激活、preflight、lease、heartbeat、fencing、stop/drain、incident/orphan clearance 已具备 |
-| 运维事件交付 | 已完成 | SQLite Outbox、注册 Dispatcher、重试、Dead Letter、JSONL Audit Sink、定时 Worker 已具备 |
-| 审计保留 | 已完成 | Retention Preview、Immutable Export Manifest、受控清理和 Tombstone 已具备 |
-
-### 3.2 部分完成的产品能力
-
-| 能力 | 状态 | 缺口 |
-| --- | --- | --- |
-| 多市场配置 | 部分完成 | 合同和 Market Pack 抽象已存在，真实可运行市场仍主要是 Crypto；尚无完整的市场创建、验证、证据和启用闭环 |
-| 按市场编排 Agent | 部分完成 | Template、Config、Graph、Validator、Registry、Compiler 已存在；任意编译 Graph 尚不能执行 |
-| 旧 LM Preset 迁移 | 部分完成 | 当前固定 Crypto Pipeline 已有等价 Graph 外形；语义 Artifact、Prompt/策略映射和行为一致性测试尚未完成 |
-| 完整回测 | 部分完成 | 固定 Pipeline 的 CSV 回测与 Walk-Forward 可运行；任意 Graph Backtest 尚未实现 |
-| Reflection | 部分完成 | 当前固定链路可生成反思报告；通用 Lesson Candidate、审批和 Decision Context 注入尚未形成合同闭环 |
-| Web 系统编排 | 部分完成 | 已能展示当前 Graph、Capability、门禁和运维状态；市场/Agent 编辑、语义 Artifact 检视和真实 Copilot 工具闭环尚未完成 |
-| Agent 策略修改 | 部分完成 | Draft 和模板基础已存在；Prompt/Policy 合同、差异审阅、证据绑定与审批工具尚未完成 |
-
-### 3.3 尚未形成闭环的核心能力
-
-| 能力 | 状态 | 说明 |
-| --- | --- | --- |
-| 通用语义 Artifact 合同 | 计划中 | 尚无统一的 Market Observation、Agent Semantic Assessment、Decision Semantic Context 和 Semantic Decision Artifact |
-| 通用 Graph Executor | 计划中 | Compiler 输出尚不能由受控 Executor 按 DAG 和 typed artifact 执行 |
-| 任意 Graph Backtest | 计划中 | 尚不能把版本化 Graph 作为回测和 Walk-Forward 的统一执行对象 |
-| 对话式策略工具 | 计划中 | Copilot 尚不能通过注册工具创建 Draft、校验、回测、提交审批 |
-| 多市场真实 Adapter | 计划中 | A 股、港股、美股等仍只有架构方向，没有真实 Market Pack、Connector 和数据证据 |
-| 通用 Graph Paper Runtime | 计划中 | 当前 Paper Runtime 仍绑定固定 Crypto DecisionPipeline，不应在历史执行与证据链成熟前泛化 |
-
-## 4. 当前优先级纠偏
-
-Runtime Safety、Outbox、Dispatcher、Worker、Audit Export 和 Retention 已经提供了足够的受控运行基础。除非发现阻断主线的安全缺陷，近期不再继续扩展通知渠道、运维控制台或额外保留策略。
-
-接下来必须优先完成以下产品主链：
-
-`语义 Artifact → 旧 LM Preset 行为迁移 → Historical Graph Executor → 任意 Graph Backtest/Walk-Forward → Market/Agent Draft API → Copilot Tool Loop → Web 完整编排体验`
-
-依赖关系如下：
-
-| 前置能力 | 解锁能力 |
-| --- | --- |
-| 语义 Artifact | 可审计的 Agent 交接、Reflection Lesson、Decision 汇总 |
-| Preset 行为迁移 | 当前固定系统与新 Graph 模型之间的兼容基准 |
-| Historical Graph Executor | 任意 Graph 单次历史决策运行和 NodeRun 证据 |
-| Graph Backtest | 策略修改的统一证据门禁 |
-| Draft API | Copilot 和 Web 的安全编辑入口 |
-| Copilot Tool Loop | 对话式配置、修改、校验和回测 |
-| 完整证据链 | 通用 Graph Paper Runtime 的安全启用 |
-
-## 5. 目标架构分层
-
-### 5.1 Market 层
-
-- `MarketPackDefinition`：市场规则、交易日历、时区、标的约束和兼容 Schema。
-- `DataSourceDefinition`：数据提供者身份和生命周期。
-- `DataSourceCapability`：真实可用的数据类型、原生窗口和允许聚合能力。
-- `Connector`：负责连接外部或本地数据源，不承担策略处理。
-- `Processing Agent`：负责清洗、校验、聚合、特征和 lineage，不伪造源数据能力。
-
-### 5.2 Agent 与 Artifact 层
-
-建议新增以下核心合同：
-
-| 合同 | 责任 |
-| --- | --- |
-| `MarketObservationArtifact` | 保存完整结构化 OHLCV、事件批次或报告期数据，以及 asOf、日历、时区和 lineage |
-| `SemanticEvidenceReference` | 引用输入 Artifact、指标、时间区间、事件或其他可验证证据 |
-| `AgentSemanticAssessment` | 保存 Agent 的语义判断、方向、信心、regime、证据、失效条件和风险标记 |
-| `ReflectionLessonCandidate` | 保存 Reflection 产生但尚未批准的经验 |
-| `ApprovedReflectionLesson` | 保存经人工批准、允许进入 Decision 的版本化经验 |
-| `DecisionSemanticContext` | 汇总多个窗口判断、研究判断、Approved Lessons、持仓、Portfolio、Risk、Data Quality 和 lineage |
-| `SemanticDecisionArtifact` | 保存 Decision 的语义结论、行动意图、信心、证据和约束，不直接等同于订单 |
-| `GraphExecutionRun` | 保存一次编译 Graph 的执行身份、输入、计划版本、状态和结果 |
-| `GraphNodeRun` | 保存节点输入输出 Schema、Artifact fingerprint、lineage、状态和稳定错误码 |
-
-`AgentSemanticAssessment` 至少应包含：
-
-- `agentConfigId`
-- `observationWindowId`
-- `direction`
-- `confidence`
-- `regime`
-- `semanticThesis`
-- `supportingEvidence`
-- `invalidationConditions`
-- `riskFlags`
-- `sourceArtifactRefs`
-- `lineageFingerprint`
-- `schemaVersion`
-- 稳定 ID、版本、生命周期和创建时间
-
-### 5.3 Graph 执行层
-
-Graph Executor 只能执行 Compiler 产出的、引用已注册实现的 execution plan。
-
-Executor 必须：
+| DecisionPipeline 与交易安全链 | `REAL` | Selector `topN=1`；当前持仓进入 Position Monitor；唯一动作链为 Decision → Portfolio → Risk → Execution |
+| Crypto Paper Runtime | `REAL` | 服务端注册 Binding、Preflight、Lease、Heartbeat、Fencing、Close-only、Drain、Safe Stop 和持久化运行记录 |
+| Exchange 写入 | `UNAVAILABLE` | Paper Only，`exchangeWriteAllowed=false`，没有 Binance 或其他交易所写接口 |
+| Market/Data/Agent Registry | `REAL` | Market Pack、Data Source Capability、Agent Template、Preset 均由服务端注册；客户端不能上传实现 |
+| Pipeline Graph 与 Validator | `REAL` | 检查 Schema、Observation Window、Lineage、权限链、Release Gate 和注册实现 |
+| Historical Graph Execution | `REAL` | 只执行后端注册 Plan/Runner；支持 Backtest 与 Walk-Forward Artifact |
+| Configuration Draft | `REAL` | SQLite 不可变版本、parent fingerprint、字段级 Diff、validation 和 Evidence stale |
+| Strategy Evidence / Approval | `REAL` | Backtest、Walk-Forward、Human Approval 和 Approved Paper Plan 使用现有单一门禁链 |
+| Conversation-first Copilot | `REAL` | 自然语言编译为注册工具调用；创建/修改 Draft；展示 Capability、Validation、Diff 和 Gate |
+| Copilot Runtime Apply / 下单 | `UNAVAILABLE` | Copilot 没有 Start、Pause、Safe Stop、Apply 或交易工具 |
+| Runtime Evidence / Causal Review | `REAL` | 读取 Run、Cycle、Trace、Artifact、Trade 和 Reflection；缺失 lineage 不推断因果 |
+| Explicit Trade Lineage | `REAL` | 新 Paper 交易记录稳定 Trade/Position/Order/Fill/Artifact 引用；旧数据保持 partial evidence |
+| Comparative Trade Evidence | `REAL` | 服务端选择同 Graph/Market/Symbol 最近历史基线；只做描述性比较，不声称因果 |
+| Lesson Candidate Human Review | `REAL` | Accept-for-validation / Reject、Bearer Actor、幂等不可变 SQLite 历史和有界分页 |
+| Accepted Candidate Draft Binding / Validation | `REAL` | 服务端唯一解析 Strategy Draft 和 Pipeline Draft；SQLite append-only binding；真实 Configuration/Graph Validation；漂移 stale |
+| Lesson Evidence Gate Projection | `REAL` | validation-passed binding 服务端关联现有 Strategy Evidence Binding；复用真实 Backtest/Walk-Forward Job；双通过后仅返回 approval required |
+| Lesson Human Approval | `REAL` | 独立于 Strategy Approval 的 Bearer Human Approval；SQLite append-only；Approve 创建 NOT_APPLIED Approved Lesson Artifact，Reject 关闭审批 |
+| Approved Lesson Semantic Materialization | `PARTIAL` | 服务复用现有 ApprovedReflectionLesson/DecisionSemanticContext 合同并严格检查 scope；生产 Reflection Report 缺完整语义 Candidate，当前返回 unavailable |
+| Approved Lesson 生产闭环 | `UNAVAILABLE` | 不会从 Review 自动创建 Approved Lesson，也不会自动进入 Decision Context |
+| 通用 Graph Paper Runtime | `UNAVAILABLE` | 当前仍复用稳定的 Current Crypto `DecisionPipeline`，不由 Draft 热替换 |
+| 通用配置语义管线预览 | `REAL` | 从现有 Strategy/Agent Configuration Draft 与服务端 Registry 解析 Data Source Capability、Observation Window 和多 Agent 拓扑；Bearer API 严格拒绝客户端实现与 Runtime 参数 |
+| 注册语义输入执行 | `REAL` | 服务端注册的有界事实源和 Agent Adapter 产生现有 Observation/Assessment 合同，SQLite append-only 持久化并提供 Bearer execute API |
+| 通用 Decision Context 组装 | `PARTIAL` | 完整服务端 Portfolio/Risk/Data Quality 快照可组装现有 DecisionSemanticContext；当前本地生产组合缺该快照时明确 unavailable |
+| 通用历史语义评估桥 | `REAL` | Semantic Execution 经 Source/Capability/Lineage/Adapter 校验后复用现有 Strategy Evidence Binding、Graph Job、Backtest、Walk-Forward 和 Human Approval |
+| 外部通知 | `UNAVAILABLE` | Operational Outbox 不等于 Slack、Email 或 Webhook 已发送 |
 
-- 按 DAG 拓扑执行节点。
-- 按合同传递 typed artifacts。
-- 实现 Required、Optional、Fallback 语义。
-- 为每个 NodeRun 记录输入、输出、fingerprint、lineage 和稳定错误码。
-- 对 Schema、lineage、窗口、市场或实现不匹配执行 fail closed。
-- 拒绝客户端提交模块、代码、Provider、URL、SQL、文件路径或未注册 Prompt 执行器。
-- 保持 Decision → Portfolio → Risk → Execution 唯一动作链路。
-- 保持当前 Position Monitor 对现有持仓的处理。
+## 3. 已完成阶段
 
-### 5.4 Evidence 与 Promotion 层
+### M0-M2：交易 Runtime 基础
 
-所有可运行策略版本继续遵守：
+- Multi-Agent DecisionPipeline、Selector、Data Quality、Portfolio、Risk、Execution、Position Monitor。
+- Paper Account、Trace、Artifact Ledger、Reflection、Backtest、Walk-Forward。
+- Runtime Safety、Preflight、Lease、Heartbeat、Fencing、Close-only、Drain 和操作审计。
 
-`Draft → Contract Validation → Backtest → Walk-Forward → Human Approval → Paper Running`
+### M3-M5：可编排研究与发布链
 
-每一步必须引用同一个 Graph Version fingerprint，或保存可审计的父子版本关系。任何 Graph、AgentConfig、Prompt、风险参数或 Market Pack 的实质变化都必须使旧证据失效。
+- 版本化 Market/Data/Agent/Pipeline 合同与 Registry。
+- Observation Window Capability、合法聚合和 lineage。
+- Pipeline Graph Validator、Historical Graph Executor、Configuration Draft。
+- Graph Backtest / Walk-Forward Evidence、Human Approval、Approved Paper Plan。
 
-### 5.5 Copilot 层
+### M6-M8：受控产品工作区
 
-Copilot 只调用后端注册工具，不拥有运行时代码执行权。
+- Strategy Workspace、Runtime Controls、Runtime Evidence。
+- Conversation-first Copilot Registry 和 Orchestration API。
+- Draft Proposal、字段级 Diff、Validation Issue、Evidence Gate 和 Runtime 隔离展示。
 
-第一组工具建议为：
+### M9-M11：Causal Trade Review 与 Human Lesson Review
 
-| 工具 | 作用 |
-| --- | --- |
-| `list_market_packs` | 获取已注册市场能力 |
-| `list_data_sources` | 获取真实数据能力和窗口 |
-| `list_agent_templates` | 获取可用 Agent 模板及输入输出 Schema |
-| `create_pipeline_draft` | 创建结构化 Graph Draft |
-| `update_agent_config_draft` | 修改允许编辑的 Prompt/Policy/参数 |
-| `validate_pipeline_draft` | 运行合同和 Graph Validator |
-| `start_graph_backtest` | 针对确定 Graph Version 发起历史证据任务 |
-| `start_walk_forward` | 发起 Walk-Forward 任务 |
-| `summarize_evidence` | 获取结构化证据摘要，不重写证据 |
-| `submit_for_approval` | 提交人工审批，不自动批准 |
+- Run/Cycle/Trade 只读 Causal Review。
+- 新 Paper 交易显式 lineage 和 Single-Trade Review。
+- Comparative Evidence、Reflection Candidate Inspect、人工接受/拒绝和持久化 Review History。
+- Accepted Candidate 的只读 Contract Validation Handoff；stale 指纹 fail closed。
+- Accepted Review 到 Configuration Draft / Pipeline Graph 的服务端不可变 binding，以及真实双层 Contract Validation。
 
-## 6. 后续里程碑
+## 4. 当前关键缺口
 
-### M1：语义 Artifact 与 Preset 行为基线
+### 已完成：Accepted Review 到现有 Draft 的服务端绑定
 
-状态：下一阶段，最高优先级。
+当前服务端可以从 Trade Graph ref 推导 Pipeline Draft，并反查唯一最新 Strategy Configuration Draft。创建结果持久化为不可变版本：
 
-交付内容：
+```text
+accepted_for_validation
+-> server-owned Draft / Graph resolution
+-> Configuration Validation
+-> Pipeline Graph Validation
+-> validation_failed | validation_passed
+-> runtimeApplied=false
+```
 
-- 新增 Market Observation、Semantic Assessment、Decision Context、Decision Artifact、Lesson Candidate 和 Approved Lesson 的严格 Zod 合同。
-- 提供当前固定数据结构到新 Artifact 的兼容映射，不破坏 `MultiTimeframeSnapshot` 和现有 Adapter。
-- 将当前 Crypto Multi-Agent 系统注册为正式 Preset，明确其默认 5m、15m、1h 只是当前数据能力，不是框架约束。
-- 增加至少一个 daily 单周期 Preset 和一个 event-only research Preset，用于证明合同没有写死 K 线或固定周期。
-- 明确 Selector、Position Monitor、Reflection 和 Decision 的语义输入输出。
-- Reflection 只产生 Lesson Candidate；测试证明未批准 Candidate 不进入 Decision，Approved Lesson 可以进入。
+客户端只提交 `selectedTradeId` 与幂等键，不能提交 Draft、Graph 或 fingerprint。无匹配或多匹配都会 fail closed；任一最新 fingerprint 漂移都会 stale。
 
-验收标准：
-
-- 多个 Observation Window 的完整结构化数据能映射为独立 Agent 输入。
-- 每个 Agent 输出可读语义判断和结构化证据字段。
-- Decision Context 能汇总多窗口语义、Bull/Bear、Approved Lessons 和 Portfolio/Risk 状态。
-- 所有 Artifact 均有稳定 ID、Schema、fingerprint、版本、状态、时间和 lineage。
-- 当前固定 DecisionPipeline 行为不变。
-
-明确不做：
-
-- 不在本阶段替换当前 Paper Runtime。
-- 不允许任意 Prompt 或代码注入。
-- 不宣称 A 股、港股、美股已经可运行。
-
-### M2：Historical Graph Executor
-
-状态：依赖 M1。
-
-交付内容：
-
-- 实现受控、可重放的 Historical Graph Executor。
-- 仅执行已注册 Node Executor 和 Compiler 产出的 plan。
-- 实现 DAG、typed artifacts、Required/Optional/Fallback 和稳定错误码。
-- 将当前固定 rule-based 或受限 LLM Agent 绑定为注册 executor。
-- 支持对一个 historical `asOf` 执行完整 Graph decision cycle。
-- 复用当前 Portfolio、Risk 和 Simulated Execution，不复制另一套风险规则。
-- 保存 GraphExecutionRun、GraphNodeRun 和 Artifact lineage。
-
-验收标准：
-
-- 当前 Crypto Preset 可对 CSV 历史数据完成一次完整 decision cycle。
-- daily 单周期 Preset 可运行。
-- event-only research Preset 可运行到研究输出；若无 Decision/Execution 权限则不得产生动作。
-- 未注册 executor、Schema 不匹配、lineage 不完整和未来数据全部 fail closed。
-- Required 失败会阻断，Optional 失败可记录后继续，Fallback 只能使用合同声明的后备节点。
-- 决策动作必须经过 Portfolio 和 Risk。
-
-### M3：任意 Graph Backtest 与 Walk-Forward
-
-状态：依赖 M2。
-
-交付内容：
-
-- 以版本化 Graph 为回测对象，为每个 historical `asOf` 调用同一个 Graph Executor。
-- 复用 CSV Historical Source 和现有数据闭合逻辑。
-- 将 NodeRun、Decision、Risk、Fill、Portfolio 和 Reflection Artifact 写入证据账本。
-- 支持 Walk-Forward split、训练窗口、验证窗口和样本外证据。
-- Graph、AgentConfig、Prompt、Market Pack、Data Source Capability 变更触发证据失效。
-- 提供受控 HTTP Job API 和幂等键。
-
-验收标准：
-
-- 当前 Crypto Preset Graph Backtest 与现有固定回测在明确容差内一致。
-- 单周期 daily、多周期和 event-only Graph 均有对应测试。
-- 防未来数据测试覆盖 Observation、Agent Artifact、Reflection Lesson 和 Portfolio 状态。
-- Backtest 和 Walk-Forward 结果可以直接用于 Promotion Gate。
-- 客户端不能提交执行模块、任意路径、URL、代码或 actor 身份。
-
-### M4：Market、Agent 与 Strategy Draft API
-
-状态：依赖 M1，可与 M3 后半段有限并行。
-
-交付内容：
-
-- Market Pack Catalog、Data Source Catalog、Agent Template Catalog 和 Preset Catalog。
-- Market Configuration Draft、AgentConfig Draft、Prompt/Policy Draft 和 Pipeline Draft。
-- 版本差异、fingerprint、合同验证、证据失效提示和审批状态。
-- 新市场接入清单，明确 Market Pack、Connector、Capability、Calendar、Schema、Risk Profile 和测试要求。
-
-验收标准：
-
-- 用户可使用后端注册项组装不同市场草案。
-- 用户可修改允许编辑的 Agent Prompt、Policy 和参数。
-- Draft 不会修改运行中的 Graph。
-- 所有变更均产生版本、审计和稳定验证错误。
-
-### M5：Copilot Tool Loop
-
-状态：依赖 M3 和 M4。
-
-交付内容：
-
-- 将 Catalog、Draft、Validation、Backtest、Walk-Forward 和 Approval 暴露为注册工具。
-- 对话能够把自然语言意图转换为结构化 Draft patch。
-- Copilot 展示影响范围、验证错误、证据缺口和下一门禁。
-- 高影响动作要求明确的人类确认。
-
-验收标准：
-
-- “把日线 Agent 的趋势判断改为更保守”只生成可审阅 Draft。
-- “接入某市场”只生成缺失能力清单或使用已注册 Market Pack，不伪造 Adapter 已存在。
-- “增加新闻 Agent”只能选择已注册模板和兼容 Data Source。
-- Copilot 不能直接批准、激活、下单、改 Risk 或修改运行中 Pipeline。
-
-### M6：Web 系统编排工作区完善
-
-状态：依赖 M4；M5 完成后接入真实 Copilot。
-
-交付内容：
-
-- 左侧 Catalog：Market、Data Source、Agent Template 和 Preset。
-- 中间稀疏 Canvas：Graph、分支、Observation Window、Draft 和门禁。
-- 右侧 Inspector：节点配置、语义合同、差异、验证错误和 Copilot Draft。
-- 单独的 Evidence 视图：Backtest、Walk-Forward、NodeRun lineage 和 Artifact。
-- 单独的 Lesson Review：Candidate 审阅、批准、拒绝和适用范围。
-
-验收标准：
-
-- 中英文模式内容完整且语义一致。
-- Draft、Validated、Backtested、Approved、Paper Running 状态不会混淆。
-- 原生与派生窗口、Data Lineage、Schema 错误和权限边界可被理解。
-- 桌面和较窄笔记本无明显溢出、遮挡、密集小字或不可读内容。
-- 无 Runtime API 的部分必须明确标记 Mock。
-
-### M7：第二个真实市场垂直切片
-
-状态：依赖 M3 和 M4。
-
-选择原则：
-
-- 优先选择有合法、稳定、可测试历史数据源的市场。
-- 必须先实现 Market Pack、Calendar、Capability、Connector、Schema、Risk Profile 和历史证据。
-- 不从日线伪造分钟数据。
-- 不接入交易所写接口。
-
-验收标准：
-
-- 第二市场能使用同一个 Graph Executor、Backtest、Walk-Forward、Draft 和 Approval 流程。
-- 市场特有规则位于 Market Pack，不散落进通用 Agent 或 Web。
-- 通过跨市场兼容性和隔离测试。
-
-### M8：通用 Graph Paper Runtime
-
-状态：后置阶段。
-
-只有当 M1 至 M7 的合同、历史执行、证据、Draft 和审批闭环稳定后，才将 Paper Runtime 从固定 Crypto DecisionPipeline 泛化为受控 Graph Runtime。
-
-验收标准：
-
-- 只运行已批准 Graph Version 和完全匹配的证据 fingerprint。
-- 保持 lease、heartbeat、fencing、stop/drain、incident、outbox、audit 和 retention 行为。
-- 保持“暂停新开仓 / 仅允许平仓”为唯一立即生效的人工风险控制。
-- 任何配置变更都创建新版本，不热改运行实例。
-
-## 7. 近期三个开发 Loop
-
-### Loop A：Semantic Contracts + Presets
-
-目标：先把旧 LM Multi-Agent 的语义交接变成系统一等合同，并建立行为迁移基线。
-
-主要测试：
-
-- 多窗口完整结构化输入。
-- 多 Agent 语义输出。
-- Bull/Bear 汇总。
-- Approved Lesson 注入。
-- 未批准 Candidate 拒绝。
-- daily 单周期。
-- event-only。
-- Schema 和 lineage mismatch fail closed。
-- 当前 Crypto Preset 合同通过。
-
-### Loop B：Historical Graph Executor
-
-目标：让 Compiler 产出的注册 Graph 完成一次可审计历史决策运行。
-
-主要测试：
-
-- DAG 顺序。
-- Required/Optional/Fallback。
-- 未注册 executor 拒绝。
-- 稳定 NodeRun 错误。
-- CSV 防未来数据。
-- Decision → Portfolio → Risk → Simulated Execution。
-- Position Monitor 继续接收当前持仓。
-- Reflection 只输出 Candidate。
-
-### Loop C：Graph Backtest + Walk-Forward
-
-目标：把任意已验证 Graph 变成可重复回测、可做样本外验证、可进入 Promotion Gate 的版本化策略。
-
-主要测试：
-
-- 当前 Crypto Preset 回测。
-- daily 单周期回测。
-- 多周期回测。
-- event-only research 回测。
-- fingerprint 变更导致证据失效。
-- 防未来数据。
-- 幂等 Job。
-- HTTP 注入拒绝。
-
-## 8. Web 信息架构
-
-Web 不应把所有配置同时铺满屏幕。推荐保持三栏核心结构并使用渐进展开：
-
-| 区域 | 默认展示 | 深入操作 |
-| --- | --- | --- |
-| 左侧 Catalog | 当前市场、Preset、Data Source、Agent Template | 搜索、筛选、Capability 和兼容性 |
-| 中间 Canvas | 稀疏 Graph、主执行链、研究分支、后处理分支 | Window、Schema、lineage 和门禁覆盖层 |
-| 右侧 Inspector | 当前节点摘要和关键配置 | Prompt/Policy Draft、验证、证据、版本差异和 Copilot |
-
-必须明确展示：
-
-- 当前固定 Crypto Preset。
-- 单周期、多周期和 event-only Preset。
-- Data Source 原生窗口和允许派生窗口。
-- Agent Semantic Assessment 与 Decision Context。
-- Lesson Candidate 是否批准。
-- Draft 与 Runtime 的隔离。
-- Backtest、Walk-Forward 和 Approval 门禁。
-- Schema、周期、市场和权限不兼容错误。
-
-## 9. 安全与治理不变量
-
-以下约束不是路线图待办，而是所有阶段必须持续满足的不变量：
-
-1. Pipeline 默认支持 Multi-Agent，但拓扑和窗口不得写死。
-2. Data Source 决定粒度，日线不能反向生成 5m。
-3. 细粒度到粗粒度聚合必须记录 lineage、转换版本、时区和交易日历。
-4. Data Provider、Connector 和 Processing Agent 分层。
-5. 市场规则通过 Market Pack 隔离。
-6. Agent 和执行器只能由后端预注册。
-7. Copilot 只创建结构化 Draft。
-8. Decision、Portfolio、Risk、Execution 是唯一动作链路。
-9. LLM 不直接下单、不绕过 Risk、不修改运行中 Pipeline。
-10. 所有策略变化必须经过验证、回测、Walk-Forward、人工审批和 Paper Running。
-11. Reflection 只能创建 Lesson Candidate。
-12. 唯一立即生效的人工风险控制是暂停新开仓或仅允许平仓。
-13. 不接入 Binance 或其他交易所写接口。
-14. Selector `topN=1` 行为保持不变，`--symbols` 仍只表示候选池。
-15. 当前持仓继续进入 Position Monitor。
-
-## 10. 质量门禁
-
-每个实现 Loop 完成后必须运行：
-
-- `npm run check`
-- `npm run test:ts`
-- `npm run build:web`
-- `git diff --check`
-
-如果修改 Web 且环境具备可控浏览器，还必须检查：
-
-- 宽桌面。
-- 较窄笔记本。
-- 中文。
-- 英文。
-- 无明显溢出、遮挡、过密文字和不可读小字。
-
-如果浏览器不可用，必须在交接中明确记录未完成视觉验证，不能声称已验证。
-
-## 11. 最近验证基线
-
-最近一个已完成实现 Loop 的验证结果：
-
-| 命令 | 结果 |
-| --- | --- |
-| `npm run check` | 通过 |
-| `npm run test:ts` | 通过，130/130 |
-| `npm run build:web` | 通过 |
-| `git diff --check` | 通过 |
-| 浏览器视觉检查 | 未执行，当前没有可控的 in-app Browser 实例 |
-
-该基线只代表最近已完成代码状态。后续任何代码变更都必须重新运行完整门禁。
-
-## 12. 当前明确不是“已完成”的能力
-
-为避免产品展示超前于 Runtime，以下表述目前不得使用：
-
-- “TradeBot 已支持自由接入任意市场”。
-- “任意 Pipeline Graph 已可运行或回测”。
-- “Copilot 已能修改和部署策略”。
-- “旧 LM Multi-Agent 系统已完整迁移”。
-- “Reflection 会自动优化运行策略”。
-- “A 股、港股、美股已经可用”。
-- “Web Canvas 的配置已经修改 Runtime”。
-
-当前准确表述应是：TradeBot 已完成架构合同、Graph 校验/注册/编译、固定 Crypto 历史证据与受控 Paper Runtime 的坚实基础；下一步正在把语义 Multi-Agent 行为、任意 Graph 历史执行和统一回测提升为产品核心能力。
-
-## 13. 下一阶段完成定义
-
-M1 至 M3 完成后，TradeBot 应达到第一个真正面向用户核心需求的闭环：
-
-1. 用户选择一个后端注册 Preset 或版本化 Graph。
-2. Data Source Capability 决定可用 Observation Window。
-3. 完整结构化数据按窗口进入不同 Agent。
-4. Agent 通过受控语义 Artifact 交接判断与证据。
-5. Decision 汇总多 Agent、Approved Lessons、Portfolio 和 Risk Context。
-6. 动作经过 Portfolio、Risk 和 Simulated Execution。
-7. 同一个 Graph 可以完成历史单次执行、Backtest 和 Walk-Forward。
-8. 所有 NodeRun、Artifact、lineage、Decision、Risk 和结果都可审计。
-9. 当前固定 Crypto Pipeline 和 Paper Runtime 行为保持不变。
-
-达到该闭环后，再扩大 Web 编辑、Copilot 和第二真实市场，能够避免界面和对话能力建立在不可执行的 Graph 之上。
-
-## 14. M1 实施记录（2026-07-26）
-
-M1 的合同与 Preset 行为基线已进入代码：
-
-- 新增 Market Observation、Semantic Evidence、Agent Semantic Assessment、Reflection Lesson Candidate、Approved Lesson、Decision Semantic Context 和 Semantic Decision Artifact。
-- 新增旧固定多周期 OHLCV Snapshot 到逐窗口 Observation Artifact 的兼容映射。
-- 新增后端只读 Preset Catalog，包含当前 Crypto Multi-Agent、daily 单周期能力模板和 event-only research 能力模板。
-- 当前 Crypto Preset 保留 Position Monitor、Decision → Portfolio → Risk → Execution 权限链和交易后 Reflection。
-- daily 与 event-only 明确标记 `capability_required`，不宣称当前 Adapter 已支持。
-- 本阶段没有替换现有 DecisionPipeline、Paper Runtime 或 Web 行为。
-
-M1 完成后，下一主线是 M2 Historical Graph Executor。最终状态以本轮质量门禁结果和 `docs/project-status-and-handoff.md` 最新记录为准。
+### 已完成：Lesson Evidence Gate Projection
+
+客户端只提交 Trade、幂等键和受限动作。服务端从当前 validation-passed binding 解析唯一注册 Evidence Scope，复用现有 Strategy Evidence Binding、Backtest、Walk-Forward Job 与 Artifact 验证；任一 scope 漂移均返回 stale。双 Evidence 通过后仅返回 `approval_required`。
+
+### 已完成：Lesson Human Approval
+
+只有 Evidence Gate 为 `approval_required` 且现有 Backtest/Walk-Forward Artifact 重新验证通过时才允许批准。Approved Lesson 包含 Candidate、Review、Validation、Evidence、Market、Graph、Configuration、历史范围、有效期和 revocation 状态，但保持 `decisionContextApplied=false`。
+
+### 已完成：Approved Lesson Semantic Materialization 边界
+
+服务端只从完整 `ReflectionLessonCandidateSchema` 物化现有 `ApprovedReflectionLessonSchema`，并可验证 Shadow `DecisionSemanticContextSchema`。当前生产 Reflection Report 没有 semanticLesson、failurePattern、confidence 和 supportingEvidence，因此 fail closed 为 unavailable，不伪造事实。
+
+### P0：Production Semantic Candidate Persistence
+
+在真实 Contract Validation、Backtest、Walk-Forward 和 Human Approval 全部完成前，不得创建 Approved Lesson。后续需要明确：
+
+- Lesson 的适用 Market、Graph、Regime、样本和有效期；
+- Evidence 与 Candidate fingerprint 连续性；
+- Approved Lesson 如何以只读、可撤销、可审计引用进入 Decision Context；
+- Strategy mutation 与 Lesson approval 是否分离。
+
+### P2：Review UI 操作验证
+
+- 完成 1440×900、820×760 的中英文真实浏览器检查。
+- 覆盖 accepted、rejected、stale、validation unavailable/failed/passed。
+- 确认无横向溢出、不可读小字和 Console error/warning。
+
+### P3：通用输入与 Agent 执行
+
+只有完成 Lesson 闭环后再评估：
+
+- 通用 Graph Paper Runtime；
+- 服务端注册 Semantic Input Executor 和 Agent Adapter；
+- 用现有语义 Artifact 组装只读 Decision Context；
+- 外部通知适配器。
+
+这些工作不能削弱当前 Crypto Runtime 安全边界。
+
+## 5. 接下来三个 Loop
+
+1. **Registered Semantic Input Execution and Decision Context Assembly Loop**：从服务端注册数据源和 Agent Adapter 产生现有语义 Artifact，并只读组装 Decision Context。
+2. **Generic Historical Semantic Evaluation Loop**：让同一配置与 Artifact 链进入现有 Historical Graph Executor、Backtest 和 Walk-Forward。
+3. **Generic Paper Runtime Migration Plan Loop**：只有前两步通过后，再设计不重写现有 DecisionPipeline 的可回退迁移方案。
+
+当前应执行的完整任务见 [`next-loop-prompt.md`](next-loop-prompt.md)。
+
+## 7. 2026-07-31：Generic Configurable Input and Multi-Agent Semantic Pipeline
+
+- 状态：`REAL`（配置与拓扑投影）。Bearer API 从现有不可变 Strategy/Agent Draft 和服务端 Registry 解析 Market Pack、Data Source Capability、Observation Window 与多个 Agent Template。
+- 产品校正：具体市场不再作为一级功能列表；相同管线可承载任意服务端注册的结构化输入。
+- 当前边界：尚未执行生产数据加载或 Agent 推理，下一门禁为 `registered_semantic_input_execution`；`decisionContextCreated=false`、`runtimeApplied=false`、`exchangeWriteAllowed=false`。
+- 验证：`check` PASS；TypeScript tests 307/307 PASS；Web build PASS（31 modules，70ms）；diff-check PASS。
+
+## 8. 2026-07-31：Registered Semantic Input Execution and Decision Context Assembly
+
+- 状态：`REAL`（语义执行）/ `PARTIAL`（Decision Context）。服务端注册 source/adapter 生成现有严格 Observation 与 Assessment Artifact，并 append-only 持久化完整执行 Record。
+- `POST /api/orchestration/configuration/semantic-pipeline/execute` 只接受 Configuration Version、Preview fingerprint 和幂等键；事实、Agent 实现、Actor、Runner、URL、SQL、路径、账户和 Runtime 参数均不可由客户端控制。
+- Preview fingerprint 漂移返回 stale；Portfolio/Risk/Data Quality 快照缺失返回稳定 unavailable code，不补造 Decision Context。
+- 所有结果保持 `decisionContextApplied=false`、`runtimeApplied=false`、`exchangeWriteAllowed=false`，现有交易行为不变。
+- 验证：`check` PASS；TypeScript tests 313/313 PASS；Web build PASS（31 modules，69ms）；diff-check PASS。
+
+## 9. 2026-07-31：Generic Historical Semantic Evaluation
+
+- 新桥接层不保存 Evidence Artifact，只调用现有 Strategy Evidence Binding、Graph Evidence Job、Backtest、Walk-Forward 和 Human Approval。
+- 客户端只提交 Execution ID、受控动作和幂等键；Dataset、Data Source、Profile、Candidate Set、Plan、历史范围、Runner、Evidence 和 Actor 均由服务端解析。
+- bar/event 输入均进入同一门禁投影；未来事实、Capability scope、lineage 和 Agent Adapter 漂移在 Evidence 前 fail closed。
+- Approval 仍要求 Backtest 与 Walk-Forward 双通过及 Approver 角色；结果为 `APPROVED_NOT_APPLIED`，不自动启动 Paper Runtime。
+- 验证：`check` PASS；TypeScript tests 319/319 PASS；Web build PASS（31 modules，70ms）；diff-check PASS。
+
+## 6. 持续不变量
+
+1. Selector `topN=1`，symbols 只是候选池。
+2. 当前持仓继续进入 Position Monitor。
+3. 唯一动作链是 Decision → Portfolio → Risk → Execution。
+4. Copilot、LLM、Reflection 和 Lesson 都不能直接下单或绕过 Risk。
+5. Draft、Evidence、Approval 和 Lesson 不热更新运行中的 Pipeline。
+6. 唯一允许立即生效的人工风险控制是暂停新开仓 / 仅允许平仓。
+7. Paper Only，`exchangeWriteAllowed=false`。
+8. 不重写当前稳定 DecisionPipeline，除非后续有独立、完整、可回退的通用 Runtime 迁移计划。
+## 2026-07-31：Production Semantic Candidate Persistence
+
+- 状态：`REAL`。Rule Reflection 已生成并持久化严格 Semantic Candidate，Review 与 Materialization 使用同一 append-only Store。
+- 事实不足：缺失败 Trade、entry trace 或 Decision Artifact 时不生成 Candidate，不从 recommendations 或客户端输入猜测。
+- 安全边界：`decisionContextApplied=false`、`runtimeApplied=false`、`exchangeWriteAllowed=false`；现有交易行为不变。
+- 验证基线：`npm run check` PASS；`npm run test:ts` 293/293 PASS；`npm run build:web` PASS（31 modules，59ms）；`git diff --check` PASS。
+- 当前 P0：Approved Lesson Shadow Decision Context Replay，只读构造并验证历史 `DecisionSemanticContextSchema`。
+## 2026-07-31：Approved Lesson Shadow Decision Context Replay
+
+- 状态：`REAL`（对新记录具备完整历史快照时）。现有 Materialization 已接入 SQLite Artifact Ledger Shadow Base Adapter。
+- 旧记录缺 Portfolio/Runtime control 快照时明确 unavailable，不补造历史事实。
+- Market Pack 或 entry Decision Artifact fingerprint 漂移时 Shadow 状态为 stale。
+- 安全边界：Shadow Context 不进入 DecisionPipeline，所有 Apply/Mutation/Exchange Write 标志保持 false。
+- 验证基线：`npm run check` PASS；`npm run test:ts` 298/298 PASS；`npm run build:web` PASS（31 modules，65ms）；`git diff --check` PASS。
+- 当前 P0：Shadow Replay Durability and Approval Audit。
+## 2026-07-31：Shadow Replay Durability and Approval Audit
+
+- 状态：`REAL`。validated Shadow Materialization 已 append-only 持久化并可分页查询。
+- 审计链显式绑定 Approval、Candidate、Approved Lesson、Decision Context 和历史 lineage。
+- unavailable/stale Shadow 不写入 validated 审计记录；所有记录保持 Runtime Not Applied。
+- 验证基线：check PASS；TypeScript tests 302/302 PASS；Web build PASS（31 modules，62ms）；diff-check PASS。
+- 当前 P0：Lesson Governance Revocation and Supersession。

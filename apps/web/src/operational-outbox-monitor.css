@@ -291,3 +291,18 @@
     max-height: calc(100vh - 100px);
   }
 }
+
+@media (max-width: 900px) {
+  #operational-outbox-monitor {
+    position: relative;
+    right: auto;
+    bottom: auto;
+    z-index: auto;
+    width: auto;
+    margin: 16px;
+  }
+
+  .outbox-body {
+    max-height: none;
+  }
+}

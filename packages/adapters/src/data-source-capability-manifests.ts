@@ -99,3 +99,45 @@ export const CSV_HISTORICAL_CAPABILITY: DataSourceCapability = {
   },
   completeness: 1,
 };
+
+export const DAILY_RESEARCH_DATA_SOURCE: DataSourceDefinition = {
+  schemaVersion: SCHEMA_VERSION,
+  dataSourceId: "data-source:daily-research",
+  name: "Registered Daily Research Source",
+  provider: "TradeBot Research",
+  sourceKind: "historical_file",
+  connectorRef: "connector:daily-research-readonly:v1",
+  humanReadableVersion: "1.0.0",
+  fingerprint: "sha256:daily-research-source-v1",
+  lifecycleStatus: "active",
+  createdAt,
+  marketPackRefs: [cryptoMarketPackRef],
+  marketSchemaRefs: [ohlcvSchemaRef],
+  capabilityRefs: ["capability:daily-research:ohlcv:v1"],
+  readOnly: true,
+};
+
+export const DAILY_RESEARCH_CAPABILITY: DataSourceCapability = {
+  schemaVersion: SCHEMA_VERSION,
+  capabilityId: "capability:daily-research:ohlcv:v1",
+  dataSourceId: DAILY_RESEARCH_DATA_SOURCE.dataSourceId,
+  humanReadableVersion: "1.0.0",
+  fingerprint: "sha256:daily-research-ohlcv-1d-v1",
+  lifecycleStatus: "active",
+  createdAt,
+  markets: ["crypto"],
+  marketPackRefs: [cryptoMarketPackRef],
+  schemaRefs: [ohlcvSchemaRef],
+  dataTypes: ["ohlcv"],
+  nativeObservationWindows: [bar(1, "day")],
+  supportsRealtime: false,
+  timezone: "UTC",
+  timestampSemantics: "close_time",
+  tradingCalendar: "calendar:crypto-24x7:v1",
+  aggregation: {
+    allowed: true,
+    transformerVersion: "ohlcv-closed-bar-aggregator:v1",
+    closedWindowsOnly: true,
+  },
+  completeness: 1,
+};

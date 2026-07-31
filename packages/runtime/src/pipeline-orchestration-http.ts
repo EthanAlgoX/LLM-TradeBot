@@ -13,6 +13,14 @@ import {
   PipelineOrchestrationError,
 } from "../../core/src/pipeline-orchestration.js";
 import {
+  OrchestrationIntentError,
+  type OrchestrationIntentDraftService,
+} from "../../core/src/orchestration-intent-compiler.js";
+import {
+  OrchestrationCopilotError,
+  type OrchestrationCopilotService,
+} from "../../core/src/orchestration-copilot-service.js";
+import {
   ApprovedPaperPlanError,
   type ApprovedPaperPlanService,
 } from "../../core/src/approved-paper-plan-service.js";
@@ -32,20 +40,46 @@ import {
   PipelineAuthenticationError,
   type PipelineOrchestrationAuthenticator,
 } from "./pipeline-orchestration-auth.js";
+import type { ConfigurationDraftHttpHandler } from "./configuration-draft-http.js";
+import type { StrategyEvidenceHttpHandler } from "./strategy-evidence-http.js";
+import type { HistoricalSemanticEvaluationHttpHandler } from "./historical-semantic-evaluation-http.js";
+import {
+  CurrentCryptoPaperLaunchError,
+  type CurrentCryptoPaperLaunchService,
+} from "./current-crypto-paper-launch.js";
+import type {
+  RuntimeEvidenceHttpHandler,
+} from "./runtime-evidence-http.js";
+import type {
+  CausalTradeReviewHttpHandler,
+} from "./causal-trade-review-http.js";
+import type {
+  ComparativeTradeReviewHttpHandler,
+} from "./comparative-trade-review-http.js";
 
 const defaultMaxBodyBytes = 1_048_576;
 
 export interface PipelineOrchestrationHttpDependencies {
   registry: ImmutablePipelineRegistry;
   service: PipelineOrchestrationService;
+  intentDraftService?: OrchestrationIntentDraftService;
+  orchestrationCopilotService?: OrchestrationCopilotService;
   authenticator: PipelineOrchestrationAuthenticator;
   evidenceWorkflow: PipelineEvidenceWorkflow;
   paperPlanService?: ApprovedPaperPlanService;
   paperRuntimeActivationService?: PaperRuntimeActivationService;
+  currentCryptoPaperLaunchService?: CurrentCryptoPaperLaunchService;
+  runtimeEvidenceHttpHandler?: RuntimeEvidenceHttpHandler;
+  causalTradeReviewHttpHandler?: CausalTradeReviewHttpHandler;
+  comparativeTradeReviewHttpHandler?: ComparativeTradeReviewHttpHandler;
   paperRuntimeSupervisorService?: PaperRuntimeSupervisorService;
   operationalOutboxDispatcher?: SqliteOperationalOutboxDispatcher;
   operationalOutboxWorker?: DurableOperationalOutboxWorker;
   operationalRetentionService?: SqliteOperationalRetentionService;
+  configurationDraftHttpHandler?: ConfigurationDraftHttpHandler;
+  strategyEvidenceHttpHandler?: StrategyEvidenceHttpHandler;
+  historicalSemanticEvaluationHttpHandler?: HistoricalSemanticEvaluationHttpHandler;
+  productionWorkspaceCatalog?: object;
   pipelineGraphs?: readonly PipelineGraphVersion[];
   maxBodyBytes?: number;
 }
@@ -128,6 +162,7 @@ class HttpRequestError extends Error {
 function registryCatalog(
   registry: ImmutablePipelineRegistry,
   pipelineGraphs: readonly PipelineGraphVersion[],
+  productionWorkspaceCatalog?: object,
 ): object {
   return {
     marketPacks: [...registry.marketPacks.values()],
@@ -139,8 +174,66 @@ function registryCatalog(
       (agentConfigId) => ({ agentConfigId, registered: true }),
     ),
     pipelineGraphs,
+    ...(productionWorkspaceCatalog
+      ? { productionWorkspace: productionWorkspaceCatalog }
+      : {}),
     runtimeMutationAllowed: false,
   };
+}
+
+async function readRawBody(
+  request: IncomingMessage,
+  maxBodyBytes: number,
+): Promise<string | undefined> {
+  if (request.method === "GET" || request.method === "HEAD") {
+    return undefined;
+  }
+  const chunks: Buffer[] = [];
+  let receivedBytes = 0;
+  for await (const chunk of request) {
+    const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+    receivedBytes += buffer.length;
+    if (receivedBytes > maxBodyBytes) {
+      throw new HttpRequestError(
+        413,
+        "REQUEST_BODY_TOO_LARGE",
+        "Request body exceeds the configured limit.",
+      );
+    }
+    chunks.push(buffer);
+  }
+  return Buffer.concat(chunks).toString("utf8");
+}
+
+async function forwardWebHandler(
+  request: IncomingMessage,
+  response: ServerResponse,
+  handler: { handle(request: Request): Promise<Response> },
+  maxBodyBytes: number,
+): Promise<void> {
+  const headers = new Headers();
+  for (const [name, rawValue] of Object.entries(request.headers)) {
+    if (Array.isArray(rawValue)) {
+      rawValue.forEach((value) => headers.append(name, value));
+    } else if (rawValue !== undefined) {
+      headers.set(name, rawValue);
+    }
+  }
+  const body = await readRawBody(request, maxBodyBytes);
+  const forwarded = new Request(
+    new URL(request.url ?? "/", "http://127.0.0.1"),
+    {
+      method: request.method,
+      headers,
+      ...(body !== undefined ? { body } : {}),
+    },
+  );
+  const handled = await handler.handle(forwarded);
+  handled.headers.forEach((value, name) => response.setHeader(name, value));
+  response.setHeader("cache-control", "no-store");
+  response.setHeader("x-content-type-options", "nosniff");
+  response.statusCode = handled.status;
+  response.end(Buffer.from(await handled.arrayBuffer()));
 }
 
 function loopbackOrigin(origin: string | undefined): string | undefined {
@@ -208,6 +301,88 @@ export function createPipelineOrchestrationHttpServer(
         }
       }
       const path = url.pathname;
+      if (
+        path.startsWith("/api/orchestration/trade-reviews/") ||
+        path.startsWith("/api/orchestration/lesson-candidates/")
+      ) {
+        if (!dependencies.comparativeTradeReviewHttpHandler) {
+          sendError(
+            response,
+            503,
+            "COMPARATIVE_TRADE_REVIEW_UNAVAILABLE",
+            "Comparative Trade Review is not configured.",
+          );
+          return;
+        }
+        dependencies.authenticator.authenticate(
+          request.headers.authorization,
+        );
+        await forwardWebHandler(
+          request,
+          response,
+          dependencies.comparativeTradeReviewHttpHandler,
+          maxBodyBytes,
+        );
+        return;
+      }
+      if (path.startsWith("/api/orchestration/causal-review/")) {
+        if (!dependencies.causalTradeReviewHttpHandler) {
+          sendError(
+            response,
+            404,
+            "CAUSAL_REVIEW_UNAVAILABLE",
+            "Causal Run and Trade Review is not configured.",
+          );
+          return;
+        }
+        const result = await dependencies.causalTradeReviewHttpHandler.handle({
+          method: request.method ?? "GET",
+          url: request.url ?? path,
+          ...(request.headers.authorization
+            ? { authorization: request.headers.authorization }
+            : {}),
+        });
+        sendJson(response, result.statusCode, result.payload);
+        return;
+      }
+      if (
+        path.startsWith("/api/orchestration/configuration/") &&
+        dependencies.configurationDraftHttpHandler
+      ) {
+        await forwardWebHandler(
+          request,
+          response,
+          dependencies.configurationDraftHttpHandler,
+          maxBodyBytes,
+        );
+        return;
+      }
+      if (path.startsWith("/api/orchestration/strategy-evidence/")) {
+        if (!dependencies.strategyEvidenceHttpHandler) {
+          sendError(
+            response,
+            503,
+            "STRATEGY_EVIDENCE_NOT_CONFIGURED",
+            "Graph evidence datasets, profiles, plans, and a session factory must be registered.",
+          );
+          return;
+        }
+        await forwardWebHandler(
+          request,
+          response,
+          dependencies.strategyEvidenceHttpHandler,
+          maxBodyBytes,
+        );
+        return;
+      }
+      if (path.startsWith("/api/orchestration/semantic-evaluation/")) {
+        if (!dependencies.historicalSemanticEvaluationHttpHandler) {
+          sendError(response, 503, "HISTORICAL_SEMANTIC_EVALUATION_NOT_CONFIGURED", "Registered Graph Evidence scope is required.");
+          return;
+        }
+        await forwardWebHandler(request, response, dependencies.historicalSemanticEvaluationHttpHandler, maxBodyBytes);
+        return;
+      }
       const draftMatch = path.match(/^\/api\/orchestration\/drafts\/([^/]+)$/);
       const actionMatch = path.match(
         /^\/api\/orchestration\/drafts\/([^/]+)\/(validate|compile)$/,
@@ -260,6 +435,80 @@ export function createPipelineOrchestrationHttpServer(
       const paperRunStopMatch = path.match(
         /^\/api\/orchestration\/paper-runs\/([^/]+)\/stop$/,
       );
+
+      if (
+        request.method === "GET" &&
+        path === "/api/orchestration/paper-runtime/launch-context"
+      ) {
+        dependencies.authenticator.authenticate(
+          request.headers.authorization,
+        );
+        if (!dependencies.currentCryptoPaperLaunchService) {
+          sendError(
+            response,
+            404,
+            "PAPER_LAUNCH_PRESET_UNAVAILABLE",
+            "Paper Runtime launch context is not configured.",
+          );
+          return;
+        }
+        sendJson(response, 200, {
+          data:
+            dependencies.currentCryptoPaperLaunchService.getContext(),
+        });
+        return;
+      }
+
+      if (
+        path === "/api/orchestration/paper-runtime/evidence"
+      ) {
+        if (!dependencies.runtimeEvidenceHttpHandler) {
+          sendError(
+            response,
+            404,
+            "RUNTIME_EVIDENCE_UNAVAILABLE",
+            "Runtime evidence read model is not configured.",
+          );
+          return;
+        }
+        const result =
+          await dependencies.runtimeEvidenceHttpHandler.handle({
+            method: request.method ?? "GET",
+            url: request.url ?? path,
+            ...(request.headers.authorization
+              ? { authorization: request.headers.authorization }
+              : {}),
+          });
+        sendJson(response, result.statusCode, result.payload);
+        return;
+      }
+
+      if (
+        request.method === "POST" &&
+        path ===
+          "/api/orchestration/paper-runtime/presets/current-crypto-fixture/prepare"
+      ) {
+        const actor = dependencies.authenticator.authenticate(
+          request.headers.authorization,
+        );
+        if (!dependencies.currentCryptoPaperLaunchService) {
+          sendError(
+            response,
+            404,
+            "PAPER_LAUNCH_PRESET_UNAVAILABLE",
+            "The Current Crypto fixture launch preset is not configured.",
+          );
+          return;
+        }
+        sendJson(response, 201, {
+          data:
+            await dependencies.currentCryptoPaperLaunchService.prepare(
+              await readJson(request, maxBodyBytes),
+              actor,
+            ),
+        });
+        return;
+      }
       const paperRunEventsMatch = path.match(
         /^\/api\/orchestration\/paper-runs\/([^/]+)\/events$/,
       );
@@ -332,6 +581,7 @@ export function createPipelineOrchestrationHttpServer(
           data: registryCatalog(
             dependencies.registry,
             dependencies.pipelineGraphs ?? [],
+            dependencies.productionWorkspaceCatalog,
           ),
         });
         return;
@@ -344,6 +594,74 @@ export function createPipelineOrchestrationHttpServer(
               request.headers.authorization,
             ),
           },
+        });
+        return;
+      }
+
+      if (
+        request.method === "GET" &&
+        path === "/api/orchestration/intent-catalog"
+      ) {
+        if (!dependencies.intentDraftService) {
+          sendError(
+            response,
+            404,
+            "INTENT_COMPILER_NOT_CONFIGURED",
+            "The controlled Orchestration Intent Compiler is not configured.",
+          );
+          return;
+        }
+        sendJson(response, 200, {
+          data: dependencies.intentDraftService.catalog(),
+        });
+        return;
+      }
+
+      if (
+        request.method === "POST" &&
+        path === "/api/orchestration/drafts/from-intent"
+      ) {
+        const actor = dependencies.authenticator.authenticate(
+          request.headers.authorization,
+        );
+        if (!dependencies.intentDraftService) {
+          sendError(
+            response,
+            404,
+            "INTENT_COMPILER_NOT_CONFIGURED",
+            "The controlled Orchestration Intent Compiler is not configured.",
+          );
+          return;
+        }
+        const intent = await readJson(request, maxBodyBytes);
+        sendJson(response, 201, {
+          data: dependencies.intentDraftService.createDraft(intent),
+        });
+        return;
+      }
+
+      if (
+        request.method === "POST" &&
+        path === "/api/orchestration/copilot/messages"
+      ) {
+        const actor = dependencies.authenticator.authenticate(
+          request.headers.authorization,
+        );
+        if (!dependencies.orchestrationCopilotService) {
+          sendError(
+            response,
+            404,
+            "ORCHESTRATION_COPILOT_NOT_CONFIGURED",
+            "The controlled Orchestration Copilot is not configured.",
+          );
+          return;
+        }
+        const message = await readJson(request, maxBodyBytes);
+        sendJson(response, 200, {
+          data: await dependencies.orchestrationCopilotService.handle(
+            message,
+            actor,
+          ),
         });
         return;
       }
@@ -712,6 +1030,24 @@ export function createPipelineOrchestrationHttpServer(
         sendError(response, 401, error.code, error.message);
         return;
       }
+      if (error instanceof OrchestrationIntentError) {
+        const statusCode =
+          error.code === "SEMANTIC_PRESET_NOT_REGISTERED" ||
+          error.code === "PRESET_GRAPH_BINDING_NOT_REGISTERED" ||
+          error.code === "MARKET_PACK_NOT_REGISTERED" ||
+          error.code === "DATA_SOURCE_NOT_REGISTERED" ||
+          error.code === "AGENT_TEMPLATE_NOT_REGISTERED"
+            ? 404
+            : error.code === "INVALID_ORCHESTRATION_INTENT"
+              ? 400
+              : 422;
+        sendError(response, statusCode, error.code, error.message, error.fields);
+        return;
+      }
+      if (error instanceof OrchestrationCopilotError) {
+        sendError(response, 400, error.code, error.message, error.fields);
+        return;
+      }
       if (error instanceof PipelineEvidenceWorkflowError) {
         const statusCode =
           error.code === "EVIDENCE_JOB_NOT_FOUND" ||
@@ -737,6 +1073,22 @@ export function createPipelineOrchestrationHttpServer(
                 ? 409
                 : 422;
         sendError(response, statusCode, error.code, error.message, error.fields);
+        return;
+      }
+      if (error instanceof CurrentCryptoPaperLaunchError) {
+        const statusCode =
+          error.code === "PAPER_LAUNCH_ACTOR_ROLE_REQUIRED"
+            ? 403
+            : error.code === "PAPER_LAUNCH_PRESET_UNAVAILABLE"
+              ? 404
+              : 422;
+        sendError(
+          response,
+          statusCode,
+          error.code,
+          error.message,
+          error.fields,
+        );
         return;
       }
       if (error instanceof PaperRuntimeActivationError) {

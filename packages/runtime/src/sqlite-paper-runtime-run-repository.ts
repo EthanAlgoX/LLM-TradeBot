@@ -121,6 +121,20 @@ export class SqlitePaperRuntimeRunRepository
       : undefined;
   }
 
+  findLatestRun(): PaperRuntimeRun | undefined {
+    const row = this.database
+      .prepare(`
+        SELECT record_json
+        FROM paper_runtime_runs
+        ORDER BY updated_at DESC, requested_at DESC
+        LIMIT 1
+      `)
+      .get() as unknown as JsonRow | undefined;
+    return row
+      ? PaperRuntimeRunSchema.parse(JSON.parse(row.record_json))
+      : undefined;
+  }
+
   createRun(
     run: PaperRuntimeRun,
     actorId: string,

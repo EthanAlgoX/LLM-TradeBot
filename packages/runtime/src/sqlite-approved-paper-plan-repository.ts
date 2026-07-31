@@ -210,6 +210,20 @@ export class SqliteApprovedPaperPlanRepository
       : undefined;
   }
 
+  findLatestActivation(): PaperActivationRecord | undefined {
+    const row = this.database
+      .prepare(`
+        SELECT record_json
+        FROM paper_activation_audits
+        ORDER BY rowid DESC
+        LIMIT 1
+      `)
+      .get() as unknown as JsonRow | undefined;
+    return row
+      ? PaperActivationRecordSchema.parse(JSON.parse(row.record_json))
+      : undefined;
+  }
+
   saveActivation(
     activation: PaperActivationRecord,
     actorId: string,

@@ -20,8 +20,8 @@ test("current orchestration composition validates and compiles the real Crypto g
   assert.equal(plan.runtimeApplied, false);
   assert.equal(plan.steps.length, CURRENT_CRYPTO_PIPELINE_GRAPH.nodes.length);
   assert.equal(runtime.registry.marketPacks.size, 1);
-  assert.equal(runtime.registry.dataSources.size, 2);
-  assert.equal(runtime.registry.capabilities.size, 2);
+  assert.equal(runtime.registry.dataSources.size, 3);
+  assert.equal(runtime.registry.capabilities.size, 3);
   await runtime.close();
   database.close();
 });
@@ -49,8 +49,8 @@ test("current orchestration server exposes the real registry only on loopback", 
     };
   };
   assert.equal(body.data.marketPacks.length, 1);
-  assert.equal(body.data.dataSources.length, 2);
-  assert.equal(body.data.capabilities.length, 2);
+  assert.equal(body.data.dataSources.length, 3);
+  assert.equal(body.data.capabilities.length, 3);
   assert.equal(body.data.runtimeMutationAllowed, false);
 
   await runtime.close();

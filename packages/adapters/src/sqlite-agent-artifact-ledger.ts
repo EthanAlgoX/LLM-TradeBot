@@ -11,13 +11,15 @@ export class SQLiteAgentArtifactLedger implements ArtifactLedger {
     mkdirSync(dirname(path), { recursive: true }); this.database = new DatabaseSync(path);
     this.database.exec("CREATE TABLE IF NOT EXISTS agent_artifacts (id INTEGER PRIMARY KEY AUTOINCREMENT, trace_id TEXT NOT NULL, symbol TEXT, stage TEXT NOT NULL, order_id TEXT, artifact_json TEXT NOT NULL); CREATE INDEX IF NOT EXISTS agent_artifacts_trace_id_id ON agent_artifacts(trace_id, id);");
     try { this.database.exec("ALTER TABLE agent_artifacts ADD COLUMN order_id TEXT;"); } catch { /* Existing database already has the column. */ }
-    this.database.exec("CREATE INDEX IF NOT EXISTS agent_artifacts_order_id ON agent_artifacts(order_id);");
+    try { this.database.exec("ALTER TABLE agent_artifacts ADD COLUMN trade_id TEXT;"); } catch { /* Existing database already has the column. */ }
+    this.database.exec("CREATE INDEX IF NOT EXISTS agent_artifacts_order_id ON agent_artifacts(order_id); CREATE INDEX IF NOT EXISTS agent_artifacts_trade_id ON agent_artifacts(trade_id);");
   }
-  async append(raw: AgentArtifact): Promise<void> { const value = AgentArtifactSchema.parse(raw); this.database.prepare("INSERT INTO agent_artifacts(trace_id, symbol, stage, order_id, artifact_json) VALUES (?, ?, ?, ?, ?)").run(value.traceId, value.symbol ?? null, value.stage, value.orderId ?? null, JSON.stringify(value)); }
+  async append(raw: AgentArtifact): Promise<void> { const value = AgentArtifactSchema.parse(raw); this.database.prepare("INSERT INTO agent_artifacts(trace_id, symbol, stage, order_id, trade_id, artifact_json) VALUES (?, ?, ?, ?, ?, ?)").run(value.traceId, value.symbol ?? null, value.stage, value.orderId ?? null, value.tradeId ?? null, JSON.stringify(value)); }
   async query(raw: AgentArtifactQuery): Promise<readonly AgentArtifact[]> {
     const query = AgentArtifactQuerySchema.parse(raw); const clauses: string[] = []; const values: (string | number)[] = [];
     if (query.traceId) { clauses.push("trace_id = ?"); values.push(query.traceId); }
     if (query.orderId) { clauses.push("order_id = ?"); values.push(query.orderId); }
+    if (query.tradeId) { clauses.push("trade_id = ?"); values.push(query.tradeId); }
     if (query.symbol) { clauses.push("symbol = ?"); values.push(query.symbol); }
     if (query.stage) { clauses.push("stage = ?"); values.push(query.stage); }
     values.push(query.limit);

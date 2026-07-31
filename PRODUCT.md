@@ -1,13 +1,14 @@
 # TradeBot Product Baseline
 
-> 状态：产品方向已确认，目标架构待实施
-> 最后更新：2026-07-26
+> 状态：产品方向已确认，Crypto Paper 与受控编排/审阅垂直切片已运行
+> 最后更新：2026-07-30
+> 文档导航：`docs/README.md`
 > 详细架构与交付状态：`docs/architecture-and-delivery-plan.md`
 > 新窗口接手摘要：`docs/project-status-and-handoff.md`
 
 ## 产品定义
 
-TradeBot 是一个面向多市场的、可编排、可回测、可审计、可受控进化的 Human-in-the-loop Multi-Agent 交易系统。
+TradeBot 是一个输入可配置、Agent 可编排、可回测、可审计、可受控进化的 Human-in-the-loop Multi-Agent 交易系统。A 股、港股、美股或币圈不是彼此独立的产品模块，而是由用户选择的 Market Pack、Data Source、Schema、Observation Window 和执行规则组合。
 
 它不是普通看盘工具，也不是让聊天机器人直接下单的产品。交易 Agent 是系统主角；右侧 Copilot 是受约束的编排和解释入口，负责把人的自然语言意图转换为结构化配置草案、Pipeline 变更草案与验证任务。
 
@@ -15,7 +16,7 @@ TradeBot 是一个面向多市场的、可编排、可回测、可审计、可�
 
 1. **多 Agent 协作**：把复杂交易任务拆成职责单一、输入最小化的子 Agent，通过 typed Artifact 协作。
 2. **灵活的观察窗口拆解**：默认支持多周期分析，但不固定 `5m/15m/1h`，允许任意数量、任意粒度、单周期或完全事件驱动。
-3. **跨市场运行**：通过 Market Pack 接入加密货币、A 股、港股、美股及后续市场，并隔离各市场的交易规则、日历、费用和模拟执行。
+3. **输入与市场解耦**：用户通过注册配置接入行情、事件、财报或其他结构化事实；Market Pack 只承载数据语义、日历、费用和模拟执行约束，不把具体市场写死在 Agent 流程中。
 4. **可配置的数据与 Agent**：数据源、Connector、Agent Template、Agent 实例和 Pipeline Graph 均版本化、可验证、可替换。
 5. **决策与独立风控**：Decision Agent 汇总压缩后的结构化证据；Risk Gate 拥有独立否决权；LLM 不能直接创建可执行订单。
 6. **可验证的持续进化**：Reflection 只能产生 Lesson Candidate。经验必须经过证据校验、回测、Walk-Forward 和人工审批，才能成为有效经验或新策略版本。

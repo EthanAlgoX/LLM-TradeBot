@@ -1,3 +1,28 @@
+import "./runtime-control.css";
+import "./release-guide.css";
+import {
+  deriveRuntimeControlState,
+  type RuntimeControlUiState,
+} from "./runtime-control-state.js";
+import {
+  createRuntimeDashboardSnapshot,
+  createRuntimeOperationKeys,
+  partitionRuntimeRun,
+  rotateRuntimeOperationKey,
+  type RuntimeOperationKey,
+} from "./runtime-operation-session.js";
+import {
+  deriveReleaseGuideState,
+  type ReleaseGateId,
+} from "./release-guide-state.js";
+import {
+  deriveRecoveredPromotionState,
+  parseReleaseSessionRefs,
+  RELEASE_SESSION_STORAGE_KEY,
+  releaseReferenceChainMatches,
+  serializeReleaseSessionRefs,
+} from "./release-session-state.js";
+
 type Locale = "zh" | "en";
 type ConnectionMode = "connecting" | "live" | "readonly" | "offline";
 
@@ -48,6 +73,7 @@ interface EvidenceJobResponse {
 
 interface ApprovedPaperPlanResponse {
   planId: string;
+  draftId: string;
   lifecycleStatus: "approved_ready";
   fingerprint: string;
   runtimeApplied: false;
@@ -68,6 +94,7 @@ interface PaperControlResponse {
 
 interface PaperRuntimeRunResponse {
   runId: string;
+  planId: string;
   status:
     | "queued"
     | "running"
@@ -122,6 +149,37 @@ interface PaperRuntimeStopResponse {
   exchangeWriteAllowed: false;
 }
 
+interface PaperRuntimeLaunchContextResponse {
+  schemaVersion: "1.0.0";
+  generatedAt: string;
+  launchState:
+    | "release_required"
+    | "preflight_required"
+    | "ready"
+    | "running"
+    | "only_close"
+    | "draining"
+    | "blocked";
+  preset: {
+    presetId: string;
+    humanVersion: string;
+    availability: "available" | "unavailable";
+    fixture: true;
+    graphId: string;
+    observationWindows: string[];
+  };
+  plan?: ApprovedPaperPlanResponse;
+  activation?: PaperActivationResponse;
+  control?: PaperControlResponse;
+  preflight?: PaperRuntimePreflightResponse;
+  run?: PaperRuntimeRunResponse;
+  blockerCode?: string;
+  paperOnly: true;
+  runtimeApplied: false;
+  exchangeWriteAllowed: false;
+  clientRuntimeParametersAccepted: false;
+}
+
 interface PaperRuntimeOperationalEventResponse {
   eventId: string;
   sequence: number;
@@ -158,18 +216,45 @@ interface ApiErrorEnvelope {
   };
 }
 
+interface TradeBotViteEnvironment {
+  readonly DEV?: boolean;
+  readonly VITE_TRADEBOT_ORCHESTRATION_API?: string;
+  readonly VITE_TRADEBOT_ORCHESTRATION_TOKEN?: string;
+  readonly VITE_TRADEBOT_MARKET_DATA_LABEL?: string;
+  readonly VITE_TRADEBOT_EVIDENCE_DATA_LABEL?: string;
+}
+
+const viteEnvironment = (
+  import.meta as ImportMeta & {
+    readonly env?: TradeBotViteEnvironment;
+  }
+).env;
 const configuredApiBase =
   (
     globalThis as typeof globalThis & {
       __TRADEBOT_ORCHESTRATION_API__?: string;
     }
-  ).__TRADEBOT_ORCHESTRATION_API__ ?? "http://127.0.0.1:8787";
+  ).__TRADEBOT_ORCHESTRATION_API__ ??
+  viteEnvironment?.VITE_TRADEBOT_ORCHESTRATION_API ??
+  "http://127.0.0.1:8787";
 const configuredToken =
   (
     globalThis as typeof globalThis & {
       __TRADEBOT_ORCHESTRATION_TOKEN__?: string;
     }
-  ).__TRADEBOT_ORCHESTRATION_TOKEN__;
+  ).__TRADEBOT_ORCHESTRATION_TOKEN__ ??
+  (viteEnvironment?.DEV
+    ? viteEnvironment.VITE_TRADEBOT_ORCHESTRATION_TOKEN
+    : undefined);
+const configuredMarketDataLabel =
+  viteEnvironment?.VITE_TRADEBOT_MARKET_DATA_LABEL ??
+  "SERVER CONFIGURED";
+const configuredEvidenceDataLabel =
+  viteEnvironment?.VITE_TRADEBOT_EVIDENCE_DATA_LABEL ??
+  (configuredMarketDataLabel === "LOCAL BACKEND FIXTURE" ||
+  configuredMarketDataLabel === "BINANCE FUTURES PUBLIC READ ONLY"
+    ? "CSV SYNTHETIC FIXTURE"
+    : "SERVER REGISTERED EVIDENCE");
 
 const state: {
   mode: ConnectionMode;
@@ -188,12 +273,18 @@ const state: {
   paperActivation?: PaperActivationResponse;
   paperControl?: PaperControlResponse;
   paperRun?: PaperRuntimeRunResponse;
+  paperLastRun?: PaperRuntimeRunResponse;
   paperPreflight?: PaperRuntimePreflightResponse;
   paperLease?: PaperRuntimeLeaseResponse;
   paperStop?: PaperRuntimeStopResponse;
   paperEvents: PaperRuntimeOperationalEventResponse[];
   paperIncidents: PaperRuntimeIncidentResponse[];
   paperClearance?: PaperRuntimeOrphanClearanceResponse;
+  paperLaunchPresetAvailable: boolean;
+  restoreCode?:
+    | "RELEASE_SESSION_RESTORED"
+    | "RELEASE_SESSION_REFERENCE_STALE"
+    | "RELEASE_SESSION_REFERENCE_INVALID";
   jobKeys: {
     backtest: string;
     walkForward: string;
@@ -212,21 +303,13 @@ const state: {
   busy: boolean;
 } = {
   mode: "connecting",
+  paperLaunchPresetAvailable: false,
   token: configuredToken,
   jobKeys: {
     backtest: crypto.randomUUID(),
     walkForward: crypto.randomUUID(),
   },
-  paperKeys: {
-    plan: crypto.randomUUID(),
-    activation: crypto.randomUUID(),
-    control: crypto.randomUUID(),
-    run: crypto.randomUUID(),
-    preflight: crypto.randomUUID(),
-    stop: crypto.randomUUID(),
-    acknowledgement: crypto.randomUUID(),
-    clearance: crypto.randomUUID(),
-  },
+  paperKeys: createRuntimeOperationKeys(),
   paperEvents: [],
   paperIncidents: [],
   busy: false,
@@ -277,6 +360,14 @@ const copy = {
     externalDeliveryOff: "外部通知未配置",
     runtimeNotApplied: "未接管 Runtime",
     actor: "操作者",
+    restore: {
+      RELEASE_SESSION_RESTORED:
+        "已从服务端恢复发布会话；Preflight 必须重新执行",
+      RELEASE_SESSION_REFERENCE_STALE:
+        "保存的发布引用已失效并清除",
+      RELEASE_SESSION_REFERENCE_INVALID:
+        "浏览器发布引用合同无效并清除",
+    },
   },
   en: {
     title: "Runtime connection",
@@ -321,13 +412,513 @@ const copy = {
     externalDeliveryOff: "External delivery not configured",
     runtimeNotApplied: "Runtime not applied",
     actor: "Operator",
+    restore: {
+      RELEASE_SESSION_RESTORED:
+        "Release session restored from the server; Preflight must run again",
+      RELEASE_SESSION_REFERENCE_STALE:
+        "Stale release references were cleared",
+      RELEASE_SESSION_REFERENCE_INVALID:
+        "Invalid browser release references were cleared",
+    },
   },
 } as const;
 
 function orchestrationRoot(): HTMLElement | null {
   return document.querySelector<HTMLElement>(
-    "[data-orchestration-root], .orchestration-workspace, .orchestration-shell, .orchestration-view, .orchestration-grid",
+    "[data-orchestration-root], .orchestration-workspace, .orchestration-shell, .orchestration-view, .orchestration-grid, .orchestration-layout",
   );
+}
+
+const runtimeControlCopy = {
+  zh: {
+    eyebrow: "Paper Runtime 控制",
+    title: "交易运行实例",
+    connection: "API",
+    plan: "策略计划",
+    run: "运行实例",
+    cycle: "周期",
+    heartbeat: "心跳",
+    marketData: "运行行情",
+    exchange: "交易所写入",
+    exchangeOff: "关闭",
+    preflight: "运行预检",
+    start: "开始运行",
+    pause: "暂停新开仓",
+    resume: "恢复新开仓",
+    stop: "安全结束",
+    retry: "重新连接 Runtime",
+    authenticate: "前往系统编排认证",
+    releaseRequired: "需要先完成策略发布与计划激活",
+    prepareFixture: "准备本地 Paper 计划",
+    prepareFixtureNote:
+      "使用服务器固定 Current Crypto Graph 执行 CSV 回测、Walk-Forward，并记录本次明确批准；不会启动交易。",
+    states: {
+      connecting: "连接中",
+      offline: "离线",
+      auth_required: "等待认证",
+      stopped: "已停止",
+      preflight: "等待预检",
+      ready: "可以启动",
+      running: "运行中",
+      only_close: "仅允许平仓",
+      draining: "安全结束中",
+      blocked: "安全阻断",
+    },
+    descriptions: {
+      connecting: "正在连接本机受控 Runtime API。",
+      offline: "Runtime API 不可用。所有运行操作均已禁用，不会在浏览器内伪造交易。",
+      auth_required: "Catalog 已连接。输入服务端启动时生成的临时 Operator Token 后才能操作。",
+      stopped: "当前没有运行实例。只有已批准并显式激活的 Paper Plan 可以启动。",
+      preflight: "计划已激活。必须先完成只读安全预检，才能启动交易周期。",
+      ready: "预检已通过。点击开始后由后端创建有界 Paper Trading Run。",
+      running: "后端正在执行有界 Paper 周期；Risk 与 Position Monitor 保持生效。",
+      only_close: "新开仓已暂停；行情、Risk、Position Monitor 和平仓链路继续运行。",
+      draining: "已拒绝后续周期，当前周期完成后由后端安全排空。",
+      blocked: "Runtime 已失败关闭。检查稳定错误代码和 Incident 后再处理。",
+    },
+    banner: {
+      connecting: "正在连接本机 Runtime API",
+      offline: "OFFLINE MOCK：Runtime API 不可用，交易控制已禁用",
+      readonly: "本机 API 已连接：需要 Operator Token 才能执行受控操作",
+      live: "本机 Runtime 已连接：PAPER ONLY · NO EXCHANGE WRITE",
+    },
+  },
+  en: {
+    eyebrow: "Paper Runtime control",
+    title: "Trading run",
+    connection: "API",
+    plan: "Strategy plan",
+    run: "Run",
+    cycle: "Cycle",
+    heartbeat: "Heartbeat",
+    marketData: "Run market data",
+    exchange: "Exchange writes",
+    exchangeOff: "OFF",
+    preflight: "Run preflight",
+    start: "Start run",
+    pause: "Pause openings",
+    resume: "Resume openings",
+    stop: "Safe stop",
+    retry: "Reconnect Runtime",
+    authenticate: "Authenticate in Orchestration",
+    releaseRequired: "Complete strategy release and plan activation first",
+    prepareFixture: "Prepare local Paper plan",
+    prepareFixtureNote:
+      "Run CSV Backtest and Walk-Forward for the server-owned Current Crypto Graph, then record this explicit approval. Trading will not start.",
+    states: {
+      connecting: "CONNECTING",
+      offline: "OFFLINE",
+      auth_required: "AUTH REQUIRED",
+      stopped: "STOPPED",
+      preflight: "PREFLIGHT REQUIRED",
+      ready: "READY",
+      running: "RUNNING",
+      only_close: "ONLY CLOSE",
+      draining: "DRAINING",
+      blocked: "SAFETY BLOCKED",
+    },
+    descriptions: {
+      connecting: "Connecting to the controlled local Runtime API.",
+      offline: "Runtime API is unavailable. Every run action is disabled and no browser-side trading is simulated.",
+      auth_required: "Catalog is connected. Enter the ephemeral server-issued Operator Token before operating.",
+      stopped: "No run is active. Only an approved and explicitly activated Paper Plan can start.",
+      preflight: "The plan is active. A read-only safety preflight must pass before trading cycles start.",
+      ready: "Preflight passed. Start creates a bounded Paper Trading Run on the backend.",
+      running: "Bounded Paper cycles are running on the backend with Risk and Position Monitor active.",
+      only_close: "New openings are paused. Data, Risk, Position Monitor, and exits remain active.",
+      draining: "Future cycles are rejected. The backend will drain safely after the current cycle.",
+      blocked: "Runtime failed closed. Inspect the stable error code and incident before recovery.",
+    },
+    banner: {
+      connecting: "Connecting to the local Runtime API",
+      offline: "OFFLINE MOCK: Runtime API unavailable, trading controls disabled",
+      readonly: "Local API connected: Operator Token required for controlled actions",
+      live: "LOCAL RUNTIME CONNECTED: PAPER ONLY · NO EXCHANGE WRITE",
+    },
+  },
+} as const;
+
+const releaseGuideCopy = {
+  zh: {
+    kicker: "受控发布路径",
+    title: "从策略草案到 Paper 运行",
+    current: "当前",
+    passed: "完成",
+    pending: "等待",
+    blocked: "阻断",
+    next: "下一安全动作",
+    humanRequired: "需要明确的人工批准，不会由系统自动执行。",
+    busy: "后端正在处理当前动作",
+    complete: "发布与启动链路已经建立。Runtime 控制保持独立。",
+    running: "Paper Run 已由后端创建。运行控制、Risk 与 Position Monitor 保持生效。",
+    connection: {
+      connecting: "正在连接受控 Runtime API。",
+      offline: "Runtime API 离线，发布动作已禁用。",
+      readonly: "请先在上方使用服务端临时 Token 完成身份认证。",
+    },
+    facts: {
+      evidence: "发布证据",
+      marketData: "Paper 行情",
+      exchange: "交易所写入",
+      exchangeOff: "永久关闭",
+    },
+    steps: {
+      draft: ["Draft", "保存服务端注册 Graph 的不可变草案"],
+      validation: ["合同验证", "校验 Schema、数据能力与权限边界"],
+      backtest: ["Backtest", "生成绑定数据指纹的后端证据"],
+      walk_forward: ["Walk-Forward", "使用隔离窗口验证泛化能力"],
+      approval: ["人工批准", "由具备权限的操作者显式确认"],
+      activation: ["计划激活", "生成并激活不可变 Paper Plan"],
+      preflight: ["Preflight", "只读检查 Binding、DB、Profile 与行情"],
+      start: ["开始", "由后端创建有界 Paper Run"],
+    },
+    actions: {
+      save: "保存 Graph 草案",
+      validate: "执行合同验证",
+      backtest: "运行 Backtest",
+      "walk-forward": "运行 Walk-Forward",
+      approve: "执行人工批准",
+      "paper-plan": "生成 Paper Plan",
+      "activate-paper": "显式激活计划",
+      "paper-preflight": "运行只读 Preflight",
+      "start-paper-run": "开始有界 Paper Run",
+      retry: "重新连接 Runtime",
+    },
+  },
+  en: {
+    kicker: "Controlled release path",
+    title: "From strategy draft to Paper run",
+    current: "CURRENT",
+    passed: "COMPLETE",
+    pending: "PENDING",
+    blocked: "BLOCKED",
+    next: "Next safe action",
+    humanRequired: "Explicit human approval is required and is never automated.",
+    busy: "The backend is processing the current action",
+    complete: "The release and start path is established. Runtime controls remain independent.",
+    running: "The backend created a Paper Run. Runtime control, Risk, and Position Monitor remain active.",
+    connection: {
+      connecting: "Connecting to the controlled Runtime API.",
+      offline: "Runtime API is offline. Release actions are disabled.",
+      readonly: "Authenticate above with the ephemeral server-issued token.",
+    },
+    facts: {
+      evidence: "Release evidence",
+      marketData: "Paper market data",
+      exchange: "Exchange writes",
+      exchangeOff: "PERMANENTLY OFF",
+    },
+    steps: {
+      draft: ["Draft", "Save an immutable draft of a server-registered Graph"],
+      validation: ["Contract validation", "Check schemas, data capabilities, and authority"],
+      backtest: ["Backtest", "Create backend evidence bound to a data fingerprint"],
+      walk_forward: ["Walk-Forward", "Validate generalization in isolated windows"],
+      approval: ["Human approval", "Require an explicit action from an authorized operator"],
+      activation: ["Plan activation", "Create and activate an immutable Paper Plan"],
+      preflight: ["Preflight", "Read-only checks for Binding, DB, Profile, and bars"],
+      start: ["Start", "Create a bounded Paper Run on the backend"],
+    },
+    actions: {
+      save: "Save Graph draft",
+      validate: "Run contract validation",
+      backtest: "Run Backtest",
+      "walk-forward": "Run Walk-Forward",
+      approve: "Record human approval",
+      "paper-plan": "Create Paper Plan",
+      "activate-paper": "Explicitly activate plan",
+      "paper-preflight": "Run read-only Preflight",
+      "start-paper-run": "Start bounded Paper Run",
+      retry: "Reconnect Runtime",
+    },
+  },
+} as const;
+
+function escapeControlValue(value: string): string {
+  return value.replace(/[&<>"']/g, (character) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#039;",
+  })[character] ?? character);
+}
+
+function renderReleaseGuide(
+  root: HTMLElement,
+  bridge: HTMLElement,
+): void {
+  const release = deriveReleaseGuideState({
+    mode: state.mode,
+    busy: state.busy,
+    hasDraft: Boolean(state.draft),
+    promotionStage: state.draft?.promotionStage,
+    validationValid: state.validationValid,
+    backtestStatus: state.backtestStatus,
+    walkForwardStatus: state.walkForwardStatus,
+    hasApproval: Boolean(state.approvalId),
+    hasPaperPlan: Boolean(state.paperPlan),
+    hasActivation: Boolean(state.paperActivation),
+    preflightStatus: state.paperPreflight?.status,
+    runStatus: state.paperRun?.status,
+    errorCode: state.errorCode,
+  });
+  const text = releaseGuideCopy[locale()];
+  const statusLabel = {
+    complete: text.passed,
+    current: text.current,
+    pending: text.pending,
+    blocked: text.blocked,
+  } as const;
+  const stepMarkup = release.steps
+    .map((step, index) => {
+      const copy = text.steps[step.id];
+      return `
+        <li data-release-status="${step.status}" ${
+          step.id === release.nextStepId ? 'aria-current="step"' : ""
+        }>
+          <div>
+            <span>${String(index + 1).padStart(2, "0")}</span>
+            <small>${statusLabel[step.status]}</small>
+          </div>
+          <strong>${copy[0]}</strong>
+          <p>${copy[1]}</p>
+        </li>
+      `;
+    })
+    .join("");
+  const currentStep = release.nextStepId
+    ? text.steps[release.nextStepId]
+    : undefined;
+  const connectionMessage =
+    state.mode === "connecting"
+      ? text.connection.connecting
+      : state.mode === "offline"
+        ? text.connection.offline
+        : state.mode === "readonly"
+          ? text.connection.readonly
+          : undefined;
+  const summary =
+    connectionMessage ??
+    (state.paperRun
+      ? text.running
+      : currentStep
+        ? `${text.next}: ${currentStep[0]}`
+        : text.complete);
+  const actionLabel = release.nextAction
+    ? text.actions[release.nextAction]
+    : undefined;
+
+  let guide = root.querySelector<HTMLElement>("[data-release-guide]");
+  if (!guide) {
+    guide = document.createElement("section");
+    guide.dataset.releaseGuide = "true";
+    bridge.insertAdjacentElement("afterend", guide);
+  }
+  guide.className = `release-guide is-${release.phase}`;
+  guide.setAttribute("aria-label", text.title);
+  guide.innerHTML = `
+    <header class="release-guide__header">
+      <div>
+        <span>${text.kicker}</span>
+        <h3>${text.title}</h3>
+      </div>
+      <p aria-live="polite">${summary}</p>
+      <dl>
+        <div>
+          <dt>${text.facts.evidence}</dt>
+          <dd>${escapeControlValue(configuredEvidenceDataLabel)}</dd>
+        </div>
+        <div>
+          <dt>${text.facts.marketData}</dt>
+          <dd>${escapeControlValue(configuredMarketDataLabel)}</dd>
+        </div>
+        <div>
+          <dt>${text.facts.exchange}</dt>
+          <dd>${text.facts.exchangeOff}</dd>
+        </div>
+      </dl>
+    </header>
+    <ol class="release-guide__steps">${stepMarkup}</ol>
+    <footer class="release-guide__footer">
+      <div>
+        ${
+          release.reasonCode
+            ? `<code>CODE: ${escapeControlValue(release.reasonCode)}</code>`
+            : ""
+        }
+        ${
+          release.requiresHumanAction
+            ? `<p>${text.humanRequired}</p>`
+            : state.busy
+              ? `<p>${text.busy}</p>`
+              : ""
+        }
+      </div>
+      ${
+        release.nextAction && actionLabel
+          ? `<button type="button" data-runtime-action="${release.nextAction}" ${
+              state.busy ? "disabled" : ""
+            } class="${release.requiresHumanAction ? "is-human" : ""}">
+              ${actionLabel}
+            </button>`
+          : ""
+      }
+    </footer>
+  `;
+}
+
+function runtimeStateLabel(
+  uiState: RuntimeControlUiState,
+  text: (typeof runtimeControlCopy)[Locale],
+): string {
+  return text.states[uiState];
+}
+
+function runtimeStateDescription(
+  uiState: RuntimeControlUiState,
+  text: (typeof runtimeControlCopy)[Locale],
+): string {
+  return text.descriptions[uiState];
+}
+
+let lastRuntimeDashboardSnapshotKey: string | undefined;
+
+function renderRuntimeControl(): void {
+  const shell = document.querySelector<HTMLElement>("#app-shell");
+  const main = document.querySelector<HTMLElement>("#main-content");
+  if (!shell || !main) return;
+
+  const controlMode =
+    state.paperControl?.mode ?? state.paperRun?.lastControlMode;
+  const ui = deriveRuntimeControlState({
+    mode: state.mode,
+    busy: state.busy,
+    hasActivatedPlan: Boolean(state.paperActivation),
+    preflightStatus: state.paperPreflight?.status,
+    runStatus: state.paperRun?.status,
+    controlMode,
+    stopStatus: state.paperStop?.status,
+    errorCode: state.errorCode,
+  });
+  const text = runtimeControlCopy[locale()];
+  const heartbeat = state.paperLease?.heartbeatAt
+    ? new Date(state.paperLease.heartbeatAt).toLocaleTimeString(
+        locale() === "zh" ? "zh-CN" : "en-US",
+        { hour12: false },
+      )
+    : "-";
+  const cycle = state.paperRun
+    ? `${state.paperRun.processedCycles}/${state.paperRun.plannedCycles}`
+    : "-";
+  const connectionLabel =
+    state.mode === "live"
+      ? "LOCAL API"
+      : state.mode === "readonly"
+        ? "AUTH REQUIRED"
+        : state.mode === "connecting"
+          ? "CONNECTING"
+          : "OFFLINE";
+
+  const html = `
+    <div class="runtime-control__identity">
+      <span>${text.eyebrow}</span>
+      <strong><i aria-hidden="true"></i>${runtimeStateLabel(ui.state, text)}</strong>
+      <p>${runtimeStateDescription(ui.state, text)}</p>
+      ${state.errorCode ? `<code>CODE: ${escapeControlValue(state.errorCode)}</code>` : ""}
+    </div>
+    <dl class="runtime-control__facts">
+      <div><dt>${text.connection}</dt><dd>${connectionLabel}</dd></div>
+      <div><dt>${text.plan}</dt><dd>${escapeControlValue(state.paperPlan?.planId ?? "-")}</dd></div>
+      <div><dt>${text.run}</dt><dd>${escapeControlValue(state.paperRun?.runId ?? "-")}</dd></div>
+      <div><dt>${text.cycle}</dt><dd>${cycle}</dd></div>
+      <div><dt>${text.heartbeat}</dt><dd>${escapeControlValue(heartbeat)}</dd></div>
+      <div><dt>${text.marketData}</dt><dd>${escapeControlValue(configuredMarketDataLabel)}</dd></div>
+      <div><dt>${text.exchange}</dt><dd class="is-locked">${text.exchangeOff}</dd></div>
+    </dl>
+    <div class="runtime-control__actions" aria-busy="${state.busy}">
+      ${state.mode === "offline" ? `<button type="button" data-runtime-action="retry">${text.retry}</button>` : ""}
+      ${state.mode === "readonly" ? `<a href="#orchestration">${text.authenticate}</a>` : ""}
+      ${
+        state.mode === "live" &&
+        !state.paperActivation &&
+        state.paperLaunchPresetAvailable
+          ? `<button type="button" class="is-start" data-runtime-action="prepare-current-crypto-fixture" ${state.busy ? "disabled" : ""}>
+              ${text.prepareFixture}
+            </button>`
+          : ""
+      }
+      <button type="button" data-runtime-action="paper-preflight" ${ui.canPreflight ? "" : "disabled"}>
+        ${text.preflight}
+      </button>
+      <button type="button" class="is-start" data-runtime-action="start-paper-run" ${ui.canStart ? "" : "disabled"}>
+        ${text.start}
+      </button>
+      ${
+        ui.state === "only_close"
+          ? `<button type="button" class="is-pause" data-runtime-action="resume-normal" ${ui.canResume ? "" : "disabled"}>${text.resume}</button>`
+          : `<button type="button" class="is-pause" data-runtime-action="close-only" ${ui.canPause ? "" : "disabled"}>${text.pause}</button>`
+      }
+      <button type="button" class="is-stop" data-runtime-action="stop-paper-run" ${ui.canStop ? "" : "disabled"}>
+        ${text.stop}
+      </button>
+      ${
+        state.mode === "live" && !state.paperActivation
+          ? `<small>${
+              state.paperLaunchPresetAvailable
+                ? text.prepareFixtureNote
+                : text.releaseRequired
+            }</small>`
+          : ""
+      }
+    </div>
+  `;
+
+  let control = shell.querySelector<HTMLElement>("[data-runtime-control]");
+  if (!control) {
+    control = document.createElement("section");
+    control.dataset.runtimeControl = "true";
+    main.insertAdjacentElement("beforebegin", control);
+  }
+  const renderKey = JSON.stringify({
+    html,
+    state: ui.state,
+    busy: state.busy,
+  });
+  control.className = `runtime-control is-${ui.state}`;
+  control.setAttribute("aria-label", text.title);
+  if (control.dataset.renderKey !== renderKey) {
+    control.dataset.renderKey = renderKey;
+    control.innerHTML = html;
+  }
+
+  const banner = shell.querySelector<HTMLElement>(".mock-banner");
+  const bannerText = text.banner[state.mode];
+  if (banner && banner.textContent !== bannerText) {
+    banner.textContent = bannerText;
+  }
+  const dashboardSnapshot = createRuntimeDashboardSnapshot({
+    connectionMode: state.mode,
+    uiState: ui.state,
+    canPause: ui.canPause,
+    canResume: ui.canResume,
+    canStop: ui.canStop,
+    controlMode: controlMode ?? "normal",
+    run: state.paperRun,
+    heartbeatAt: state.paperLease?.heartbeatAt,
+    events: state.paperEvents.map((event) => ({
+      eventType: event.eventType,
+      occurredAt: event.occurredAt,
+    })),
+  });
+  const dashboardSnapshotKey = JSON.stringify(dashboardSnapshot);
+  if (dashboardSnapshotKey !== lastRuntimeDashboardSnapshotKey) {
+    lastRuntimeDashboardSnapshotKey = dashboardSnapshotKey;
+    window.dispatchEvent(
+      new CustomEvent("tradebot:runtime-context", {
+        detail: dashboardSnapshot,
+      }),
+    );
+  }
 }
 
 async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
@@ -355,7 +946,250 @@ async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
   }
 }
 
+function releaseStorage(): Storage | undefined {
+  try {
+    return window.localStorage;
+  } catch {
+    return undefined;
+  }
+}
+
+function persistReleaseSession(): void {
+  if (state.mode !== "live") return;
+  const storage = releaseStorage();
+  if (!storage) return;
+  if (!state.draft && !state.paperPlan && !state.paperRun) {
+    storage.removeItem(RELEASE_SESSION_STORAGE_KEY);
+    return;
+  }
+  storage.setItem(
+    RELEASE_SESSION_STORAGE_KEY,
+    serializeReleaseSessionRefs({
+      schemaVersion: "1.0.0",
+      ...(state.draft ? { draftId: state.draft.draftId } : {}),
+      ...(state.paperPlan
+        ? { paperPlanId: state.paperPlan.planId }
+        : {}),
+      ...(state.paperRun ? { paperRunId: state.paperRun.runId } : {}),
+    }),
+  );
+}
+
+function applyRecoveredDraft(draft: DraftResponse): void {
+  state.draft = draft;
+  const promotion = deriveRecoveredPromotionState(
+    draft.promotionStage,
+  );
+  state.validationValid = promotion.validationValid;
+  state.backtestStatus = promotion.backtestStatus;
+  state.walkForwardStatus = promotion.walkForwardStatus;
+}
+
+function rotatePaperKey(operation: RuntimeOperationKey): void {
+  state.paperKeys = rotateRuntimeOperationKey(
+    state.paperKeys,
+    operation,
+  );
+}
+
+function acceptPaperRun(run: PaperRuntimeRunResponse | undefined): void {
+  const partition = partitionRuntimeRun(run);
+  state.paperRun = partition.activeRun;
+  if (partition.terminalRun) {
+    state.paperLastRun = partition.terminalRun;
+    state.paperLease = undefined;
+    state.paperStop = undefined;
+  }
+}
+
+async function applyPaperLaunchContext(
+  context: PaperRuntimeLaunchContextResponse,
+): Promise<boolean> {
+  if (
+    context.paperOnly !== true ||
+    context.runtimeApplied !== false ||
+    context.exchangeWriteAllowed !== false ||
+    context.clientRuntimeParametersAccepted !== false
+  ) {
+    throw new Error("PAPER_LAUNCH_CONTEXT_INVARIANT_FAILED");
+  }
+  state.paperLaunchPresetAvailable =
+    context.preset.availability === "available";
+  state.paperPlan = context.plan;
+  state.paperActivation = context.activation;
+  state.paperControl = context.control;
+  acceptPaperRun(context.run);
+  if (!context.run) {
+    state.paperLease = undefined;
+    state.paperStop = undefined;
+  }
+  state.paperPreflight =
+    context.preflight &&
+    Date.parse(context.preflight.expiresAt) > Date.now()
+      ? context.preflight
+      : undefined;
+  state.errorCode = context.blockerCode;
+  if (context.plan) {
+    applyRecoveredDraft(
+      await apiRequest<DraftResponse>(
+        `/api/orchestration/drafts/${encodeURIComponent(
+          context.plan.draftId,
+        )}`,
+      ),
+    );
+  }
+  if (state.paperRun) {
+    await refreshPaperSupervisor(state.paperRun.runId);
+    void pollPaperRun(state.paperRun.runId);
+  }
+  persistReleaseSession();
+  return Boolean(context.plan);
+}
+
+async function restorePaperLaunchContext(): Promise<boolean> {
+  return applyPaperLaunchContext(
+    await apiRequest<PaperRuntimeLaunchContextResponse>(
+      "/api/orchestration/paper-runtime/launch-context",
+    ),
+  );
+}
+
+function codeFromError(error: unknown): string {
+  return error instanceof Error ? error.message : "API_REQUEST_FAILED";
+}
+
+async function restoreReleaseSession(): Promise<void> {
+  const storage = releaseStorage();
+  const raw = storage?.getItem(RELEASE_SESSION_STORAGE_KEY);
+  if (!storage || raw == null) return;
+  const parsed = parseReleaseSessionRefs(raw);
+  if (!parsed.ok) {
+    storage.removeItem(RELEASE_SESSION_STORAGE_KEY);
+    state.restoreCode = parsed.code;
+    return;
+  }
+
+  let stale = false;
+  try {
+    if (parsed.refs.draftId) {
+      applyRecoveredDraft(
+        await apiRequest<DraftResponse>(
+          `/api/orchestration/drafts/${encodeURIComponent(
+            parsed.refs.draftId,
+          )}`,
+        ),
+      );
+    }
+  } catch {
+    stale = true;
+    state.draft = undefined;
+    state.paperPlan = undefined;
+    state.paperActivation = undefined;
+    state.paperRun = undefined;
+  }
+
+  if (!stale && parsed.refs.paperPlanId) {
+    try {
+      const plan = await apiRequest<ApprovedPaperPlanResponse>(
+        `/api/orchestration/paper-plans/${encodeURIComponent(
+          parsed.refs.paperPlanId,
+        )}`,
+      );
+      if (plan.runtimeApplied !== false) {
+        throw new Error("RUNTIME_MUTATION_INVARIANT_FAILED");
+      }
+      if (
+        !releaseReferenceChainMatches({
+          draftId: state.draft?.draftId,
+          planId: plan.planId,
+          planDraftId: plan.draftId,
+        })
+      ) {
+        throw new Error("RELEASE_SESSION_REFERENCE_MISMATCH");
+      }
+      state.paperPlan = plan;
+      try {
+        const activation =
+          await apiRequest<PaperActivationResponse>(
+            `/api/orchestration/paper-plans/${encodeURIComponent(
+              plan.planId,
+            )}/activation`,
+          );
+        if (activation.runtimeApplied !== false) {
+          throw new Error("RUNTIME_MUTATION_INVARIANT_FAILED");
+        }
+        state.paperActivation = activation;
+        try {
+          state.paperControl = await apiRequest<PaperControlResponse>(
+            `/api/orchestration/paper-plans/${encodeURIComponent(
+              plan.planId,
+            )}/control`,
+          );
+        } catch {
+          state.paperControl = undefined;
+        }
+      } catch (error) {
+        if (codeFromError(error) !== "PAPER_PLAN_NOT_ACTIVATED") {
+          throw error;
+        }
+        state.paperActivation = undefined;
+      }
+    } catch {
+      stale = true;
+      state.paperPlan = undefined;
+      state.paperActivation = undefined;
+      state.paperControl = undefined;
+      state.paperRun = undefined;
+    }
+  }
+
+  if (!stale && parsed.refs.paperRunId) {
+    try {
+      const run = await apiRequest<PaperRuntimeRunResponse>(
+        `/api/orchestration/paper-runs/${encodeURIComponent(
+          parsed.refs.paperRunId,
+        )}`,
+      );
+      if (run.exchangeWriteAllowed !== false) {
+        throw new Error("EXCHANGE_WRITE_INVARIANT_FAILED");
+      }
+      if (
+        !releaseReferenceChainMatches({
+          draftId: state.draft?.draftId,
+          planId: state.paperPlan?.planId,
+          planDraftId: state.paperPlan?.draftId,
+          runPlanId: run.planId,
+        })
+      ) {
+        throw new Error("RELEASE_SESSION_REFERENCE_MISMATCH");
+      }
+      acceptPaperRun(run);
+      await refreshPaperSupervisor(run.runId);
+      if (
+        run.status === "queued" ||
+        run.status === "running" ||
+        run.status === "stop_requested"
+      ) {
+        void pollPaperRun(run.runId);
+      }
+    } catch {
+      stale = true;
+      state.paperRun = undefined;
+      state.paperLease = undefined;
+      state.paperEvents = [];
+      state.paperIncidents = [];
+    }
+  }
+
+  state.paperPreflight = undefined;
+  state.restoreCode = stale
+    ? "RELEASE_SESSION_REFERENCE_STALE"
+    : "RELEASE_SESSION_RESTORED";
+  persistReleaseSession();
+}
+
 function renderBridge(): void {
+  renderRuntimeControl();
   const root = orchestrationRoot();
   if (!root) {
     return;
@@ -416,6 +1250,7 @@ function renderBridge(): void {
       ? `Artifact: ${state.artifactSha256.slice(0, 22)}…`
       : undefined,
     state.artifactLineage,
+    state.restoreCode ? text.restore[state.restoreCode] : undefined,
     state.errorCode ? `CODE: ${state.errorCode}` : undefined,
   ].filter(Boolean);
 
@@ -619,12 +1454,14 @@ function renderBridge(): void {
       </div>
     </section>
   `;
+  renderReleaseGuide(root, bridge);
 }
 
 async function connect(): Promise<void> {
   state.mode = "connecting";
   state.busy = true;
   state.errorCode = undefined;
+  state.restoreCode = undefined;
   renderBridge();
   try {
     const catalog = await apiRequest<CatalogResponse>("/api/orchestration/catalog");
@@ -638,6 +1475,16 @@ async function connect(): Promise<void> {
       );
       state.actorDisplayName = session.actor.displayName;
       state.mode = "live";
+      const restoredFromServer =
+        await restorePaperLaunchContext();
+      if (!restoredFromServer) {
+        await restoreReleaseSession();
+      }
+      window.dispatchEvent(
+        new CustomEvent("tradebot:orchestration-session", {
+          detail: { token: state.token },
+        }),
+      );
     } else {
       state.mode = "readonly";
     }
@@ -675,9 +1522,25 @@ async function runAction(action: string): Promise<void> {
   }
   state.busy = true;
   state.errorCode = undefined;
+  state.restoreCode = undefined;
   renderBridge();
   try {
-    if (action === "save") {
+    if (action === "prepare-current-crypto-fixture") {
+      await applyPaperLaunchContext(
+        await apiRequest<PaperRuntimeLaunchContextResponse>(
+          "/api/orchestration/paper-runtime/presets/current-crypto-fixture/prepare",
+          {
+            method: "POST",
+            body: JSON.stringify({
+              schemaVersion: "1.0.0",
+              idempotencyKey: crypto.randomUUID(),
+              confirmation:
+                "prepare_current_crypto_fixture_paper_plan",
+            }),
+          },
+        ),
+      );
+    } else if (action === "save") {
       const graph = state.catalog?.pipelineGraphs[0];
       if (!graph) {
         throw new Error("PIPELINE_GRAPH_UNAVAILABLE");
@@ -777,6 +1640,7 @@ async function runAction(action: string): Promise<void> {
         throw new Error("RUNTIME_MUTATION_INVARIANT_FAILED");
       }
       state.paperPlan = plan;
+      rotatePaperKey("plan");
     } else if (action === "activate-paper" && state.paperPlan) {
       const activation = await apiRequest<PaperActivationResponse>(
         `/api/orchestration/paper-plans/${encodeURIComponent(
@@ -795,6 +1659,7 @@ async function runAction(action: string): Promise<void> {
         throw new Error("RUNTIME_MUTATION_INVARIANT_FAILED");
       }
       state.paperActivation = activation;
+      rotatePaperKey("activation");
     } else if (
       action === "close-only" &&
       state.paperPlan &&
@@ -818,6 +1683,7 @@ async function runAction(action: string): Promise<void> {
         throw new Error("RUNTIME_MUTATION_INVARIANT_FAILED");
       }
       state.paperControl = control;
+      rotatePaperKey("control");
     } else if (
       action === "resume-normal" &&
       state.paperPlan &&
@@ -831,13 +1697,14 @@ async function runAction(action: string): Promise<void> {
           method: "POST",
           body: JSON.stringify({
             schemaVersion: "1.0.0",
-            idempotencyKey: crypto.randomUUID(),
+            idempotencyKey: state.paperKeys.control,
             mode: "normal",
             confirmation: "resume_normal_paper_cycles",
           }),
         },
       );
       state.paperControl = control;
+      rotatePaperKey("control");
     } else if (
       action === "paper-preflight" &&
       state.paperPlan &&
@@ -863,10 +1730,12 @@ async function runAction(action: string): Promise<void> {
         throw new Error("PREFLIGHT_MUTATION_INVARIANT_FAILED");
       }
       state.paperPreflight = preflight;
+      rotatePaperKey("preflight");
     } else if (
       action === "start-paper-run" &&
       state.paperPlan &&
-      state.paperActivation
+      state.paperActivation &&
+      state.paperControl?.mode !== "pause_new_openings_close_only"
     ) {
       const run = await apiRequest<PaperRuntimeRunResponse>(
         `/api/orchestration/paper-plans/${encodeURIComponent(
@@ -884,7 +1753,10 @@ async function runAction(action: string): Promise<void> {
       if (run.exchangeWriteAllowed !== false) {
         throw new Error("EXCHANGE_WRITE_INVARIANT_FAILED");
       }
-      state.paperRun = run;
+      acceptPaperRun(run);
+      state.paperLastRun = undefined;
+      state.paperStop = undefined;
+      rotatePaperKey("run");
       void pollPaperRun(run.runId);
     } else if (
       action === "stop-paper-run" &&
@@ -912,6 +1784,7 @@ async function runAction(action: string): Promise<void> {
         throw new Error("STOP_CONTROL_INVARIANT_FAILED");
       }
       state.paperStop = stop;
+      rotatePaperKey("stop");
     } else if (action === "ack-runtime-incident") {
       const incident = state.paperIncidents.find(
         (item) => item.status === "open",
@@ -931,6 +1804,7 @@ async function runAction(action: string): Promise<void> {
             }),
           },
         );
+        rotatePaperKey("acknowledgement");
         await refreshPaperSupervisor(state.paperRun.runId);
       }
     } else if (
@@ -962,6 +1836,7 @@ async function runAction(action: string): Promise<void> {
         throw new Error("ORPHAN_CLEARANCE_INVARIANT_FAILED");
       }
       state.paperClearance = clearance;
+      rotatePaperKey("clearance");
       await refreshPaperSupervisor(state.paperRun.runId);
     } else if (action === "compile" && state.draft) {
       const plan = await apiRequest<CompileResponse>(
@@ -977,6 +1852,7 @@ async function runAction(action: string): Promise<void> {
     state.errorCode = error instanceof Error ? error.message : "API_REQUEST_FAILED";
   } finally {
     state.busy = false;
+    persistReleaseSession();
     renderBridge();
   }
 }
@@ -988,7 +1864,7 @@ async function pollPaperRun(runId: string): Promise<void> {
       const run = await apiRequest<PaperRuntimeRunResponse>(
         `/api/orchestration/paper-runs/${encodeURIComponent(runId)}`,
       );
-      state.paperRun = run;
+      acceptPaperRun(run);
       try {
         state.paperLease = await apiRequest<PaperRuntimeLeaseResponse>(
           `/api/orchestration/paper-runs/${encodeURIComponent(runId)}/lease`,
@@ -997,6 +1873,7 @@ async function pollPaperRun(runId: string): Promise<void> {
         state.paperLease = undefined;
       }
       await refreshPaperSupervisor(runId);
+      persistReleaseSession();
       renderBridge();
       if (
         run.status === "completed" ||
@@ -1005,6 +1882,9 @@ async function pollPaperRun(runId: string): Promise<void> {
         run.status === "drained" ||
         run.status === "orphaned"
       ) {
+        acceptPaperRun(run);
+        persistReleaseSession();
+        renderBridge();
         return;
       }
     } catch {
@@ -1048,6 +1928,13 @@ document.addEventListener("click", (event) => {
   void runAction(button.dataset.runtimeAction ?? "");
 });
 
+window.addEventListener("tradebot:runtime-action-request", (event) => {
+  const action = (event as CustomEvent<{ action?: unknown }>).detail?.action;
+  if (action === "close-only" || action === "resume-normal") {
+    void runAction(action);
+  }
+});
+
 const observer = new MutationObserver((records) => {
   const languageChanged = records.some(
     (record) =>
@@ -1057,7 +1944,8 @@ const observer = new MutationObserver((records) => {
   );
   if (
     languageChanged ||
-    !document.querySelector("[data-orchestration-api-bridge]")
+    !document.querySelector("[data-orchestration-api-bridge]") ||
+    !document.querySelector("[data-runtime-control]")
   ) {
     renderBridge();
   }

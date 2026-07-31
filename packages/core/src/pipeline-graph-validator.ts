@@ -400,12 +400,13 @@ function validateObservationWindow(
     details?: Record<string, unknown>,
   ) => void,
 ): void {
-  const native = capability.nativeObservationWindows.find((window) => windowsEqual(window, requested));
-  if (native) return;
-  const aggregateSource = capability.nativeObservationWindows.find((window) => (
-    capability.aggregation.allowed && canAggregate(window, requested)
-  ));
-  if (aggregateSource) {
+  const assessment = assessObservationWindowCapability(
+    capability,
+    requested,
+  );
+  if (assessment.status === "native") return;
+  if (assessment.status === "aggregated") {
+    const aggregateSource = assessment.sourceWindow;
     const lineage = graph.dataLineage.find((candidate) => (
       candidate.dataSourceId === capability.dataSourceId
       && candidate.capabilityId === capability.capabilityId
@@ -425,16 +426,7 @@ function validateObservationWindow(
     return;
   }
 
-  const requestedSize = fixedWindowSize(requested);
-  const comparableNative = capability.nativeObservationWindows
-    .map((window) => ({ window, size: fixedWindowSize(window) }))
-    .filter((item): item is { window: ObservationWindow; size: number } => item.size !== undefined);
-  if (
-    requested.kind === "bar_interval"
-    && requestedSize !== undefined
-    && comparableNative.length > 0
-    && comparableNative.every((item) => item.size > requestedSize)
-  ) {
+  if (assessment.status === "upsampling_forbidden") {
     addIssue("UPSAMPLING_FORBIDDEN", "agent_config", config.agentConfigId, ["observationRequests", requestIndex, "window"], {
       requested,
       nativeObservationWindows: capability.nativeObservationWindows,
@@ -510,6 +502,56 @@ function canAggregate(source: ObservationWindow, target: ObservationWindow): boo
     && targetMonths !== undefined
     && sourceMonths < targetMonths
     && targetMonths % sourceMonths === 0;
+}
+
+export type ObservationWindowCapabilityAssessment =
+  | { status: "native"; requestedWindow: ObservationWindow }
+  | {
+      status: "aggregated";
+      requestedWindow: ObservationWindow;
+      sourceWindow: ObservationWindow;
+    }
+  | {
+      status: "upsampling_forbidden" | "unsupported";
+      requestedWindow: ObservationWindow;
+    };
+
+export function assessObservationWindowCapability(
+  capability: DataSourceCapability,
+  requestedWindow: ObservationWindow,
+): ObservationWindowCapabilityAssessment {
+  if (
+    capability.nativeObservationWindows.some((window) =>
+      windowsEqual(window, requestedWindow),
+    )
+  ) {
+    return { status: "native", requestedWindow };
+  }
+  const sourceWindow = capability.nativeObservationWindows.find(
+    (window) =>
+      capability.aggregation.allowed &&
+      canAggregate(window, requestedWindow),
+  );
+  if (sourceWindow) {
+    return {
+      status: "aggregated",
+      requestedWindow,
+      sourceWindow,
+    };
+  }
+  const requestedSize = fixedWindowSize(requestedWindow);
+  const comparableNative = capability.nativeObservationWindows
+    .map((window) => fixedWindowSize(window))
+    .filter((size): size is number => size !== undefined);
+  if (
+    requestedWindow.kind === "bar_interval" &&
+    requestedSize !== undefined &&
+    comparableNative.length > 0 &&
+    comparableNative.every((size) => size > requestedSize)
+  ) {
+    return { status: "upsampling_forbidden", requestedWindow };
+  }
+  return { status: "unsupported", requestedWindow };
 }
 
 function validateFeedbackEdge(
@@ -670,10 +712,24 @@ function validateExecutionBoundaries(
       });
     }
     const incoming = edges.filter((edge) => edge.toNodeId === executionNodeId && edge.kind !== "post_process");
-    const riskEdge = incoming.find((edge) => edge.toPort === "risk");
-    const decisionEdge = incoming.find((edge) => edge.toPort === "decision");
+    const riskEdge = incoming.find(
+      (edge) => resolved.get(edge.fromNodeId)?.template.role === "risk",
+    );
+    const decisionEdge = incoming.find(
+      (edge) => resolved.get(edge.fromNodeId)?.template.role === "portfolio",
+    );
     const riskNode = riskEdge ? resolved.get(riskEdge.fromNodeId) : undefined;
-    const portfolioNode = decisionEdge ? resolved.get(decisionEdge.fromNodeId) : undefined;
+    const riskInput = riskEdge
+      ? edges.find((edge) => (
+        edge.toNodeId === riskEdge.fromNodeId
+        && edge.kind !== "post_process"
+        && resolved.get(edge.fromNodeId)?.template.role === "portfolio"
+      ))
+      : undefined;
+    const portfolioEdge = decisionEdge ?? riskInput;
+    const portfolioNode = portfolioEdge
+      ? resolved.get(portfolioEdge.fromNodeId)
+      : undefined;
     if (!riskNode || riskNode.template.role !== "risk" || !riskNode.template.permissions.includes("veto_risk")) {
       addIssue("RISK_BOUNDARY_BYPASSED", "node", executionNodeId, ["inputPorts", "risk"], {
         riskSourceNodeId: riskEdge?.fromNodeId,
@@ -689,21 +745,23 @@ function validateExecutionBoundaries(
       });
     }
     if (riskNode && portfolioNode) {
-      const riskInput = edges.find((edge) => (
-        edge.toNodeId === riskEdge!.fromNodeId
-        && edge.toPort === "decision"
-        && edge.fromNodeId === decisionEdge!.fromNodeId
-      ));
-      if (!riskInput) {
+      if (
+        !riskInput ||
+        riskInput.fromNodeId !== portfolioEdge!.fromNodeId
+      ) {
         addIssue("RISK_BOUNDARY_BYPASSED", "node", executionNodeId, ["inputPorts", "risk"], {
           reason: "risk_did_not_validate_portfolio_decision",
           riskNodeId: riskEdge?.fromNodeId,
-          portfolioNodeId: decisionEdge?.fromNodeId,
+          portfolioNodeId: portfolioEdge?.fromNodeId,
         });
       }
     }
     if (portfolioNode) {
-      const proposals = edges.filter((edge) => edge.toNodeId === decisionEdge!.fromNodeId && edge.toPort === "proposals");
+      const proposals = edges.filter(
+        (edge) =>
+          edge.toNodeId === portfolioEdge!.fromNodeId &&
+          edge.kind !== "post_process",
+      );
       const invalidProposal = proposals.find((edge) => {
         const source = resolved.get(edge.fromNodeId);
         return !source || !(
@@ -718,7 +776,10 @@ function validateExecutionBoundaries(
         });
       }
     }
-    const unexpectedIncoming = incoming.find((edge) => edge.toPort !== "decision" && edge.toPort !== "risk");
+    const unexpectedIncoming = incoming.find((edge) => {
+      const role = resolved.get(edge.fromNodeId)?.template.role;
+      return role !== "portfolio" && role !== "risk";
+    });
     if (unexpectedIncoming) {
       addIssue("EXECUTION_BOUNDARY_BYPASSED", "edge", unexpectedIncoming.edgeId, ["toNodeId"], {
         toNodeId: executionNodeId,

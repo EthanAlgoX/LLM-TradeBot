@@ -1,7 +1,7 @@
 import type {
   Agent,
-  AgentArtifact,
   AgentArtifactQuery,
+  AgentArtifact,
   AnalysisBundle,
   CycleRequest,
   DecisionBundle,
@@ -48,6 +48,13 @@ export interface PortfolioRiskInput { decision: DecisionBundle; state: Portfolio
 export interface ExecutionInput {
   decision: DecisionBundle;
   risk: RiskDecision;
+  evidence?: {
+    executionArtifactId: string;
+    sourceArtifactIds: readonly string[];
+    decisionArtifactId?: string;
+    portfolioArtifactId?: string;
+    riskArtifactId?: string;
+  };
 }
 
 export interface PositionMonitorInput {
@@ -57,7 +64,11 @@ export interface PositionMonitorInput {
   position: OpenPosition;
 }
 
-export interface ReflectionInput { asOf: Date; trades: readonly ClosedTrade[]; }
+export interface ReflectionInput {
+  asOf: Date;
+  trades: readonly ClosedTrade[];
+  sourceArtifacts?: readonly AgentArtifact[];
+}
 
 export type SelectorAgent = Agent<SelectionInput, UniverseSet>;
 export type DataSyncAgent = Agent<MarketDataInput, MultiTimeframeSnapshot>;

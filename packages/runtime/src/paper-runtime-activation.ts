@@ -478,6 +478,16 @@ export class PaperRuntimeActivationService {
     return report;
   }
 
+  findLatestPreflight(
+    planId: string,
+  ): PaperRuntimePreflightReport | undefined {
+    return this.operations?.findLatestPreflight(planId);
+  }
+
+  findActiveRun(planId: string): PaperRuntimeRun | undefined {
+    return this.repository.findActive(planId);
+  }
+
   startRun(
     planId: string,
     rawRequest: unknown,

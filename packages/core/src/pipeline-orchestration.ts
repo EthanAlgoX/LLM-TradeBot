@@ -259,7 +259,8 @@ function graphIdentity(graph: PipelineGraphVersion): {
       getStringField(graph, ["graphId", "pipelineGraphId", "id"]) ??
       "pipeline-graph:unknown",
     humanVersion:
-      getStringField(graph, ["humanVersion", "version"]) ?? "unversioned",
+      getStringField(graph, ["humanVersion", "humanReadableVersion", "version"]) ??
+      "unversioned",
   };
 }
 

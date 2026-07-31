@@ -1,11 +1,16 @@
 import { DatabaseSync } from "node:sqlite";
 import { randomBytes } from "node:crypto";
-import type { OrchestrationActor } from "../../contracts/src/index.js";
+import type {
+  OrchestrationActor,
+  PipelineGraphVersion,
+} from "../../contracts/src/index.js";
 import {
   BINANCE_FUTURES_PUBLIC_CAPABILITY,
   BINANCE_FUTURES_PUBLIC_DATA_SOURCE,
   CSV_HISTORICAL_CAPABILITY,
   CSV_HISTORICAL_DATA_SOURCE,
+  DAILY_RESEARCH_CAPABILITY,
+  DAILY_RESEARCH_DATA_SOURCE,
 } from "../../adapters/src/data-source-capability-manifests.js";
 import {
   CURRENT_CRYPTO_AGENT_CONFIGS,
@@ -26,7 +31,16 @@ import {
   ImmutablePipelineRegistry,
   PipelineGraphCompiler,
   PipelineOrchestrationService,
+  type PipelineRegistrySeed,
 } from "../../core/src/pipeline-orchestration.js";
+import {
+  OrchestrationIntentCompiler,
+  OrchestrationIntentDraftService,
+} from "../../core/src/orchestration-intent-compiler.js";
+import {
+  OrchestrationCopilotService,
+} from "../../core/src/orchestration-copilot-service.js";
+import { createRegisteredSemanticPipelinePresetCatalog } from "../../core/src/semantic-pipeline-presets.js";
 import { validatePipelineGraph } from "../../core/src/pipeline-graph-validator.js";
 import { createPipelineOrchestrationHttpServer } from "./pipeline-orchestration-http.js";
 import { SqlitePipelineDraftRepository } from "./sqlite-pipeline-draft-repository.js";
@@ -52,6 +66,35 @@ import {
   PaperRuntimeSupervisorService,
   SqlitePaperRuntimeSupervisorRepository,
 } from "./sqlite-paper-runtime-supervisor.js";
+import {
+  createProductionStrategyOrchestration,
+  type ProductionStrategyOrchestration,
+  type ProductionStrategyOrchestrationOptions,
+} from "./production-strategy-orchestration.js";
+import { CurrentCryptoPaperLaunchService } from "./current-crypto-paper-launch.js";
+import {
+  createSqliteRuntimeEvidenceReadModelService,
+  type RuntimeEvidenceReadModelConfig,
+  type RuntimeEvidenceReadModelService,
+} from "./runtime-evidence-read-model.js";
+import { RuntimeEvidenceHttpHandler } from "./runtime-evidence-http.js";
+import {
+  createSqliteCausalTradeReviewReadModelService,
+  type CausalTradeReviewReadModelService,
+} from "./causal-trade-review-read-model.js";
+import { CausalTradeReviewHttpHandler } from "./causal-trade-review-http.js";
+import {
+  ProductionComparativeTradeReviewComposition,
+  type ProductionComparativeTradeReviewOptions,
+} from "./production-comparative-trade-review.js";
+import {
+  SqliteLessonCandidateValidationBindingRepository,
+} from "./sqlite-lesson-candidate-validation-binding-repository.js";
+
+export type ComparativeTradeReviewRuntimeOptions = Omit<
+  ProductionComparativeTradeReviewOptions,
+  "authenticator" | "validationBinding" | "evidenceGate"
+>;
 
 export interface CurrentPipelineOrchestrationRuntimeOptions {
   database?: DatabaseSync;
@@ -67,6 +110,15 @@ export interface CurrentPipelineOrchestrationRuntimeOptions {
   paperRuntimeOwnerId?: string;
   paperRuntimeLeaseTtlMs?: number;
   paperRuntimePreflightTtlMs?: number;
+  currentCryptoPaperLaunchPreset?: boolean;
+  runtimeEvidenceReadModel?: RuntimeEvidenceReadModelConfig;
+  comparativeTradeReview?: ComparativeTradeReviewRuntimeOptions;
+  strategyOrchestration?: ProductionStrategyOrchestrationOptions;
+  strategyOrchestrationFactory?: (
+    registry: ImmutablePipelineRegistry,
+  ) => ProductionStrategyOrchestrationOptions;
+  registrySeed?: PipelineRegistrySeed;
+  pipelineGraphs?: readonly PipelineGraphVersion[];
 }
 
 export interface CurrentPipelineOrchestrationRuntime {
@@ -76,6 +128,9 @@ export interface CurrentPipelineOrchestrationRuntime {
   repository: SqlitePipelineDraftRepository;
   compiler: PipelineGraphCompiler;
   service: PipelineOrchestrationService;
+  intentCompiler: OrchestrationIntentCompiler;
+  intentDraftService: OrchestrationIntentDraftService;
+  orchestrationCopilotService: OrchestrationCopilotService;
   evidenceRepository: SqlitePipelineEvidenceRepository;
   evidenceWorkflow: PipelineEvidenceWorkflow;
   artifactStore?: HistoricalEvidenceArtifactStore;
@@ -87,6 +142,11 @@ export interface CurrentPipelineOrchestrationRuntime {
   paperRuntimeSupervisorRepository: SqlitePaperRuntimeSupervisorRepository;
   paperRuntimeSupervisorService: PaperRuntimeSupervisorService;
   paperRuntimeActivationService: PaperRuntimeActivationService;
+  currentCryptoPaperLaunchService?: CurrentCryptoPaperLaunchService;
+  runtimeEvidenceReadModelService?: RuntimeEvidenceReadModelService;
+  causalTradeReviewReadModelService?: CausalTradeReviewReadModelService;
+  comparativeTradeReviewComposition?: ProductionComparativeTradeReviewComposition;
+  productionStrategyOrchestration: ProductionStrategyOrchestration;
   ephemeralOperatorToken: string;
   server: ReturnType<typeof createPipelineOrchestrationHttpServer>;
   close(): Promise<void>;
@@ -113,33 +173,75 @@ export function createCurrentPipelineOrchestrationRuntime(
   if (options.database && options.databasePath) {
     throw new Error("Provide database or databasePath, not both.");
   }
+  if (
+    options.strategyOrchestration &&
+    options.strategyOrchestrationFactory
+  ) {
+    throw new Error(
+      "Provide strategyOrchestration or strategyOrchestrationFactory, not both.",
+    );
+  }
 
   const ownsDatabase = !options.database;
   const database =
     options.database ??
     new DatabaseSync(options.databasePath ?? "tradebot-orchestration.sqlite");
+  const registrySeed = options.registrySeed ?? {};
   const registry = new ImmutablePipelineRegistry({
-    marketPacks: [CURRENT_CRYPTO_MARKET_PACK],
+    marketPacks: [
+      CURRENT_CRYPTO_MARKET_PACK,
+      ...(registrySeed.marketPacks ?? []),
+    ],
     dataSources: [
       BINANCE_FUTURES_PUBLIC_DATA_SOURCE,
       CSV_HISTORICAL_DATA_SOURCE,
+      DAILY_RESEARCH_DATA_SOURCE,
+      ...(registrySeed.dataSources ?? []),
     ],
     capabilities: [
       BINANCE_FUTURES_PUBLIC_CAPABILITY,
       CSV_HISTORICAL_CAPABILITY,
+      DAILY_RESEARCH_CAPABILITY,
+      ...(registrySeed.capabilities ?? []),
     ],
-    agentTemplates: CURRENT_CRYPTO_AGENT_TEMPLATES,
-    agentConfigs: CURRENT_CRYPTO_AGENT_CONFIGS,
-    implementationBindings: implementationBindings(),
+    agentTemplates: [
+      ...CURRENT_CRYPTO_AGENT_TEMPLATES,
+      ...(registrySeed.agentTemplates ?? []),
+    ],
+    agentConfigs: [
+      ...CURRENT_CRYPTO_AGENT_CONFIGS,
+      ...(registrySeed.agentConfigs ?? []),
+    ],
+    implementationBindings: [
+      ...implementationBindings(),
+      ...(registrySeed.implementationBindings ?? []),
+    ],
   });
   const repository = new SqlitePipelineDraftRepository(database);
-  const validator = (graph: typeof CURRENT_CRYPTO_PIPELINE_GRAPH) =>
+  const validator = (graph: PipelineGraphVersion) =>
     validatePipelineGraph(graph, registry.toValidationContext());
   const compiler = new PipelineGraphCompiler(registry, validator);
   const service = new PipelineOrchestrationService(
     repository,
     compiler,
     validator,
+  );
+  const intentCompiler = new OrchestrationIntentCompiler({
+    registry,
+    presets: createRegisteredSemanticPipelinePresetCatalog(),
+    bindings: [
+      {
+        presetId: "preset.current-crypto-multi-agent",
+        graph: CURRENT_CRYPTO_PIPELINE_GRAPH,
+        marketPackIds: [CURRENT_CRYPTO_MARKET_PACK.marketPackId],
+        dataSourceIds: CURRENT_CRYPTO_PIPELINE_GRAPH.dataSourceRefs,
+      },
+    ],
+    validateGraph: validator,
+  });
+  const intentDraftService = new OrchestrationIntentDraftService(
+    intentCompiler,
+    service,
   );
   const operatorToken =
     options.operatorToken ?? randomBytes(24).toString("base64url");
@@ -183,6 +285,112 @@ export function createCurrentPipelineOrchestrationRuntime(
     evidenceExecutor,
   );
   const paperPlanRepository = new SqliteApprovedPaperPlanRepository(database);
+  const strategyOrchestration =
+    options.strategyOrchestrationFactory?.(registry) ??
+    options.strategyOrchestration;
+  const productionStrategyOrchestration =
+    createProductionStrategyOrchestration(
+      {
+        database,
+        registry,
+        pipelineService: service,
+        authenticator,
+        paperPlanRepository,
+      },
+      strategyOrchestration,
+    );
+  const comparativeTradeReviewComposition = options.comparativeTradeReview
+    ? new ProductionComparativeTradeReviewComposition({
+        ...options.comparativeTradeReview,
+        authenticator: {
+          async authenticate(authorization) {
+            const actor = authenticator.authenticate(
+              authorization ?? undefined,
+            );
+            if (!actor.roles.includes("approver")) {
+              throw new Error("Authenticated actor is not an approver.");
+            }
+            return {
+              actorId: actor.actorId,
+              role: "approver",
+              authenticatedAt: new Date().toISOString(),
+            };
+          },
+        },
+        validationBinding: {
+          repository:
+            new SqliteLessonCandidateValidationBindingRepository(database),
+          configurations:
+            productionStrategyOrchestration.configurationDraftService,
+          configurationResolver:
+            productionStrategyOrchestration.configurationDraftRepository,
+          pipelines: service,
+        },
+        ...(productionStrategyOrchestration.strategyEvidenceApprovalService
+          ? {
+              evidenceGate: {
+                strategyEvidence:
+                  productionStrategyOrchestration.strategyEvidenceApprovalService,
+                scopes: productionStrategyOrchestration.lessonEvidenceScopes,
+                deriveActor: (context) => {
+                  if (context.actorId !== operatorActor.actorId) {
+                    throw new Error("FORBIDDEN");
+                  }
+                  return operatorActor;
+                },
+              },
+            }
+          : {}),
+      })
+    : undefined;
+  const orchestrationCopilotService = new OrchestrationCopilotService({
+    intentDraftService,
+    configurationDraftService:
+      productionStrategyOrchestration.configurationDraftService,
+    pipelineService: service,
+    evidenceWorkflow,
+    registry,
+    recipes: [
+      {
+        presetId: "preset.event-only-research",
+        aliases: ["新闻", "事件", "news", "event"],
+        marketPackId: CURRENT_CRYPTO_MARKET_PACK.marketPackId,
+        dataSourceIds: [],
+        defaultObservationWindows: [
+          { kind: "event_batch", unit: "hour", value: 1 },
+        ],
+        editableAgentTemplateId: "agent-template:analysis:v1",
+        editableParameters: {},
+      },
+      {
+        presetId: "preset.single-window-daily",
+        aliases: ["日线", "单周期", "daily", "1d"],
+        marketPackId: CURRENT_CRYPTO_MARKET_PACK.marketPackId,
+        dataSourceIds: [DAILY_RESEARCH_DATA_SOURCE.dataSourceId],
+        defaultObservationWindows: [
+          { kind: "bar_interval", unit: "day", value: 1 },
+        ],
+        editableAgentTemplateId: "agent-template:analysis:v1",
+        editableParameters: { confidenceThreshold: 0.6 },
+      },
+      {
+        presetId: "preset.current-crypto-multi-agent",
+        aliases: ["当前", "加密", "比特币", "crypto", "btc", "current"],
+        marketPackId: CURRENT_CRYPTO_MARKET_PACK.marketPackId,
+        dataSourceIds: CURRENT_CRYPTO_PIPELINE_GRAPH.dataSourceRefs,
+        defaultObservationWindows: [
+          { kind: "bar_interval", unit: "minute", value: 5 },
+          { kind: "bar_interval", unit: "minute", value: 15 },
+          { kind: "bar_interval", unit: "hour", value: 1 },
+        ],
+        editableAgentTemplateId: "agent-template:analysis:v1",
+        editableParameters: {
+          confidenceThreshold: 0.6,
+          lookbackPeriods: 48,
+        },
+      },
+    ],
+  });
   const paperEvidenceVerifier = new SqliteApprovedPaperEvidenceVerifier(
     database,
     evidenceRepository,
@@ -204,6 +412,32 @@ export function createCurrentPipelineOrchestrationRuntime(
   const paperRuntimeOperationsRepository =
     new SqlitePaperRuntimeOperationsRepository(database);
   const paperRuntimeRunRepository = new SqlitePaperRuntimeRunRepository(database);
+  const runtimeEvidenceReadModelService =
+    options.runtimeEvidenceReadModel
+      ? createSqliteRuntimeEvidenceReadModelService(
+          options.runtimeEvidenceReadModel,
+          paperRuntimeRunRepository,
+        )
+      : undefined;
+  const runtimeEvidenceHttpHandler = runtimeEvidenceReadModelService
+    ? new RuntimeEvidenceHttpHandler(
+        authenticator,
+        runtimeEvidenceReadModelService,
+      )
+    : undefined;
+  const causalTradeReviewReadModelService =
+    options.runtimeEvidenceReadModel
+      ? createSqliteCausalTradeReviewReadModelService(
+          options.runtimeEvidenceReadModel,
+          paperRuntimeRunRepository,
+        )
+      : undefined;
+  const causalTradeReviewHttpHandler = causalTradeReviewReadModelService
+    ? new CausalTradeReviewHttpHandler(
+        authenticator,
+        causalTradeReviewReadModelService,
+      )
+    : undefined;
   const paperRuntimeSupervisorRepository =
     new SqlitePaperRuntimeSupervisorRepository(database);
   const paperRuntimeSupervisorService = new PaperRuntimeSupervisorService(
@@ -229,6 +463,15 @@ export function createCurrentPipelineOrchestrationRuntime(
       supervisor: paperRuntimeSupervisorRepository,
     },
   );
+  const currentCryptoPaperLaunchService =
+    new CurrentCryptoPaperLaunchService({
+      available: options.currentCryptoPaperLaunchPreset === true,
+      graph: CURRENT_CRYPTO_PIPELINE_GRAPH,
+      orchestration: service,
+      evidenceWorkflow,
+      paperPlans: paperPlanService,
+      paperRuntime: paperRuntimeActivationService,
+    });
   const operationalOutboxDispatcher = new SqliteOperationalOutboxDispatcher({
     database,
   });
@@ -260,15 +503,45 @@ export function createCurrentPipelineOrchestrationRuntime(
   const server = createPipelineOrchestrationHttpServer({
     registry,
     service,
+    intentDraftService,
+    orchestrationCopilotService,
     authenticator,
     evidenceWorkflow,
     paperPlanService,
     paperRuntimeActivationService,
+    currentCryptoPaperLaunchService,
+    runtimeEvidenceHttpHandler,
+    causalTradeReviewHttpHandler,
+    ...(comparativeTradeReviewComposition
+      ? {
+          comparativeTradeReviewHttpHandler:
+            comparativeTradeReviewComposition.handler,
+        }
+      : {}),
     paperRuntimeSupervisorService,
     operationalOutboxDispatcher,
     operationalOutboxWorker,
     operationalRetentionService,
-    pipelineGraphs: [CURRENT_CRYPTO_PIPELINE_GRAPH],
+    configurationDraftHttpHandler:
+      productionStrategyOrchestration.configurationDraftHttpHandler,
+    ...(productionStrategyOrchestration.strategyEvidenceHttpHandler
+      ? {
+          strategyEvidenceHttpHandler:
+            productionStrategyOrchestration.strategyEvidenceHttpHandler,
+        }
+      : {}),
+    ...(productionStrategyOrchestration.historicalSemanticEvaluationHttpHandler
+      ? {
+          historicalSemanticEvaluationHttpHandler:
+            productionStrategyOrchestration.historicalSemanticEvaluationHttpHandler,
+        }
+      : {}),
+    productionWorkspaceCatalog:
+      productionStrategyOrchestration.workspaceCatalog,
+    pipelineGraphs: [
+      CURRENT_CRYPTO_PIPELINE_GRAPH,
+      ...(options.pipelineGraphs ?? []),
+    ],
     ...(options.maxBodyBytes ? { maxBodyBytes: options.maxBodyBytes } : {}),
   });
 
@@ -279,6 +552,9 @@ export function createCurrentPipelineOrchestrationRuntime(
     repository,
     compiler,
     service,
+    intentCompiler,
+    intentDraftService,
+    orchestrationCopilotService,
     evidenceRepository,
     evidenceWorkflow,
     paperPlanRepository,
@@ -288,6 +564,17 @@ export function createCurrentPipelineOrchestrationRuntime(
     paperRuntimeSupervisorRepository,
     paperRuntimeSupervisorService,
     paperRuntimeActivationService,
+    currentCryptoPaperLaunchService,
+    ...(runtimeEvidenceReadModelService
+      ? { runtimeEvidenceReadModelService }
+      : {}),
+    ...(causalTradeReviewReadModelService
+      ? { causalTradeReviewReadModelService }
+      : {}),
+    ...(comparativeTradeReviewComposition
+      ? { comparativeTradeReviewComposition }
+      : {}),
+    productionStrategyOrchestration,
     ...(artifactStore ? { artifactStore } : {}),
     ...(artifactLedger ? { artifactLedger } : {}),
     ephemeralOperatorToken: operatorToken,
@@ -304,6 +591,9 @@ export function createCurrentPipelineOrchestrationRuntime(
           });
         });
       }
+      runtimeEvidenceReadModelService?.close();
+      causalTradeReviewReadModelService?.close();
+      comparativeTradeReviewComposition?.close();
       if (ownsDatabase) {
         database.close();
       }

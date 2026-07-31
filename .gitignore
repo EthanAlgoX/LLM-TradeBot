@@ -19,6 +19,9 @@ __pycache__/
 # Trading data, logs, traces
 data/
 reports/
+.playwright-cli/
+output/
+/tradebot-orchestration.sqlite
 
 # Temporary files
 /tmp/

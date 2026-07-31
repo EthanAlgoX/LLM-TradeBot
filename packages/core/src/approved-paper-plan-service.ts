@@ -60,6 +60,7 @@ export interface ApprovedPaperPlanRepository {
     idempotencyKey: string,
   ): PaperActivationRecord | undefined;
   findActivationByPlanId(planId: string): PaperActivationRecord | undefined;
+  findLatestActivation(): PaperActivationRecord | undefined;
   saveActivation(
     activation: PaperActivationRecord,
     actorId: string,
@@ -410,6 +411,18 @@ export class ApprovedPaperPlanService {
       );
     }
     return activation;
+  }
+
+  findLatestActivatedPlan(): {
+    plan: ApprovedPaperPlan;
+    activation: PaperActivationRecord;
+  } | undefined {
+    const activation = this.repository.findLatestActivation();
+    if (!activation) return undefined;
+    return {
+      plan: this.getPlan(activation.planId),
+      activation,
+    };
   }
 
   recordCloseOnly(
