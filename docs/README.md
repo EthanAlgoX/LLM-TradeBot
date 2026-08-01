@@ -10,6 +10,7 @@
 | [`../PRODUCT.md`](../PRODUCT.md) | TradeBot 是什么，哪些边界不能突破 | 产品定义或核心边界变化时更新 |
 | [`architecture-and-delivery-plan.md`](architecture-and-delivery-plan.md) | 目标架构、系统边界和阶段依赖是什么 | 架构决策或交付阶段变化时更新 |
 | [`product-roadmap-and-progress.md`](product-roadmap-and-progress.md) | 当前完成到哪里，剩余工作按什么顺序推进 | 每个 Loop 完成后更新当前状态，不追加完整日志 |
+| [`product-optimization-plan-and-progress.md`](product-optimization-plan-and-progress.md) | 数据中心、历史对话、实验场、多模拟与未来 Live 如何逐步形成完整产品 | 产品优化决策或里程碑进度变化时更新 |
 | [`project-status-and-handoff.md`](project-status-and-handoff.md) | 新窗口接手时需要知道哪些运行事实、风险和命令 | 每个 Loop 完成后覆盖为最新快照 |
 | [`next-loop-prompt.md`](next-loop-prompt.md) | 尚未执行的下一阶段具体任务是什么 | 下一 Loop 完成后替换，不保留已完成任务 |
 

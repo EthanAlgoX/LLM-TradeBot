@@ -33,6 +33,141 @@ export const ConversationCommandSchema = z
   })
   .strict();
 
+export const ConversationTurnDraftReferenceSchema =
+  ConversationDraftReferenceSchema;
+
+const ConversationPageCursorSchema = z
+  .string()
+  .max(240)
+  .regex(/^[A-Za-z0-9._~-]+$/u, "page_cursor");
+
+const ConversationSelectionSelectionIdArraySchema = z
+  .array(ConversationStableIdSchema)
+  .default([]);
+
+const ConversationSummarySelectionSchema = z
+  .object({
+    marketPackId: ConversationStableIdSchema.optional(),
+    dataSourceIds: ConversationSelectionSelectionIdArraySchema,
+    presetId: ConversationStableIdSchema.optional(),
+    agentTemplateId: ConversationStableIdSchema.optional(),
+    draftReference: ConversationDraftReferenceSchema.optional(),
+  })
+  .strict();
+
+const ConversationSummaryStatusSchema = z.enum([
+  "proposal",
+  "validation_failed",
+  "evidence_required",
+  "approval_ready",
+  "unavailable",
+]);
+
+export const ConversationSummarySchema = z
+  .object({
+    schemaVersion: z.literal("1.0.0"),
+    conversationId: ConversationStableIdSchema,
+    createdAt: CreatedAtSchema,
+    updatedAt: CreatedAtSchema,
+    turnCount: z.number().int().min(0).max(10_000),
+    displayTitle: z.string().min(1).max(220),
+    latestStatus: ConversationSummaryStatusSchema,
+    selected: ConversationSummarySelectionSchema,
+    latestDraftReference: ConversationTurnDraftReferenceSchema.optional(),
+    nextGate: z
+      .enum([
+        "contract_validation",
+        "backtest",
+        "walk_forward",
+        "human_approval",
+        "paper_running",
+      ])
+      .optional(),
+    runtimeApplied: z.literal(false),
+  })
+  .strict();
+
+export const ConversationTurnSchema = z
+  .object({
+    schemaVersion: z.literal("1.0.0"),
+    turnId: ConversationStableIdSchema,
+    idempotencyKey: ConversationStableIdSchema,
+    conversationId: ConversationStableIdSchema,
+    createdAt: CreatedAtSchema,
+    command: z
+      .object({
+        message: z.string().min(2).max(2_000),
+        locale: ConversationCommandSchema.shape.locale,
+      })
+      .strict(),
+    response: z
+      .object({
+        status: z
+          .enum([
+            "proposal",
+            "validation_failed",
+            "evidence_required",
+            "approval_ready",
+            "unavailable",
+          ]),
+        assistantMessage: z.string().min(1).max(4_000),
+        selected: ConversationSummarySelectionSchema,
+        draftReference: ConversationTurnDraftReferenceSchema.optional(),
+        proposal: z.lazy(() => DraftProposalSchema).optional(),
+        toolActivity: z.lazy(() => ToolActivityListSchema),
+        validation: z.lazy(() => ValidationSummarySchema),
+        evidenceGates: z.lazy(() => EvidenceGateSummarySchema),
+      })
+      .strict(),
+    runtimeApplied: z.literal(false),
+  })
+  .strict();
+
+export const ConversationSummaryPageSchema = z
+  .object({
+    schemaVersion: z.literal("1.0.0"),
+    items: z.array(ConversationSummarySchema),
+    hasMore: z.boolean(),
+    ...(z.object({}).shape),
+    nextCursor: ConversationPageCursorSchema.optional(),
+  })
+  .strict();
+
+export const ConversationTurnPageSchema = z
+  .object({
+    schemaVersion: z.literal("1.0.0"),
+    conversationId: ConversationStableIdSchema,
+    items: z.array(ConversationTurnSchema),
+    hasMore: z.boolean(),
+    nextCursor: ConversationPageCursorSchema.optional(),
+  })
+  .strict();
+
+const ConversationListRequestPagingSchema = z
+  .object({
+    schemaVersion: z.literal("1.0.0"),
+    cursor: ConversationPageCursorSchema.optional(),
+    limit: z.number().int().min(1).max(50).default(20),
+  })
+  .strict();
+
+export const ConversationListRequestSchema = z
+  .object({
+    ...(ConversationListRequestPagingSchema.shape),
+  })
+  .strict();
+
+export const ConversationTurnsRequestSchema = z
+  .object({
+    ...(ConversationListRequestPagingSchema.shape),
+  })
+  .strict();
+
+export const ConversationIdSchema = z.object({
+  schemaVersion: z.literal("1.0.0"),
+  conversationId: ConversationStableIdSchema,
+});
+
 export const ConversationContextSchema = z
   .object({
     schemaVersion: z.literal("1.0.0"),
@@ -113,6 +248,52 @@ export const RegisteredToolResultSchema = z
     output: z.record(z.string(), z.unknown()),
   })
   .strict();
+
+/** Bounded browser-safe projection; raw tool arguments and output never cross this boundary. */
+export const ToolActivitySchema = z
+  .object({
+    schemaVersion: z.literal("1.0.0"),
+    toolName: RegisteredCopilotToolNameSchema,
+    toolCallId: ConversationStableIdSchema,
+    toolCallHumanVersion: HumanVersionSchema,
+    toolCallFingerprint: FingerprintSchema,
+    toolCallCreatedAt: CreatedAtSchema,
+    toolCallLifecycle: z.literal("requested"),
+    toolResultId: ConversationStableIdSchema.optional(),
+    toolResultHumanVersion: HumanVersionSchema.optional(),
+    toolResultFingerprint: FingerprintSchema.optional(),
+    toolResultCreatedAt: CreatedAtSchema.optional(),
+    toolResultLifecycle: z.enum(["succeeded", "rejected", "unavailable"]).optional(),
+  })
+  .strict();
+
+export const ToolActivityListSchema = z.array(ToolActivitySchema).max(12);
+
+export function projectToolActivity(
+  calls: readonly z.infer<typeof RegisteredToolCallSchema>[],
+  results: readonly z.infer<typeof RegisteredToolResultSchema>[],
+): z.infer<typeof ToolActivityListSchema> {
+  const resultByCallId = new Map(results.map((result) => [result.toolCallId, result]));
+  return ToolActivityListSchema.parse(calls.slice(0, 12).map((call) => {
+    const result = resultByCallId.get(call.toolCallId);
+    return {
+      schemaVersion: "1.0.0",
+      toolName: call.toolName,
+      toolCallId: call.toolCallId,
+      toolCallHumanVersion: call.humanVersion,
+      toolCallFingerprint: call.fingerprint,
+      toolCallCreatedAt: call.createdAt,
+      toolCallLifecycle: "requested",
+      ...(result && result.toolName === call.toolName ? {
+        toolResultId: result.toolResultId,
+        toolResultHumanVersion: result.humanVersion,
+        toolResultFingerprint: result.fingerprint,
+        toolResultCreatedAt: result.createdAt,
+        toolResultLifecycle: result.lifecycleStatus,
+      } : {}),
+    };
+  }));
+}
 
 export const DraftChangeSchema = z
   .object({
@@ -315,6 +496,8 @@ export const OrchestrationCopilotErrorCodeSchema = z.enum([
   "COPILOT_IDEMPOTENCY_CONFLICT",
   "COPILOT_PARENT_FINGERPRINT_CONFLICT",
   "COPILOT_AGENT_FIELD_NOT_ALLOWED",
+  "COPILOT_CONVERSATION_DRAFT_REFERENCE_CONFLICT",
+  "CONVERSATION_NOT_FOUND",
 ]);
 
 // Compatibility aliases for existing imports while the endpoint adopts the
@@ -325,12 +508,29 @@ export const OrchestrationCopilotResponseSchema =
   ConversationAssistantResponseSchema;
 
 export type ConversationCommand = z.infer<typeof ConversationCommandSchema>;
+export type ConversationTurnDraftReference = z.infer<
+  typeof ConversationTurnDraftReferenceSchema
+>;
+export type ConversationDraftReference = z.infer<
+  typeof ConversationDraftReferenceSchema
+>;
+export type ConversationSummary = z.infer<typeof ConversationSummarySchema>;
+export type ConversationTurn = z.infer<typeof ConversationTurnSchema>;
+export type ConversationSummaryPage = z.infer<typeof ConversationSummaryPageSchema>;
+export type ConversationTurnPage = z.infer<typeof ConversationTurnPageSchema>;
+export type ConversationListRequest = z.infer<typeof ConversationListRequestSchema>;
+export type ConversationTurnsRequest = z.infer<typeof ConversationTurnsRequestSchema>;
+export type ConversationId = z.infer<typeof ConversationIdSchema>;
+export type ConversationListRequestSchema = z.infer<
+  typeof ConversationListRequestSchema
+>;
 export type ConversationContext = z.infer<typeof ConversationContextSchema>;
 export type RegisteredCopilotToolName = z.infer<
   typeof RegisteredCopilotToolNameSchema
 >;
 export type RegisteredToolCall = z.infer<typeof RegisteredToolCallSchema>;
 export type RegisteredToolResult = z.infer<typeof RegisteredToolResultSchema>;
+export type ToolActivity = z.infer<typeof ToolActivitySchema>;
 export type DraftChange = z.infer<typeof DraftChangeSchema>;
 export type AgentOrchestrationClass = z.infer<
   typeof AgentOrchestrationClassSchema

@@ -4,13 +4,14 @@ import "./runtime-evidence-api.js";
 import "./causal-review-api.js";
 import "./comparative-trade-review-api.js";
 import "./strategy-workspace-api.js";
+import "./data-center-api.js";
 import "./runtime-dashboard.css";
 import type {
   RuntimeDashboardSnapshot,
 } from "./runtime-operation-session.js";
 
 type Locale = "zh-CN" | "en";
-type ViewId = "overview" | "orchestration" | "lab" | "activity" | "connections";
+type ViewId = "overview" | "data-center" | "orchestration" | "lab" | "experiment" | "activity" | "connections";
 type AgentMode = "paper" | "only-close";
 type CapabilityId = "selector" | "data" | "analysis" | "decision" | "risk" | "execution";
 type CapabilityStatus = "passed" | "active" | "idle" | "fallback";
@@ -183,7 +184,7 @@ function initialLocale(): Locale {
 
 function initialView(): ViewId {
   const hashView = window.location.hash.slice(1);
-  return ["overview", "orchestration", "lab", "activity", "connections"].includes(hashView)
+  return ["overview", "data-center", "orchestration", "lab", "experiment", "activity", "connections"].includes(hashView)
     ? hashView as ViewId
     : "overview";
 }
@@ -1003,7 +1004,9 @@ function renderHeader(): string {
       <nav class="primary-nav" aria-label="${tr("主要导航", "Primary navigation")}">
         ${[
           ["overview", tr("交易 Agent", "Trading Agent")],
-          ["lab", tr("编排 Agent", "Orchestration Agent")],
+          ["data-center", tr("数据中心", "Data Center")],
+          ["orchestration", tr("编排 Agent", "Orchestration Agent")],
+          ["lab", tr("实验场", "Experiment Lab")],
           ["activity", tr("审计记录", "Audit Log")],
           ["connections", tr("连接配置", "Connections")],
         ].map(([id, label]) => `
@@ -1503,6 +1506,10 @@ function renderOrchestration(): string {
       <div id="orchestration-workspace-host" class="orchestration-workspace-host"></div>
     </section>
   `;
+}
+
+function renderDataCenter(): string {
+  return `<section class="page-intro"><div><h1>${tr("数据中心", "Data Center")}</h1><p>${tr("仅展示服务端登记的资产、能力和版本化快照。没有真实来源的市场维度会明确标为不可用。", "Only server-registered assets, capabilities, and versioned snapshots are shown. Market dimensions without a real source remain explicitly unavailable.")}</p></div><div class="orchestration-version"><span>${tr("运行时边界", "Runtime boundary")}</span><strong>${tr("只读", "Read only")}</strong><small>runtimeApplied=false</small></div></section><div id="data-center-host"></div>`;
 }
 
 function renderActivityRow(event: ActivityEvent): string {
@@ -2115,12 +2122,16 @@ function render(): void {
     tr("从候选市场中选择一个标的，并追踪每个 Agent 决策。", "Select one symbol from the market universe and trace every Agent decision."),
   );
 
-  const view = state.view === "overview"
+    const view = state.view === "overview"
     ? renderOverview()
     : state.view === "orchestration"
       ? renderOrchestration()
+    : state.view === "data-center"
+      ? renderDataCenter()
     : state.view === "lab"
-      ? renderOrchestration()
+      ? renderLab()
+    : state.view === "experiment"
+      ? renderLab()
       : state.view === "activity"
         ? renderActivity()
         : renderConnections();
@@ -2524,6 +2535,14 @@ function bindEvents(): void {
   });
   document.querySelectorAll<HTMLButtonElement>("[data-activity]").forEach((button) => button.addEventListener("click", () => openPanel(button.dataset.kind === "selection" ? "universe" : "review")));
 }
+
+window.addEventListener("tradebot:data-center-send", ((event: Event) => {
+  const asset = (event as CustomEvent<{ name: string; dataset: { version: string; fingerprint: string } }>).detail;
+  state.view = "orchestration";
+  window.history.replaceState(null, "", "#orchestration");
+  render();
+  window.setTimeout(() => window.dispatchEvent(new CustomEvent("tradebot:orchestration-data-intent", { detail: asset })), 0);
+}) as EventListener);
 
 function applyActivityFilter(query: string): void {
   const normalized = query.trim().toLowerCase();

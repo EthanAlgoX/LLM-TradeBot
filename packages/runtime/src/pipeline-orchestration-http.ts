@@ -8,10 +8,17 @@ import type {
   ImmutablePipelineRegistry,
   PipelineOrchestrationService,
 } from "../../core/src/pipeline-orchestration.js";
-import type { PipelineGraphVersion } from "../../contracts/src/index.js";
+import {
+  ConversationIdSchema,
+  ConversationListRequestSchema,
+  ConversationTurnsRequestSchema,
+  projectToolActivity,
+  type PipelineGraphVersion,
+} from "../../contracts/src/index.js";
 import {
   PipelineOrchestrationError,
 } from "../../core/src/pipeline-orchestration.js";
+import { ConversationReplayReadError } from "./sqlite-conversation-replay-repository.js";
 import {
   OrchestrationIntentError,
   type OrchestrationIntentDraftService,
@@ -43,6 +50,7 @@ import {
 import type { ConfigurationDraftHttpHandler } from "./configuration-draft-http.js";
 import type { StrategyEvidenceHttpHandler } from "./strategy-evidence-http.js";
 import type { HistoricalSemanticEvaluationHttpHandler } from "./historical-semantic-evaluation-http.js";
+import type { DataCenterHttpHandler } from "./data-center-http.js";
 import {
   CurrentCryptoPaperLaunchError,
   type CurrentCryptoPaperLaunchService,
@@ -79,6 +87,7 @@ export interface PipelineOrchestrationHttpDependencies {
   configurationDraftHttpHandler?: ConfigurationDraftHttpHandler;
   strategyEvidenceHttpHandler?: StrategyEvidenceHttpHandler;
   historicalSemanticEvaluationHttpHandler?: HistoricalSemanticEvaluationHttpHandler;
+  dataCenterHttpHandler?: DataCenterHttpHandler;
   productionWorkspaceCatalog?: object;
   pipelineGraphs?: readonly PipelineGraphVersion[];
   maxBodyBytes?: number;
@@ -157,6 +166,26 @@ class HttpRequestError extends Error {
   ) {
     super(message);
   }
+}
+
+function paginationRequest(url: URL, kind: "conversations" | "turns") {
+  const allowed = new Set(["cursor", "limit"]);
+  const fields: Record<string, string> = {};
+  for (const [key] of url.searchParams) {
+    if (!allowed.has(key) || url.searchParams.getAll(key).length !== 1) fields[key] = "unsupported_or_duplicate";
+  }
+  const limit = url.searchParams.get("limit");
+  const value = {
+    schemaVersion: "1.0.0" as const,
+    ...(url.searchParams.has("cursor") ? { cursor: url.searchParams.get("cursor") ?? "" } : {}),
+    ...(limit !== null ? { limit: Number(limit) } : {}),
+  };
+  const schema = kind === "conversations" ? ConversationListRequestSchema : ConversationTurnsRequestSchema;
+  const parsed = schema.safeParse(value);
+  if (Object.keys(fields).length > 0 || !parsed.success) {
+    throw new HttpRequestError(400, "INVALID_CONVERSATION_PAGINATION", "Conversation pagination is invalid.", fields);
+  }
+  return parsed.data;
 }
 
 function registryCatalog(
@@ -301,6 +330,14 @@ export function createPipelineOrchestrationHttpServer(
         }
       }
       const path = url.pathname;
+      if (path.startsWith("/api/orchestration/data-center/")) {
+        if (!dependencies.dataCenterHttpHandler) {
+          sendError(response, 503, "DATA_CENTER_UNAVAILABLE", "Data Center is not configured.");
+          return;
+        }
+        await forwardWebHandler(request, response, dependencies.dataCenterHttpHandler, maxBodyBytes);
+        return;
+      }
       if (
         path.startsWith("/api/orchestration/trade-reviews/") ||
         path.startsWith("/api/orchestration/lesson-candidates/")
@@ -657,12 +694,50 @@ export function createPipelineOrchestrationHttpServer(
           return;
         }
         const message = await readJson(request, maxBodyBytes);
+        const copilotResponse = await dependencies.orchestrationCopilotService.handle(message, actor);
+        const { toolCalls, toolResults, ...browserResponse } = copilotResponse;
         sendJson(response, 200, {
-          data: await dependencies.orchestrationCopilotService.handle(
-            message,
-            actor,
-          ),
+          data: {
+            ...browserResponse,
+            toolActivity: projectToolActivity(toolCalls, toolResults),
+          },
         });
+        return;
+      }
+
+      const conversationMatch = path.match(/^\/api\/orchestration\/conversations\/([^/]+)$/);
+      const turnsMatch = path.match(/^\/api\/orchestration\/conversations\/([^/]+)\/turns$/);
+      if (path === "/api/orchestration/conversations" || conversationMatch || turnsMatch) {
+        if (request.method !== "GET") {
+          sendError(response, 405, "METHOD_NOT_ALLOWED", "Conversation history is read-only.");
+          return;
+        }
+        const actor = dependencies.authenticator.authenticate(request.headers.authorization);
+        if (!dependencies.orchestrationCopilotService) {
+          sendError(response, 404, "ORCHESTRATION_COPILOT_NOT_CONFIGURED", "The controlled Orchestration Copilot is not configured.");
+          return;
+        }
+        if (path === "/api/orchestration/conversations") {
+          sendJson(response, 200, { data: dependencies.orchestrationCopilotService.listConversations(actor.actorId, paginationRequest(url, "conversations")) });
+          return;
+        }
+        let rawConversationId: string;
+        try {
+          rawConversationId = decodeURIComponent((turnsMatch ?? conversationMatch)![1]);
+        } catch {
+          throw new HttpRequestError(400, "INVALID_CONVERSATION_ID", "Conversation id is invalid.");
+        }
+        const parsedId = ConversationIdSchema.safeParse({ schemaVersion: "1.0.0", conversationId: rawConversationId });
+        if (!parsedId.success) throw new HttpRequestError(400, "INVALID_CONVERSATION_ID", "Conversation id is invalid.");
+        if (!dependencies.orchestrationCopilotService.getConversation(actor.actorId, parsedId.data.conversationId)) {
+          sendError(response, 404, "CONVERSATION_NOT_FOUND", "Conversation was not found.");
+          return;
+        }
+        if (turnsMatch) {
+          sendJson(response, 200, { data: dependencies.orchestrationCopilotService.listTurns(actor.actorId, parsedId.data.conversationId, paginationRequest(url, "turns")) });
+          return;
+        }
+        sendJson(response, 200, { data: dependencies.orchestrationCopilotService.getConversation(actor.actorId, parsedId.data.conversationId) });
         return;
       }
 
@@ -1024,6 +1099,10 @@ export function createPipelineOrchestrationHttpServer(
           error.message,
           error.fields,
         );
+        return;
+      }
+      if (error instanceof ConversationReplayReadError) {
+        sendError(response, 400, error.code, "Conversation history request is invalid.");
         return;
       }
       if (error instanceof PipelineAuthenticationError) {

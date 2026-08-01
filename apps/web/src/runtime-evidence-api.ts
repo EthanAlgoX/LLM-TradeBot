@@ -126,16 +126,12 @@ interface RuntimeEvidenceResponse {
   };
 }
 
-const viteEnvironment = (
-  import.meta as unknown as {
-    env?: Record<string, string | undefined>;
-  }
-).env;
 const apiBase =
-  viteEnvironment?.VITE_TRADEBOT_ORCHESTRATION_API ??
+  import.meta.env.VITE_TRADEBOT_ORCHESTRATION_API ??
   "http://127.0.0.1:8787";
-let token =
-  viteEnvironment?.VITE_TRADEBOT_ORCHESTRATION_TOKEN;
+let token = import.meta.env.DEV
+  ? import.meta.env.VITE_TRADEBOT_ORCHESTRATION_TOKEN
+  : undefined;
 let evidence: RuntimeEvidenceResponse | undefined;
 let timer: number | undefined;
 let countdownTimer: number | undefined;

@@ -17,7 +17,7 @@ TradeBot 已从固定 Crypto Paper Pipeline 扩展出真实的 Registry、Capabi
 
 ```text
 npm run check       PASS
-npm run test:ts     PASS (319/319)
+npm run test:ts     PASS (328/328)
 npm run build:web   PASS (31 modules, 70ms)
 git diff --check    PASS
 npm run dev:paper   STARTED
@@ -180,6 +180,18 @@ accepted_for_validation
 6. 唯一允许立即生效的人工风险控制是暂停新开仓 / 仅允许平仓。
 7. Paper Only，`exchangeWriteAllowed=false`。
 8. 不重写当前稳定 DecisionPipeline，除非后续有独立、完整、可回退的通用 Runtime 迁移计划。
+
+## 2026-08-01：M1 Conversation History V1
+
+- 状态：`COMPLETE`。实现已完成：Conversation Replay 以 SQL CTE/window query 与 `LIMIT limit + 1` 提供 actor-scoped conversation/turn 分页；cursor 为版本化、kind-bound 的 opaque 合同，SQLite 仍 append-only。
+- Bearer read-only API：`GET /api/orchestration/conversations`、`GET /api/orchestration/conversations/:conversationId`、`GET /api/orchestration/conversations/:conversationId/turns`；畸形分页、无效 ID、跨 actor 和写入请求均 fail closed。
+- Web 以服务端 Turn 为唯一对话事实，localStorage 只保存 `conversationId`；工作台收敛为历史会话、当前对话、策略上下文三栏并适配窄屏。
+- Operator identity：Strategy Workspace 现使用 global runtime injection → DEV Vite injection → manual page-memory fallback；不再依赖可能丢失的一次性 session event。所有读取 Vite token 的 Web 模块均限制在 DEV，production sentinel leak check 通过。
+- 验证：Draft Authority 对完整 `draftId/versionId/fingerprint` fail-closed；Repository 覆盖双 actor、跨 kind cursor、稳定分页、重启恢复、损坏 replay 和 append-only；新增身份解析优先级/fail-closed 回归。最新完整自动化为 `npm run test:ts` 328/328 PASS，check、Web build 与 diff-check 同步通过；production sentinel absent；干净 `dev:paper` 服务地址可达。
+- 本轮浏览器插件验收：以干净 local Paper workspace 完成真实后端连接、第一会话创建与 v2 不可变 Draft、第二会话创建、两会话往返切换隔离、1440 中文和 820 英文无横向溢出、刷新及 Web/API 重启后自动认证与已选会话（2 Turn、v2）恢复；全程 `runtimeApplied=false`，控制台无 warning/error。原有损坏的本地 workspace 已可恢复地移至 `data/local-paper-workspace.backup-20260801T183000`，未删除。
+- 后续真实 Chrome 验收已确认：session、conversation list、turn list 均为 200 且无 401；受控 Copilot 成功创建 Draft Version 3；Console 无 warning/error；`runtimeApplied=false`、Paper Only 与 Exchange writes OFF 保持成立。
+- LOOP-003 保持未完成的历史交接记录。LOOP-004 中用户明确授权 Agent 直接操作真实 Chrome DevTools：localStorage、sessionStorage 与 Cookie 均为空；可见 Composer 触发的 `POST /api/orchestration/copilot/messages` 为 `200`，生成仅 Draft 的 Version 5；清空 Console 并刷新后无 TradeBot 页面 error/warning。没有读取 value、请求载荷或响应。
+- M2 数据中心 V1 为 `IN_PROGRESS`：服务端资产目录、绑定契约和页面首版已完成；LOOP-006、LOOP-007 因 Chrome 控制通道不可用而保持 `PARTIAL`，真实浏览器验收尚未完成。下一阶段为采用用户手工交接优先的 [`LOOP-008`](loop-prompts/loop-008-m2-data-center-chrome-closeout-v2.md) 收尾。
 ## 2026-07-31：Production Semantic Candidate Persistence
 
 - 状态：`REAL`。Rule Reflection 已生成并持久化严格 Semantic Candidate，Review 与 Materialization 使用同一 append-only Store。

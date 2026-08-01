@@ -204,12 +204,11 @@ interface ShadowAuditRecord {
   runtimeApplied: false;
 }
 
-const environment = (import.meta as ImportMeta & {
-  env?: Record<string, string | undefined>;
-}).env;
-const apiBase = environment?.VITE_TRADEBOT_ORCHESTRATION_API ??
+const apiBase = import.meta.env.VITE_TRADEBOT_ORCHESTRATION_API ??
   "http://127.0.0.1:8787";
-let token = environment?.VITE_TRADEBOT_ORCHESTRATION_TOKEN ?? "";
+let token = import.meta.env.DEV
+  ? import.meta.env.VITE_TRADEBOT_ORCHESTRATION_TOKEN ?? ""
+  : "";
 let selectedTradeId: string | undefined;
 let lifecycleStatus: string | undefined;
 let loading = false;

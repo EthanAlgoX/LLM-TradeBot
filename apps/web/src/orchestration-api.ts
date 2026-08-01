@@ -263,18 +263,19 @@ interface TradeBotViteEnvironment {
   readonly VITE_TRADEBOT_EVIDENCE_DATA_LABEL?: string;
 }
 
-const viteEnvironment = (
-  import.meta as ImportMeta & {
-    readonly env?: TradeBotViteEnvironment;
-  }
-).env;
+const viteApiBase = import.meta.env.VITE_TRADEBOT_ORCHESTRATION_API;
+const viteMarketDataLabel = import.meta.env.VITE_TRADEBOT_MARKET_DATA_LABEL;
+const viteEvidenceDataLabel = import.meta.env.VITE_TRADEBOT_EVIDENCE_DATA_LABEL;
+const developmentOperatorToken = import.meta.env.DEV
+  ? import.meta.env.VITE_TRADEBOT_ORCHESTRATION_TOKEN
+  : undefined;
 const configuredApiBase =
   (
     globalThis as typeof globalThis & {
       __TRADEBOT_ORCHESTRATION_API__?: string;
     }
   ).__TRADEBOT_ORCHESTRATION_API__ ??
-  viteEnvironment?.VITE_TRADEBOT_ORCHESTRATION_API ??
+  viteApiBase ??
   "http://127.0.0.1:8787";
 const configuredToken =
   (
@@ -282,14 +283,12 @@ const configuredToken =
       __TRADEBOT_ORCHESTRATION_TOKEN__?: string;
     }
   ).__TRADEBOT_ORCHESTRATION_TOKEN__ ??
-  (viteEnvironment?.DEV
-    ? viteEnvironment.VITE_TRADEBOT_ORCHESTRATION_TOKEN
-    : undefined);
+  developmentOperatorToken;
 const configuredMarketDataLabel =
-  viteEnvironment?.VITE_TRADEBOT_MARKET_DATA_LABEL ??
+  viteMarketDataLabel ??
   "SERVER CONFIGURED";
 const configuredEvidenceDataLabel =
-  viteEnvironment?.VITE_TRADEBOT_EVIDENCE_DATA_LABEL ??
+  viteEvidenceDataLabel ??
   (configuredMarketDataLabel === "LOCAL BACKEND FIXTURE" ||
   configuredMarketDataLabel === "BINANCE FUTURES PUBLIC READ ONLY"
     ? "CSV SYNTHETIC FIXTURE"

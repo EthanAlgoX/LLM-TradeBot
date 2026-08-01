@@ -165,6 +165,16 @@ function localizedSemanticText(
   return value;
 }
 
+function batchHasTradeReviewArtifacts(
+  artifacts: readonly AgentArtifact[],
+): boolean {
+  return artifacts.some((artifact) =>
+    artifact.stage === "decision" ||
+    artifact.stage === "risk" ||
+    artifact.stage === "portfolio_risk" ||
+    artifact.stage === "execution");
+}
+
 function localizedReflectionRecommendation(
   value: string,
   locale: SemanticLocale,
@@ -428,7 +438,13 @@ export class RuntimeEvidenceReadModelService {
     const traceEvents = traceId && this.ports.traces
       ? this.ports.traces.load(traceId)
       : [];
-    const review = buildTradeReview(latestArtifacts);
+    const reviewArtifacts = batchHasTradeReviewArtifacts(currentArtifacts)
+      ? currentArtifacts
+      : [...artifactBatches]
+          .reverse()
+          .find((batch) => batchHasTradeReviewArtifacts(batch.artifacts))
+          ?.artifacts ?? currentArtifacts;
+    const review = buildTradeReview(reviewArtifacts.length > 0 ? reviewArtifacts : latestArtifacts);
     const summaries = artifactBatches.flatMap((batch) =>
       batch.artifacts
         .sort(

@@ -91,6 +91,7 @@ import {
 import {
   SqliteLessonCandidateValidationBindingRepository,
 } from "./sqlite-lesson-candidate-validation-binding-repository.js";
+import { DataCenterHttpHandler } from "./data-center-http.js";
 
 export type ComparativeTradeReviewRuntimeOptions = Omit<
   ProductionComparativeTradeReviewOptions,
@@ -300,6 +301,13 @@ export function createCurrentPipelineOrchestrationRuntime(
       },
       strategyOrchestration,
     );
+  const dataCenterHttpHandler = new DataCenterHttpHandler(
+    [...registry.dataSources.values()],
+    [...registry.capabilities.values()],
+    strategyOrchestration?.graphEvidence?.datasets ?? [],
+    productionStrategyOrchestration.configurationDraftService,
+    authenticator,
+  );
   const comparativeTradeReviewComposition = options.comparativeTradeReview
     ? new ProductionComparativeTradeReviewComposition({
         ...options.comparativeTradeReview,
@@ -542,6 +550,7 @@ export function createCurrentPipelineOrchestrationRuntime(
     operationalRetentionService,
     configurationDraftHttpHandler:
       productionStrategyOrchestration.configurationDraftHttpHandler,
+    dataCenterHttpHandler,
     ...(productionStrategyOrchestration.strategyEvidenceHttpHandler
       ? {
           strategyEvidenceHttpHandler:

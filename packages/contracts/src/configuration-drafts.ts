@@ -18,11 +18,26 @@ const ObservationWindowDraftSchema = z
   })
   .strict();
 
+/** A server-registered immutable dataset reference. It is deliberately not a URL,
+ * path, query or client supplied payload: configuration may only point at a
+ * version that the Data Center has registered. */
+export const DatasetBindingDraftSchema = z
+  .object({
+    assetId: ConfigurationIdSchema,
+    datasetId: ConfigurationIdSchema,
+    version: z.string().min(1).max(80),
+    fingerprint: ArtifactFingerprintSchema,
+    capabilityId: ConfigurationIdSchema,
+    mode: z.enum(["latest_snapshot", "pinned_snapshot", "replay"]),
+  })
+  .strict();
+
 export const MarketConfigurationDraftSchema = z
   .object({
     kind: z.literal("market"),
     marketPackId: ConfigurationIdSchema,
     dataSourceIds: z.array(ConfigurationIdSchema).min(1),
+    dataBindings: z.array(DatasetBindingDraftSchema).max(32).optional(),
     observationWindows: z.array(ObservationWindowDraftSchema).min(1),
     timezone: z.string().min(1).max(80),
     tradingCalendarRef: z.string().min(1).max(160),
@@ -46,6 +61,7 @@ export const AgentConfigurationDraftSchema = z
     marketPackId: ConfigurationIdSchema,
     agentTemplateId: ConfigurationIdSchema,
     dataSourceIds: z.array(ConfigurationIdSchema),
+    dataBindings: z.array(DatasetBindingDraftSchema).max(32).optional(),
     observationWindows: z.array(ObservationWindowDraftSchema),
     promptPolicyDraftId: ConfigurationIdSchema.optional(),
     parameters: z.record(z.string(), PrimitiveSchema),
@@ -123,6 +139,10 @@ export const ConfigurationValidationCodeSchema = z.enum([
   "DRAFT_KIND_MISMATCH",
   "PARENT_FINGERPRINT_CONFLICT",
   "HISTORICAL_COMPILE_FAILED",
+  "DATASET_ASSET_NOT_REGISTERED",
+  "DATASET_VERSION_NOT_REGISTERED",
+  "DATASET_CAPABILITY_MISMATCH",
+  "DATASET_BINDING_FORBIDDEN",
 ]);
 
 export const ConfigurationValidationIssueSchema = z
@@ -150,10 +170,19 @@ export const ConfigurationCatalogSnapshotSchema = z
     dataSourceIds: z.array(ConfigurationIdSchema),
     agentTemplateIds: z.array(ConfigurationIdSchema),
     allowedToolIds: z.array(ConfigurationIdSchema),
+    datasets: z.array(z.object({
+      assetId: ConfigurationIdSchema,
+      datasetId: ConfigurationIdSchema,
+      version: z.string().min(1).max(80),
+      fingerprint: ArtifactFingerprintSchema,
+      dataSourceId: ConfigurationIdSchema,
+      capabilityId: ConfigurationIdSchema,
+    }).strict()).optional(),
   })
   .strict();
 
 export type MarketConfigurationDraft = z.infer<typeof MarketConfigurationDraftSchema>;
+export type DatasetBindingDraft = z.infer<typeof DatasetBindingDraftSchema>;
 export type AgentConfigurationDraft = z.infer<typeof AgentConfigurationDraftSchema>;
 export type PromptPolicyDraft = z.infer<typeof PromptPolicyDraftSchema>;
 export type StrategyCompositionDraft = z.infer<typeof StrategyCompositionDraftSchema>;

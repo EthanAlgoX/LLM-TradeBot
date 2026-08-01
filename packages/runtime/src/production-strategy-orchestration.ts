@@ -169,6 +169,14 @@ export function createProductionStrategyOrchestration(
         dataSourceIds: [...dependencies.registry.dataSources.keys()],
         agentTemplateIds: [...dependencies.registry.agentTemplates.keys()],
         allowedToolIds: [...allowedToolIds],
+        datasets: (options.graphEvidence?.datasets ?? []).map((dataset) => ({
+          assetId: `asset:${dataset.dataSourceRef.id.replace(/^data-source:/u, "")}`,
+          datasetId: dataset.id,
+          version: dataset.version,
+          fingerprint: dataset.fingerprint,
+          dataSourceId: dataset.dataSourceRef.id,
+          capabilityId: "capability:csv-historical:ohlcv:v1",
+        })),
       }),
     },
     {

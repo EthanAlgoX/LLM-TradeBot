@@ -217,6 +217,23 @@ export class ConfigurationDraftService {
         issues.push(issue("DATA_SOURCE_NOT_REGISTERED", "data_source", dataSourceId, ["payload", "dataSourceIds", index]));
       }
     }
+    const bindings = "dataBindings" in payload ? payload.dataBindings ?? [] : [];
+    for (const [index, binding] of bindings.entries()) {
+      const registered = (catalog.datasets ?? []).find((item) =>
+        item.assetId === binding.assetId && item.datasetId === binding.datasetId &&
+        item.version === binding.version && item.fingerprint === binding.fingerprint,
+      );
+      if (!registered) {
+        issues.push(issue("DATASET_VERSION_NOT_REGISTERED", "data_source", binding.datasetId, ["payload", "dataBindings", index]));
+        continue;
+      }
+      if (!dataSourceIds.includes(registered.dataSourceId)) {
+        issues.push(issue("DATASET_BINDING_FORBIDDEN", "data_source", registered.dataSourceId, ["payload", "dataBindings", index]));
+      }
+      if (binding.capabilityId !== registered.capabilityId) {
+        issues.push(issue("DATASET_CAPABILITY_MISMATCH", "data_source", binding.capabilityId, ["payload", "dataBindings", index, "capabilityId"]));
+      }
+    }
     if ("agentTemplateId" in payload && !catalog.agentTemplateIds.includes(payload.agentTemplateId)) {
       issues.push(issue("AGENT_TEMPLATE_NOT_REGISTERED", "agent_template", payload.agentTemplateId, ["payload", "agentTemplateId"]));
     }

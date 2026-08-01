@@ -3,6 +3,10 @@ import {
   deriveConversationViewState,
   type ConversationViewState,
 } from "./orchestration-conversation-view-state.js";
+import {
+  resolveOrchestrationSessionConfiguration,
+  type OrchestrationViteEnvironment,
+} from "./orchestration-session.js";
 
 type Locale = "zh-CN" | "en";
 type ConnectionMode = "connecting" | "live" | "readonly" | "offline";
@@ -36,6 +40,19 @@ interface ConversationResponse {
     | "approval_ready"
     | "unavailable";
   assistantMessage: string;
+  toolActivity?: Array<{
+    toolName: string;
+    toolCallId: string;
+    toolCallHumanVersion: string;
+    toolCallFingerprint: string;
+    toolCallCreatedAt: string;
+    toolCallLifecycle: "requested";
+    toolResultId?: string;
+    toolResultHumanVersion?: string;
+    toolResultFingerprint?: string;
+    toolResultCreatedAt?: string;
+    toolResultLifecycle?: "succeeded" | "rejected" | "unavailable";
+  }>;
   context: {
     actor: { actorId: string; roles: string[] };
     selected: {
@@ -128,21 +145,60 @@ interface Operation {
   response: ConversationResponse;
 }
 
+interface ConversationSummary {
+  conversationId: string;
+  displayTitle: string;
+  updatedAt: string;
+  turnCount: number;
+  latestStatus: ConversationResponse["status"];
+  latestDraftReference?: DraftReference;
+}
+
+interface ConversationTurn {
+  turnId: string;
+  idempotencyKey: string;
+  createdAt: string;
+  command: { message: string; locale: Locale };
+  response: Omit<ConversationResponse, "context" | "runtimeApplied"> & {
+    selected: ConversationResponse["context"]["selected"];
+    draftReference?: DraftReference;
+  };
+  runtimeApplied: false;
+}
+
+interface ConversationPage<T> {
+  items: T[];
+  hasMore: boolean;
+  nextCursor?: string;
+}
+
 interface ApiError {
   error?: { code?: string };
 }
 
-const apiBase =
-  (
+const viteEnvironment: OrchestrationViteEnvironment = {
+  DEV: import.meta.env.DEV,
+  VITE_TRADEBOT_ORCHESTRATION_API:
+    import.meta.env.VITE_TRADEBOT_ORCHESTRATION_API,
+  VITE_TRADEBOT_ORCHESTRATION_TOKEN: import.meta.env.DEV
+    ? import.meta.env.VITE_TRADEBOT_ORCHESTRATION_TOKEN
+    : undefined,
+};
+const sessionConfiguration = resolveOrchestrationSessionConfiguration({
+  globalApiBase: (
     globalThis as typeof globalThis & {
       __TRADEBOT_ORCHESTRATION_API__?: string;
     }
-  ).__TRADEBOT_ORCHESTRATION_API__ ?? "http://127.0.0.1:8787";
-let token = (
-  globalThis as typeof globalThis & {
-    __TRADEBOT_ORCHESTRATION_TOKEN__?: string;
-  }
-).__TRADEBOT_ORCHESTRATION_TOKEN__;
+  ).__TRADEBOT_ORCHESTRATION_API__,
+  globalToken: (
+    globalThis as typeof globalThis & {
+      __TRADEBOT_ORCHESTRATION_TOKEN__?: string;
+    }
+  ).__TRADEBOT_ORCHESTRATION_TOKEN__,
+  viteEnvironment,
+});
+const apiBase = sessionConfiguration.apiBase;
+let token = sessionConfiguration.token;
 
 const state: {
   open: boolean;
@@ -150,6 +206,9 @@ const state: {
   mode: ConnectionMode;
   conversationId: string;
   catalog: IntentCatalogEntry[];
+  conversations: ConversationSummary[];
+  conversationsCursor?: string;
+  turnsCursor?: string;
   operations: Operation[];
   composerValue: string;
   currentDraft?: DraftReference;
@@ -160,9 +219,16 @@ const state: {
   mode: "connecting",
   conversationId: `conversation.${crypto.randomUUID()}`,
   catalog: [],
+  conversations: [],
   operations: [],
   composerValue: "",
 };
+
+const conversationStorageKey = "tradebot.orchestration.conversation-id.v1";
+
+function dedupeBy<T>(items: readonly T[], key: (item: T) => string): T[] {
+  return [...new Map(items.map((item) => [key(item), item])).values()];
+}
 
 const copy = {
   "zh-CN": {
@@ -381,7 +447,28 @@ function viewState(): ConversationViewState {
     busy: state.busy,
     responseStatus: latestResponse()?.status,
     unavailable: state.mode === "offline",
+    hasTurns: state.operations.length > 0,
+    unauthorized: state.mode === "readonly" && Boolean(token),
+    failed: Boolean(state.errorCode),
   });
+}
+
+function responseFromTurn(turn: ConversationTurn): ConversationResponse {
+  return {
+    ...turn.response,
+    context: { actor: { actorId: "server-history", roles: [] }, selected: turn.response.selected },
+    runtimeApplied: false,
+  };
+}
+
+function renderHistory(): string {
+  const active = state.conversationId;
+  const rows = state.conversations.map((conversation) => `
+    <button type="button" class="copilot-history__item ${conversation.conversationId === active ? "is-active" : ""}" data-conversation-id="${escapeHtml(conversation.conversationId)}">
+      <strong>${escapeHtml(conversation.displayTitle)}</strong>
+      <small>${escapeHtml(conversation.latestStatus)} · ${conversation.turnCount}</small>
+    </button>`).join("");
+  return `<aside class="copilot-history"><header><span>${locale() === "zh-CN" ? "历史会话" : "History"}</span><button type="button" data-new-conversation>${locale() === "zh-CN" ? "新建" : "New"}</button></header>${rows || `<p>${locale() === "zh-CN" ? "暂无服务端会话" : "No server conversations"}</p>`}${state.conversationsCursor ? `<button type="button" data-load-conversations>${locale() === "zh-CN" ? "加载更多" : "Load more"}</button>` : ""}</aside>`;
 }
 
 function stateLabel(status: ConversationResponse["status"]): string {
@@ -720,6 +807,28 @@ function renderCompactDetails(response: ConversationResponse): string {
   `;
 }
 
+function compact(value: string): string {
+  return value.length > 36 ? `${value.slice(0, 18)}…${value.slice(-8)}` : value;
+}
+
+function renderToolActivity(response: ConversationResponse): string {
+  const activities = response.toolActivity;
+  const summary = !activities
+    ? (locale() === "zh-CN" ? "工具活动：历史投影不可用" : "Tool activity: history projection unavailable")
+    : activities.length === 0
+    ? (locale() === "zh-CN" ? "工具活动：无受控工具调用" : "Tool activity: no registered calls")
+    : (locale() === "zh-CN"
+      ? `工具活动：${activities.length} 项受控调用`
+      : `Tool activity: ${activities.length} registered call${activities.length === 1 ? "" : "s"}`);
+  return `<details class="copilot-tool-activity"><summary>${summary}</summary><div>${(activities ?? []).map((activity) => {
+    const result = activity.toolResultLifecycle ?? (locale() === "zh-CN" ? "pending" : "pending");
+    return `<section><strong>${escapeHtml(activity.toolName)}</strong><dl>
+      <dt>${locale() === "zh-CN" ? "Call" : "Call"}</dt><dd>${escapeHtml(activity.toolCallLifecycle)} · <code>${escapeHtml(compact(activity.toolCallId))}</code> · ${escapeHtml(activity.toolCallHumanVersion)} · <code>${escapeHtml(compact(activity.toolCallFingerprint))}</code> · ${escapeHtml(activity.toolCallCreatedAt)}</dd>
+      <dt>${locale() === "zh-CN" ? "Result" : "Result"}</dt><dd>${escapeHtml(result)}${activity.toolResultId ? ` · <code>${escapeHtml(compact(activity.toolResultId))}</code> · ${escapeHtml(activity.toolResultHumanVersion ?? "")} · <code>${escapeHtml(compact(activity.toolResultFingerprint ?? ""))}</code> · ${escapeHtml(activity.toolResultCreatedAt ?? "")}` : ""}</dd>
+    </dl></section>`;
+  }).join("")}</div></details>`;
+}
+
 function renderReleaseActions(response: ConversationResponse): string {
   const text = copy[locale()];
   const nextGate = response.evidenceGates.nextGate;
@@ -764,6 +873,7 @@ function renderOperation(operation: Operation): string {
         </header>
         <p>${escapeHtml(response.assistantMessage)}</p>
         ${renderProposal(response)}
+        ${renderToolActivity(response)}
         ${renderCompactDetails(response)}
         ${renderGates(response)}
         <aside class="copilot-runtime-boundary">
@@ -892,11 +1002,16 @@ function render(): void {
           `
           : ""
       }
-      <main class="copilot-results" aria-live="polite" aria-busy="${state.busy}">
-        ${renderOperations()}
-        ${state.busy ? `<div class="copilot-loading"><i></i><span>${text.sending}</span></div>` : ""}
-        ${state.errorCode ? `<p class="copilot-api-error"><code>${escapeHtml(state.errorCode)}</code></p>` : ""}
-      </main>
+      <section class="copilot-workspace">
+        ${renderHistory()}
+        <main class="copilot-results" aria-live="polite" aria-busy="${state.busy}">
+          ${renderOperations()}
+          ${state.busy ? `<div class="copilot-loading"><i></i><span>${text.sending}</span></div>` : ""}
+          ${state.turnsCursor ? `<button type="button" data-load-turns>${locale() === "zh-CN" ? "加载更早消息" : "Load earlier turns"}</button>` : ""}
+          ${state.errorCode ? `<p class="copilot-api-error"><code>${escapeHtml(state.errorCode)}</code></p>` : ""}
+        </main>
+        <aside class="copilot-inspector"><section><h2>${locale() === "zh-CN" ? "当前策略上下文" : "Strategy context"}</h2><dl class="copilot-selection">${renderSelection()}</dl></section><section><h2>${text.presets}</h2><div class="copilot-presets">${renderCatalog()}</div></section><section><strong>${text.runtimeIsolation}</strong><p>${text.runtimeIsolationBody}</p></section></aside>
+      </section>
       <details class="copilot-strategy-editor">
         <summary>
           <strong>${locale() === "zh-CN" ? "策略配置" : "Strategy configuration"}</strong>
@@ -941,6 +1056,7 @@ async function connect(): Promise<void> {
     if (token) {
       await request("/api/orchestration/session");
       state.mode = "live";
+      await refreshHistory();
     } else {
       state.mode = "readonly";
     }
@@ -950,6 +1066,43 @@ async function connect(): Promise<void> {
     state.errorCode =
       error instanceof Error ? error.message : "COPILOT_API_UNAVAILABLE";
   }
+  render();
+}
+
+async function refreshHistory(append = false): Promise<void> {
+  if (!token) return;
+  const page = await request<ConversationPage<ConversationSummary>>(`/api/orchestration/conversations?limit=20${append && state.conversationsCursor ? `&cursor=${encodeURIComponent(state.conversationsCursor)}` : ""}`);
+  state.conversations = dedupeBy(
+    append ? [...state.conversations, ...page.items] : page.items,
+    (conversation) => conversation.conversationId,
+  );
+  state.conversationsCursor = page.nextCursor;
+  const remembered = window.localStorage.getItem(conversationStorageKey);
+  const selected = state.conversations.find((item) => item.conversationId === (remembered || state.conversationId));
+  if (selected) await loadConversation(selected.conversationId);
+}
+
+async function loadConversation(conversationId: string, append = false): Promise<void> {
+  const page = await request<ConversationPage<ConversationTurn>>(`/api/orchestration/conversations/${encodeURIComponent(conversationId)}/turns?limit=20${append && state.turnsCursor ? `&cursor=${encodeURIComponent(state.turnsCursor)}` : ""}`);
+  const operations = page.items.map((turn) => ({ id: turn.turnId, message: turn.command.message, response: responseFromTurn(turn) }));
+  state.conversationId = conversationId;
+  window.localStorage.setItem(conversationStorageKey, conversationId);
+  state.operations = dedupeBy(
+    append ? [...operations.reverse(), ...state.operations] : operations.reverse(),
+    (operation) => operation.id,
+  );
+  state.turnsCursor = page.nextCursor;
+  state.currentDraft = state.operations.at(-1)?.response.context.selected.draftReference;
+  state.errorCode = undefined;
+  render();
+}
+
+function newConversation(): void {
+  state.conversationId = `conversation.${crypto.randomUUID()}`;
+  window.localStorage.setItem(conversationStorageKey, state.conversationId);
+  state.operations = [];
+  state.currentDraft = undefined;
+  state.turnsCursor = undefined;
   render();
 }
 
@@ -994,14 +1147,9 @@ async function sendMessage(message: string): Promise<void> {
     if (response.runtimeApplied !== false) {
       throw new Error("RUNTIME_MUTATION_INVARIANT_FAILED");
     }
-    state.currentDraft =
-      response.context.selected.draftReference ?? state.currentDraft;
-    state.operations.push({
-      id: `operation.${crypto.randomUUID()}`,
-      message: normalized,
-      response,
-    });
+    state.currentDraft = response.context.selected.draftReference ?? state.currentDraft;
     state.composerValue = "";
+    await refreshHistory();
   } catch (error) {
     state.composerValue = normalized;
     state.errorCode =
@@ -1042,6 +1190,23 @@ document.addEventListener(
     const prompt = target.closest<HTMLElement>("[data-copilot-prompt]");
     if (prompt?.dataset.copilotPrompt) {
       void sendMessage(prompt.dataset.copilotPrompt);
+      return;
+    }
+    if (target.closest("[data-new-conversation]")) {
+      newConversation();
+      return;
+    }
+    if (target.closest("[data-load-conversations]")) {
+      void refreshHistory(true);
+      return;
+    }
+    if (target.closest("[data-load-turns]")) {
+      void loadConversation(state.conversationId, true);
+      return;
+    }
+    const conversation = target.closest<HTMLElement>("[data-conversation-id]");
+    if (conversation?.dataset.conversationId) {
+      void loadConversation(conversation.dataset.conversationId);
     }
   },
   true,

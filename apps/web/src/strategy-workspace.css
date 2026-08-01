@@ -873,9 +873,31 @@ body.orchestration-copilot-open {
     min-height: 0;
   }
 
-  #orchestration-copilot-root.is-embedded .copilot-layout {
-    min-height: 0;
-  }
+#orchestration-copilot-root.is-embedded .copilot-layout {
+  min-height: 0;
+}
+
+/* M1 server-backed conversation workspace. */
+.copilot-workspace {
+  display: grid;
+  grid-template-columns: minmax(190px, .72fr) minmax(360px, 1.8fr) minmax(230px, .85fr);
+  min-height: 460px;
+  overflow: hidden;
+  border-bottom: 1px solid var(--line);
+}
+.copilot-history { min-width: 0; overflow-y: auto; border-right: 1px solid var(--line); background: rgb(7 10 11 / .55); }
+.copilot-history header { display: flex; justify-content: space-between; align-items: center; padding: 14px; border-bottom: 1px solid var(--line); color: var(--text-soft); font-weight: 700; }
+.copilot-history button { width: 100%; border: 0; border-bottom: 1px solid var(--line); background: transparent; color: var(--text-soft); text-align: left; }
+.copilot-history header button { width: auto; padding: 5px 8px; border: 1px solid var(--line); color: var(--accent); }
+.copilot-history__item { display: grid; gap: 5px; padding: 13px 14px; }
+.copilot-history__item strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+.copilot-history__item small { color: var(--muted); font-family: var(--font-mono); font-size: 10px; }
+.copilot-history__item.is-active { background: rgb(219 183 111 / .10); box-shadow: inset 3px 0 var(--accent); }
+.copilot-history p { padding: 14px; color: var(--muted); font-size: 13px; }
+.copilot-workspace .copilot-results { min-height: 0; overflow-y: auto; }
+.copilot-workspace .copilot-inspector { border-left: 1px solid var(--line); }
+@media (max-width: 900px) { .copilot-workspace { grid-template-columns: 190px minmax(0, 1fr); } .copilot-workspace .copilot-inspector { display: none; } }
+@media (max-width: 640px) { .copilot-workspace { grid-template-columns: 1fr; } .copilot-history { max-height: 180px; border-right: 0; border-bottom: 1px solid var(--line); } }
 }
 
 /* Conversation-first orchestration: one readable flow, progressive technical detail. */
@@ -1304,6 +1326,65 @@ body.orchestration-copilot-open {
 
 .copilot-technical > .copilot-result__section {
   padding-inline: 0;
+}
+
+.copilot-tool-activity {
+  border-top: 1px solid var(--line);
+}
+
+.copilot-tool-activity > summary,
+.copilot-technical > summary,
+.copilot-workflow > details > summary {
+  padding: 13px 4px;
+  cursor: pointer;
+}
+
+.copilot-tool-activity > div {
+  display: grid;
+  gap: 8px;
+  padding: 0 0 13px;
+}
+
+.copilot-tool-activity section {
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--line);
+  background: rgb(255 255 255 / 0.018);
+}
+
+.copilot-tool-activity strong,
+.copilot-tool-activity dt {
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.copilot-tool-activity dl {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr);
+  gap: 5px 9px;
+  margin: 8px 0 0;
+}
+
+.copilot-tool-activity dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: var(--text-soft);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.copilot-tool-activity code {
+  font-size: 11px;
+}
+
+.copilot-drawer summary:focus-visible,
+.copilot-drawer button:focus-visible,
+.copilot-drawer input:focus-visible,
+.copilot-drawer select:focus-visible,
+.copilot-drawer textarea:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 3px;
 }
 
 .copilot-release-actions {

@@ -1,9 +1,11 @@
 # TradeBot 当前状态与接手说明
 
-> 快照日期：2026-07-31
+> 快照日期：2026-08-01
 > 适用仓库：`/Users/hyx/Documents/workspace/tradebot`
 > 历史交接：[`archive/project-status-and-handoff-through-2026-07-29.md`](archive/project-status-and-handoff-through-2026-07-29.md)
 > 下一任务：[`next-loop-prompt.md`](next-loop-prompt.md)
+
+> Git 快照规则：从 2026-08-01 起，每轮对代码或文档产生任何修改后，必须在最终汇报前创建范围明确的 commit 并推送当前分支到 `origin`。即使里程碑仍为 `PARTIAL`，执行记录和下一 Loop Prompt 的修改也必须提交、推送；禁止提交本地运行数据、Token、Secret 或 `data/local-paper-workspace*`。
 
 ## 1. 接手结论
 
@@ -136,11 +138,11 @@ Comparative Evidence 当前由 active production composition 的内存索引支�
 
 ## 6. 最新验证
 
-Lesson Evidence Gate Projection 完成后的基线：
+M1 历史对话 V1 完成后的最新完整基线：
 
 ```text
 npm run check       PASS
-npm run test:ts     PASS (288/288)
+npm run test:ts     PASS (328/328)
 npm run build:web   PASS (31 modules, 82ms)
 git diff --check    PASS
 npm run dev:paper   STARTED
@@ -153,18 +155,37 @@ Web: http://127.0.0.1:5174/
 API: http://127.0.0.1:8787
 ```
 
-启动日志确认 Comparative Trade Review 与 Strategy Evidence API 已启用，exchange write capability disabled。
+启动日志确认 Comparative Trade Review、Runtime Evidence 与 Orchestration/API 已启用，exchange write capability disabled。
 
-浏览器限制：宿主内置 Browser 列表为空并返回 `Browser is not available: iab`。Approved Lesson Semantic Materialization 的 1440×900、820×760、中英文、语义状态展示和 Console 尚未验证，不能标记为通过。
+浏览器状态：M1 已通过真实 Chrome 完成 1440×900、820×760、中英文、会话恢复、Storage/Network、Console 与 Runtime 安全验收。M2 实现完成后仍必须使用真实 Chrome 验证数据中心可见工作流；不能只以自动化测试替代。
 
 ## 7. 下一阶段
 
-执行 **Production Semantic Candidate Persistence Loop**：
+执行 **数据中心 V1**（M2）：
 
-1. 让生产 Reflection 路径持久化真实 `ReflectionLessonCandidateSchema`，不再只有 recommendations。
-2. Candidate 必须绑定 source Trade、Decision Artifact、Market、regime 和 supporting evidence lineage。
-3. Review Candidate 与 Semantic Candidate fingerprint 必须统一或具备显式绑定。
-4. 不把 Candidate 或 Lesson 接入活跃 DecisionPipeline。
+1. 增加一级“数据中心”入口与服务端登记的 Data Assets 列表/详情。
+2. 首期复用现有 Binance Public 与 CSV Historical 能力。
+3. 展示 Snapshot、Schema、Quality、Lineage、更新时间与健康状态。
+4. 让 Strategy Draft 显式绑定不可变 Dataset version/fingerprint。
+5. 对缺失资产、跨 actor 引用和能力不匹配 fail closed。
+6. 提供基于当前真实能力的 Market Radar，不伪造不可用数据。
+7. 在真实 Chrome 中完成数据绑定、拒绝路径、窄屏和 Runtime 安全验收。
+
+### M1 实施状态（2026-08-01）
+
+- 已完成：SQLite Conversation Replay read model、actor-scoped SQL-bounded cursor pagination、Conversation/Turn/detail Bearer GET API、Draft Reference 服务端恢复、三栏历史会话工作台和 `conversationId` localStorage 恢复。
+- 已完成：Authority 对完整 `draftId/versionId/fingerprint` 比较；跨会话/actor 无历史 Draft 继承 fail closed；严格 pagination/id 校验、只读端点 `405`、不存在会话 `404`、`runtimeApplied=false` 传播与 HTTP/状态测试。
+- 已完成身份桥：干净的单命令 `npm run dev:paper` 启动会将同一随机 Operator Token 注入 API 与 loopback Vite；Strategy Workspace 使用 global runtime injection → DEV Vite injection → manual page-memory fallback 的顺序，不依赖一次性 session event。production build 不读取该 token。
+- 验证通过：`npm run check`、`npm run test:ts`（最新 328/328）、`npm run build:web`、production sentinel leak check、`git diff --check`；干净重启后 5174 和 8787 均可达，且启动日志确认 Web/API、development injection 与 Exchange Write disabled。
+- 本轮浏览器插件复验：干净 local Paper workspace 中，5174 自动认证为 Real backend connected；第一会话的 v2 Draft、第二会话、会话隔离、1440 中文与 820 英文、刷新与一次 Web/API 重启均通过，重启后恢复已选会话的 2 Turn/v2，且始终 `runtimeApplied=false`、控制台无 warning/error。原损坏 local workspace 已移至可恢复备份 `data/local-paper-workspace.backup-20260801T183000`。
+- 后续真实 Chrome 已确认 session、conversation list、turn list 均为 200 且无 401，受控 Copilot 成功创建 Draft Version 3，Console 无 warning/error，Runtime/Exchange 安全边界保持成立。
+- LOOP-003 保持未完成用户手工交接的历史记录。LOOP-004 中用户明确授权 Agent 直接操作真实 Chrome DevTools：localStorage、sessionStorage 与 Cookie 均为空；可见 Composer 触发的 `POST /api/orchestration/copilot/messages` 为 `200`，产生仅 Draft 的 Version 5；Console 清空并刷新后无 TradeBot 页面 error/warning。全程未读取或复制 Storage/Cookie/request value，Runtime 仍为 `runtimeApplied=false`、Paper Only、Exchange writes OFF。
+- LOOP-005（M2 数据中心 V1）为 `PARTIAL`：新增服务端登记 Data Assets API、Binance Public/CSV Historical 的真实来源标签、CSV Snapshot/Schema/Quality/Lineage 投影，以及 Dataset version/fingerprint/capability 的不可变 Configuration Draft binding。Binding 由 Bearer actor 限制，跨 actor、缺失 Dataset、非法版本和能力不匹配均 fail closed；所有结果仍为 `runtimeApplied=false`。
+- 新增一级“数据中心”页面与 Market Radar。没有登记的实时 Binance Snapshot 不会伪造成实盘数据；当前 Regime、Mover、Volume、Funding/OI 均标记 unavailable。"送入编排"只导航至受控 Draft 意图，不含 Runtime Apply、Paper Run 或交易所写入。
+- 自动化在本轮首版通过：`npm run check`、`npm run test:ts` 328/328、`npm run build:web`。但 Chrome 控制通道在点击和刷新后两次超时重置，未能完成 LOOP-005 强制的 1440×900/820×760、可见绑定/拒绝、Console 与 Network 验收；不得标记 M2 COMPLETE。
+- LOOP-006（M2 收尾）仍为 `PARTIAL`：本地 Paper 服务成功启动，`npm run check`、`npm run test:ts`（328/328）、`npm run build:web` 与 `git diff --check` 均通过；但 Chrome 控制通道明确不可用，故未执行或声称完成真实 Chrome 的桌面/窄屏、资产标签、CSV 正向 UI 绑定与刷新恢复、负向路径、Console/Network 验收。没有修改产品代码或 `data/local-paper-workspace*`。
+- LOOP-007（M2 Chrome 收尾）仍为 `PARTIAL`：真实 Chrome 已启动，但页面导航控制持续超时；未伪造中文/英文响应式、资产标签、CSV UI 绑定、负向路径或 Console/Network 结论，也未修改产品代码。自动化仍为 328/328 PASS，Runtime 安全边界保持不变。
+- 下一步执行唯一编号 [`LOOP-008`](loop-prompts/loop-008-m2-data-center-chrome-closeout-v2.md)（M2 用户协同 Chrome 收尾，不进入 M3）。如果 Agent 控制通道失败，必须在同一 Loop 内转为用户手工操作和非敏感证据交接，不再原样重复控制链路。
 
 完整 Prompt：[`next-loop-prompt.md`](next-loop-prompt.md)。
 

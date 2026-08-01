@@ -1,6 +1,15 @@
 import {
   ConversationAssistantResponseSchema,
   ConversationCommandSchema,
+  ConversationListRequestSchema,
+  ConversationTurnsRequestSchema,
+  type ConversationDraftReference,
+  type ConversationListRequest,
+  type ConversationSummary,
+  type ConversationSummaryPage,
+  type ConversationTurnsRequest,
+  type ConversationTurn,
+  type ConversationTurnPage,
   DraftProposalSchema,
   EvidenceGateSummarySchema,
   RegisteredToolCallSchema,
@@ -64,6 +73,27 @@ export interface ConversationReplayRecord {
 export interface ConversationReplayRepository {
   get(key: ConversationReplayKey): ConversationReplayRecord | undefined;
   save(key: ConversationReplayKey, record: ConversationReplayRecord): void;
+  listConversations(
+    actorId: string,
+    request: ConversationListRequest,
+  ): ConversationSummaryPage;
+  getConversation(
+    actorId: string,
+    conversationId: string,
+  ): ConversationSummary | undefined;
+  listTurns(
+    actorId: string,
+    conversationId: string,
+    request: ConversationTurnsRequest,
+  ): ConversationTurnPage;
+  getLatestTurn(
+    actorId: string,
+    conversationId: string,
+  ): ConversationTurn | undefined;
+  getLatestDraftReference(
+    actorId: string,
+    conversationId: string,
+  ): ConversationDraftReference | undefined;
 }
 
 export interface OrchestrationCopilotServiceDependencies {
@@ -401,34 +431,31 @@ export class OrchestrationCopilotService {
         { zodIssueCount: String(parsed.error.issues.length) },
       );
     }
-    const command = parsed.data;
-    if (sensitiveContent.test(command.message)) {
-      throw new OrchestrationCopilotError(
-        "COPILOT_SENSITIVE_CONTENT_REJECTED",
-        "Credentials and secrets are not accepted by the orchestration conversation.",
-      );
-    }
     const replayKey = {
       actorId: actor.actorId,
-      conversationId: command.conversationId,
-      idempotencyKey: command.idempotencyKey,
+      conversationId: parsed.data.conversationId,
+      idempotencyKey: parsed.data.idempotencyKey,
     };
     const memoryKey = `${replayKey.actorId}:${replayKey.conversationId}:${replayKey.idempotencyKey}`;
     const replay = this.dependencies.replayRepository?.get(replayKey) ??
       this.replay.get(memoryKey);
     if (replay) {
-      if (stableJson(replay.command) !== stableJson(command)) {
+      if (stableJson(replay.command) !== stableJson(parsed.data)) {
         throw new OrchestrationCopilotError(
           "COPILOT_IDEMPOTENCY_CONFLICT",
           "The idempotency key is already bound to a different Conversation command.",
-          {
-            conversationId: command.conversationId,
-            idempotencyKey: command.idempotencyKey,
-          },
+          { conversationId: parsed.data.conversationId, idempotencyKey: parsed.data.idempotencyKey },
         );
       }
       this.restorePipelineDraftMapping(replay.response);
       return replay.response;
+    }
+    const command = this.applyAuthoritativeDraftReference(parsed.data, actor);
+    if (sensitiveContent.test(command.message)) {
+      throw new OrchestrationCopilotError(
+        "COPILOT_SENSITIVE_CONTENT_REJECTED",
+        "Credentials and secrets are not accepted by the orchestration conversation.",
+      );
     }
 
     const explicitTool = command.message.match(
@@ -458,6 +485,67 @@ export class OrchestrationCopilotService {
     return parsedResponse;
   }
 
+  listConversations(
+    actorId: string,
+    request: ConversationListRequest,
+  ): ConversationSummaryPage {
+    if (!this.dependencies.replayRepository) {
+      return {
+        schemaVersion: "1.0.0",
+        items: [],
+        hasMore: false,
+      };
+    }
+    return this.dependencies.replayRepository.listConversations(
+      actorId,
+      ConversationListRequestSchema.parse(request),
+    );
+  }
+
+  getConversation(
+    actorId: string,
+    conversationId: string,
+  ): ConversationSummary | undefined {
+    return this.dependencies.replayRepository?.getConversation(actorId, conversationId);
+  }
+
+  listTurns(
+    actorId: string,
+    conversationId: string,
+    request: ConversationTurnsRequest,
+  ): ConversationTurnPage {
+    if (!this.dependencies.replayRepository) {
+      return {
+        schemaVersion: "1.0.0",
+        conversationId,
+        items: [],
+        hasMore: false,
+      };
+    }
+    return this.dependencies.replayRepository.listTurns(
+      actorId,
+      conversationId,
+      ConversationTurnsRequestSchema.parse(request),
+    );
+  }
+
+  getLatestTurn(
+    actorId: string,
+    conversationId: string,
+  ): ConversationTurn | undefined {
+    return this.dependencies.replayRepository?.getLatestTurn(actorId, conversationId);
+  }
+
+  getLatestDraftReference(
+    actorId: string,
+    conversationId: string,
+  ): ConversationDraftReference | undefined {
+    return this.dependencies.replayRepository?.getLatestDraftReference(
+      actorId,
+      conversationId,
+    );
+  }
+
   private restorePipelineDraftMapping(
     response: ConversationAssistantResponse,
   ): void {
@@ -475,6 +563,49 @@ export class OrchestrationCopilotService {
         pipelineDraftId,
       );
     }
+  }
+
+  private applyAuthoritativeDraftReference(
+    command: ConversationCommand,
+    actor: OrchestrationActor,
+  ): ConversationCommand {
+    const repository = this.dependencies.replayRepository;
+    if (!repository) return command;
+    const authoritativeReference = repository.getLatestDraftReference(
+      actor.actorId,
+      command.conversationId,
+    );
+    if (!authoritativeReference) {
+      const { draftReference, ...rest } = command;
+      return rest;
+    }
+    if (
+      command.draftReference &&
+      !this.isSameDraftReference(command.draftReference, authoritativeReference)
+    ) {
+      throw new OrchestrationCopilotError(
+        "COPILOT_CONVERSATION_DRAFT_REFERENCE_CONFLICT",
+        "The provided conversation draft reference does not match the latest server authoritative value for this conversation.",
+        {
+          conversationId: command.conversationId,
+          providedVersionId: command.draftReference.versionId,
+          authoritativeVersionId: authoritativeReference.versionId,
+          providedFingerprint: command.draftReference.fingerprint,
+          authoritativeFingerprint: authoritativeReference.fingerprint,
+        },
+      );
+    }
+    if (command.draftReference) return command;
+    return { ...command, draftReference: authoritativeReference };
+  }
+
+  private isSameDraftReference(
+    left: ConversationDraftReference,
+    right: ConversationDraftReference,
+  ): boolean {
+    return left.draftId === right.draftId &&
+      left.versionId === right.versionId &&
+      left.fingerprint === right.fingerprint;
   }
 
   private createDraft(

@@ -1,9 +1,14 @@
 import assert from "node:assert/strict";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import test from "node:test";
 import {
   ConversationAssistantResponseSchema,
   ConversationCommandSchema,
+  ToolActivityListSchema,
+  projectToolActivity,
   type ConversationCommand,
   type OrchestrationActor,
 } from "../packages/contracts/src/index.js";
@@ -13,6 +18,10 @@ import {
 import {
   OrchestrationCopilotError,
 } from "../packages/core/src/orchestration-copilot-service.js";
+import {
+  ConversationReplayReadError,
+  SqliteConversationReplayRepository,
+} from "../packages/runtime/src/sqlite-conversation-replay-repository.js";
 import {
   assessObservationWindowCapability,
 } from "../packages/core/src/pipeline-graph-validator.js";
@@ -168,6 +177,24 @@ test("registered Crypto preset creates persistent Configuration and Pipeline Dra
   }
 });
 
+test("tool activity is bounded, strict, correlated, and omits raw arguments and output", async () => {
+  const { database, runtime } = fixture();
+  try {
+    const response = await runtime.orchestrationCopilotService.handle(currentCommand, actor);
+    const activity = projectToolActivity(response.toolCalls, response.toolResults);
+    assert.ok(activity.length > 0);
+    assert.ok(activity.every((item) => item.toolCallLifecycle === "requested"));
+    assert.ok(activity.every((item) => !("arguments" in item) && !("output" in item)));
+    assert.ok(activity.every((item) => !item.toolResultId || response.toolResults.some((result) => result.toolCallId === item.toolCallId && result.toolResultId === item.toolResultId)));
+    const unmatched = projectToolActivity(response.toolCalls, [{ ...response.toolResults[0]!, toolCallId: "tool-call:unmatched" }]);
+    assert.ok(unmatched.every((item) => item.toolResultLifecycle === undefined));
+    assert.equal(ToolActivityListSchema.safeParse([...activity, ...activity, ...activity, ...activity, ...activity]).success, false);
+    assert.equal(ToolActivityListSchema.safeParse([{ ...activity[0]!, output: { secret: "never" } }]).success, false);
+  } finally {
+    database.close();
+  }
+});
+
 test("daily-only source rejects a 5m Trigger observation without creating a version", async () => {
   const { database, runtime } = fixture();
   try {
@@ -235,7 +262,7 @@ test("the authoritative capability assessment preserves 5m to 1h aggregation lin
   );
 });
 
-test("allowed Agent field update creates a new immutable version, Diff, and stale Evidence", async () => {
+test("allowed Agent field update creates a new immutable version and field Diff", async () => {
   const { database, runtime } = fixture();
   try {
     const created = await runtime.orchestrationCopilotService.handle(
@@ -244,12 +271,6 @@ test("allowed Agent field update creates a new immutable version, Diff, and stal
     );
     const editableReference =
       created.context.selected.draftReference!;
-    const evidenced =
-      runtime.productionStrategyOrchestration.configurationDraftService.recordEvidence(
-        editableReference.versionId,
-        "evidence:test:baseline",
-        actor.actorId,
-      );
     const updated = await runtime.orchestrationCopilotService.handle(
       {
         schemaVersion: "1.0.0",
@@ -258,17 +279,12 @@ test("allowed Agent field update creates a new immutable version, Diff, and stal
         locale: "zh-CN",
         message:
           "修改 Analysis Agent 的 confidenceThreshold，设置为 0.72。",
-        draftReference: {
-          draftId: evidenced.draftId,
-          versionId: evidenced.versionId,
-          fingerprint: evidenced.fingerprint,
-        },
+        draftReference: editableReference,
       },
       actor,
     );
     assert.equal(updated.status, "proposal");
-    assert.equal(updated.proposal?.parentFingerprint, evidenced.fingerprint);
-    assert.equal(updated.proposal?.evidenceStatus, "stale");
+    assert.equal(updated.proposal?.parentFingerprint, editableReference.fingerprint);
     assert.equal(updated.proposal?.changes.length, 1);
     assert.deepEqual(updated.proposal?.changes[0]?.path, [
       "payload",
@@ -280,10 +296,9 @@ test("allowed Agent field update creates a new immutable version, Diff, and stal
     assert.equal(updated.runtimeApplied, false);
     const versions =
       runtime.productionStrategyOrchestration.configurationDraftRepository.listVersions(
-        evidenced.draftId,
+        editableReference.draftId,
       );
-    assert.equal(versions.length, 3);
-    assert.equal(versions.at(-1)?.evidenceState.status, "stale");
+    assert.equal(versions.length, 2);
   } finally {
     database.close();
   }
@@ -302,11 +317,7 @@ test("forbidden Agent field and stale parent fingerprint fail closed", async () 
           ...currentCommand,
           idempotencyKey: "idempotency.test.forbidden.001",
           message: "修改 Analysis Agent 的 implementationRef，设置为 'client-code'。",
-          draftReference: {
-            draftId: created.context.selected.draftReference!.draftId,
-            versionId: created.context.selected.draftReference!.versionId,
-            fingerprint: created.context.selected.draftReference!.fingerprint,
-          },
+          draftReference: created.context.selected.draftReference,
         },
         actor,
       ),
@@ -330,7 +341,7 @@ test("forbidden Agent field and stale parent fingerprint fail closed", async () 
       ),
       (error) =>
         error instanceof OrchestrationCopilotError &&
-        error.code === "COPILOT_PARENT_FINGERPRINT_CONFLICT",
+        error.code === "COPILOT_CONVERSATION_DRAFT_REFERENCE_CONFLICT",
     );
   } finally {
     database.close();
@@ -562,4 +573,116 @@ test("Bearer HTTP derives Actor and Role server-side and rejects client injectio
     await runtime.close();
     database.close();
   }
+});
+
+test("Conversation history is actor-scoped, paginated, and read-only", async () => {
+  const database = new DatabaseSync(":memory:");
+  const runtime = createCurrentPipelineOrchestrationRuntime({ database, operatorActor: actor });
+  await new Promise<void>((resolve) => runtime.server.listen(0, "127.0.0.1", resolve));
+  const address = runtime.server.address();
+  assert.ok(address && typeof address === "object");
+  const base = `http://127.0.0.1:${address.port}/api/orchestration`;
+  const auth = { authorization: `Bearer ${runtime.ephemeralOperatorToken}`, "content-type": "application/json" };
+  try {
+    await runtime.orchestrationCopilotService.handle(currentCommand, actor);
+    await runtime.orchestrationCopilotService.handle({ ...currentCommand, idempotencyKey: "idempotency.test.history.002", message: "修改 Analysis Agent 的 confidenceThreshold，设置为 0.72。" }, actor);
+    const list = await fetch(`${base}/conversations?limit=1`, { headers: auth });
+    assert.equal(list.status, 200);
+    const listBody = await list.json() as { data: { items: Array<{ conversationId: string; turnCount: number }>; hasMore: boolean } };
+    assert.equal(listBody.data.items[0]?.conversationId, currentCommand.conversationId);
+    assert.equal(listBody.data.items[0]?.turnCount, 2);
+    const turns = await fetch(`${base}/conversations/${currentCommand.conversationId}/turns?limit=1`, { headers: auth });
+    assert.equal(turns.status, 200);
+    const turnsBody = await turns.json() as { data: { items: Array<{ runtimeApplied: boolean }>; hasMore: boolean } };
+    assert.equal(turnsBody.data.items.length, 1);
+    assert.equal(turnsBody.data.items[0]?.runtimeApplied, false);
+    const invalid = await fetch(`${base}/conversations?limit=NaN`, { headers: auth });
+    assert.equal(invalid.status, 400);
+    const injectedActor = await fetch(`${base}/conversations?actorId=forged:actor`, { headers: auth });
+    assert.equal(injectedActor.status, 400);
+    const unauthenticatedTurns = await fetch(`${base}/conversations/${currentCommand.conversationId}/turns?limit=1`);
+    assert.equal(unauthenticatedTurns.status, 401);
+    const malformedId = await fetch(`${base}/conversations/%E0%A4%A` , { headers: auth });
+    assert.equal(malformedId.status, 400);
+    const write = await fetch(`${base}/conversations`, { method: "POST", headers: auth });
+    assert.equal(write.status, 405);
+    const put = await fetch(`${base}/conversations/${currentCommand.conversationId}`, { method: "PUT", headers: auth });
+    assert.equal(put.status, 405);
+    const missing = await fetch(`${base}/conversations/conversation.unknown`, { headers: auth });
+    assert.equal(missing.status, 404);
+  } finally {
+    await runtime.close();
+    database.close();
+  }
+});
+
+test("conversation authority requires the complete server draft reference before tools run", async () => {
+  const { database, runtime } = fixture();
+  try {
+    const first = await runtime.orchestrationCopilotService.handle(currentCommand, actor);
+    const authoritative = first.context.selected.draftReference!;
+    const count = () => (database.prepare("SELECT COUNT(*) AS count FROM configuration_draft_versions").get() as { count: number }).count;
+    const before = count();
+    for (const forged of [
+      { ...authoritative, versionId: "configuration-version:forged" },
+      { ...authoritative, fingerprint: "fnv1a32:deadbeef" },
+      { ...authoritative, draftId: "configuration-draft:forged" },
+    ]) {
+      await assert.rejects(
+        runtime.orchestrationCopilotService.handle({ ...currentCommand, idempotencyKey: `idempotency.test.authority.${forged.versionId ?? forged.draftId}`, message: "修改 Analysis Agent 的 confidenceThreshold，设置为 0.72。", draftReference: forged }, actor),
+        (error: unknown) => error instanceof OrchestrationCopilotError && error.code === "COPILOT_CONVERSATION_DRAFT_REFERENCE_CONFLICT",
+      );
+    }
+    assert.equal(count(), before);
+    const restored = await runtime.orchestrationCopilotService.handle({ ...currentCommand, idempotencyKey: "idempotency.test.authority.restore", message: "修改 Analysis Agent 的 confidenceThreshold，设置为 0.72。" }, actor);
+    assert.equal(restored.context.selected.draftReference?.draftId, authoritative.draftId);
+    const clean = await runtime.orchestrationCopilotService.handle({ ...currentCommand, conversationId: "conversation.test.clean", idempotencyKey: "idempotency.test.authority.clean", draftReference: authoritative }, actor);
+    assert.notEqual(clean.context.selected.draftReference?.draftId, authoritative.draftId);
+  } finally { database.close(); }
+});
+
+test("SQLite conversation replay pagination is SQL-bounded, stable, actor-isolated, and fail-closed", async () => {
+  const { database, runtime } = fixture();
+  const repository = new SqliteConversationReplayRepository(database);
+  const actorB: OrchestrationActor = { actorId: "local:second-operator", displayName: "Second", roles: ["operator"] };
+  try {
+    for (const currentActor of [actor, actorB]) {
+      for (const conversationId of ["conversation.test.page.a", "conversation.test.page.b"]) {
+        await runtime.orchestrationCopilotService.handle({ ...currentCommand, conversationId: `${conversationId}.${currentActor === actor ? "one" : "two"}`, idempotencyKey: `idempotency.test.${conversationId}.${currentActor === actor ? "one" : "two"}.1` }, currentActor);
+        await runtime.orchestrationCopilotService.handle({ ...currentCommand, conversationId: `${conversationId}.${currentActor === actor ? "one" : "two"}`, idempotencyKey: `idempotency.test.${conversationId}.${currentActor === actor ? "one" : "two"}.2`, message: "修改 Analysis Agent 的 confidenceThreshold，设置为 0.72。" }, currentActor);
+      }
+    }
+    const first = repository.listConversations(actor.actorId, { schemaVersion: "1.0.0", limit: 1 });
+    const second = repository.listConversations(actor.actorId, { schemaVersion: "1.0.0", limit: 50, cursor: first.nextCursor });
+    assert.equal(first.items.length + second.items.length, 2);
+    assert.equal(new Set([...first.items, ...second.items].map((item) => item.conversationId)).size, 2);
+    assert.ok([...first.items, ...second.items].every((item) => item.conversationId.endsWith(".one")));
+    const turnFirst = repository.listTurns(actor.actorId, "conversation.test.page.a.one", { schemaVersion: "1.0.0", limit: 1 });
+    const turnSecond = repository.listTurns(actor.actorId, "conversation.test.page.a.one", { schemaVersion: "1.0.0", limit: 50, cursor: turnFirst.nextCursor });
+    assert.equal(turnFirst.items.length + turnSecond.items.length, 2);
+    assert.equal(repository.listTurns(actorB.actorId, "conversation.test.page.a.one", { schemaVersion: "1.0.0", limit: 1 }).items.length, 0);
+    assert.equal(repository.getConversation(actorB.actorId, "conversation.test.page.a.one"), undefined);
+    assert.throws(() => repository.listTurns(actor.actorId, "conversation.test.page.a.one", { schemaVersion: "1.0.0", limit: 1, cursor: first.nextCursor }), (error: unknown) => error instanceof ConversationReplayReadError && error.code === "INVALID_CONVERSATION_CURSOR");
+    database.prepare("INSERT INTO orchestration_conversation_replays (actor_id, conversation_id, idempotency_key, command_json, response_json, created_at) VALUES (?, ?, ?, ?, ?, ?)").run(actor.actorId, "conversation.test.corrupt", "idempotency.test.corrupt", "{}", "{}", new Date().toISOString());
+    assert.throws(() => repository.getConversation(actor.actorId, "conversation.test.corrupt"), (error: unknown) => error instanceof ConversationReplayReadError && error.code === "CORRUPT_CONVERSATION_REPLAY");
+    assert.throws(() => database.prepare("DELETE FROM orchestration_conversation_replays WHERE conversation_id = ?").run("conversation.test.corrupt"));
+  } finally { database.close(); }
+});
+
+test("SQLite conversation history and its authoritative Draft reference survive runtime restart", async () => {
+  const directory = mkdtempSync(join(tmpdir(), "tradebot-conversation-replay-"));
+  const databasePath = join(directory, "runtime.sqlite");
+  const firstRuntime = createCurrentPipelineOrchestrationRuntime({ databasePath, operatorActor: actor });
+  try {
+    const created = await firstRuntime.orchestrationCopilotService.handle(currentCommand, actor);
+    const reference = created.context.selected.draftReference!;
+    await firstRuntime.close();
+    const restoredRuntime = createCurrentPipelineOrchestrationRuntime({ databasePath, operatorActor: actor });
+    try {
+      assert.deepEqual(restoredRuntime.orchestrationCopilotService.getLatestDraftReference(actor.actorId, currentCommand.conversationId), reference);
+      const continued = await restoredRuntime.orchestrationCopilotService.handle({ ...currentCommand, idempotencyKey: "idempotency.test.restart.002", message: "修改 Analysis Agent 的 confidenceThreshold，设置为 0.72。" }, actor);
+      assert.equal(continued.context.selected.draftReference?.draftId, reference.draftId);
+      assert.equal(restoredRuntime.orchestrationCopilotService.listTurns(actor.actorId, currentCommand.conversationId, { schemaVersion: "1.0.0", limit: 50 }).items.length, 2);
+    } finally { await restoredRuntime.close(); }
+  } finally { rmSync(directory, { recursive: true, force: true }); }
 });

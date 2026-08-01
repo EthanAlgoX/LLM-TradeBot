@@ -35,6 +35,9 @@ test("conversation view state distinguishes all orchestration outcomes", () => {
       busy: false,
       unavailable: true,
     }),
-    "unavailable",
+    "offline",
   );
+  assert.equal(deriveConversationViewState({ busy: false, unavailable: false }), "empty");
+  assert.equal(deriveConversationViewState({ busy: false, unavailable: false, hasTurns: true }), "ready");
+  assert.equal(deriveConversationViewState({ busy: false, unavailable: false, unauthorized: true }), "unauthorized");
 });

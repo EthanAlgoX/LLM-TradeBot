@@ -494,7 +494,7 @@ export async function createCurrentCryptoPaperRuntimeBinding(
         if (artifactLedger) {
           closers.push(() => artifactLedger.close());
         }
-        await paperStore.reset(accountId, profile.execution.initialCash);
+        await paperStore.initialize(accountId, profile.execution.initialCash);
         const executor = await PersistentPaperExecutionAgent.open(
           accountId,
           paperStore,
