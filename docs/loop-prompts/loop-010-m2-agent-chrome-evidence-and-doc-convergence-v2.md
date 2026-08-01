@@ -25,8 +25,9 @@ Loop ID：LOOP-010
 
 - M2 服务端资产目录、Dataset version/fingerprint binding、Validation fail-closed、Evidence lineage 和 Market Radar 真实性已经由代码与自动化验证。
 - `http://127.0.0.1:5174/#data-center` 最近一次检查可达。
-- 最近一次 Agent Chrome 尝试在读取页面 DOM 时超时重置，未取得 UI、响应式或 DevTools 证据；这不是产品 FAIL。
-- 最新自动化基线：`npm run check` PASS、`npm run test:ts` 328/328 PASS、`npm run build:web` PASS（34 modules）、`git diff --check` PASS。
+- 已定位并修复数据中心 `MutationObserver -> render -> innerHTML mutation` 自循环；修复前独立 Chrome Renderer 约 89% CPU/3.6GB RSS，修复后约 0.2% CPU/212MB RSS，页面 snapshot/eval 恢复。
+- 独立浏览器性能冒烟已确认 1440×900 与 820×760 无横向溢出、两个资产可见、Console 无 error，Data Assets 请求不再持续增长；该冒烟只证明卡死缺陷已修复，不替代本 Loop 要求的完整 Agent Chrome 绑定/恢复与 Network 验收。
+- 最新自动化基线：`npm run check` PASS、`npm run test:ts` 329/329 PASS、`npm run build:web` PASS（35 modules）、`git diff --check` PASS。
 - Git 工作区最近一次报告为干净，`main` 与 `origin/main` 同步。
 - Runtime 安全边界保持：`runtimeApplied=false`、Paper Only、`exchangeWriteAllowed=false`。
 
