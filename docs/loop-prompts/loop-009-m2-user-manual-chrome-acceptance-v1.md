@@ -3,13 +3,21 @@
 ```text
 Loop ID：LOOP-009
 里程碑：M2 数据中心 V1 收尾
-状态：READY
+状态：PARTIAL
 前置 Loop：LOOP-008（PARTIAL）
 执行环境：本地仓库 + 用户真实 Chrome
 浏览器要求：必需
 推荐执行端：Chrome ChatGPT
 验收主路径：USER_MANUAL_CHROME_VERIFIED
 ```
+
+## 实际执行结果（2026-08-01）
+
+- 服务检查通过，`http://127.0.0.1:5174/#data-center` 可达。
+- 执行窗口仍尝试了 Agent Chrome 控制；页面能够打开，但控制会话在设置 1440×900 和读取页面结构时超时，重连后的新受控标签页再次超时，最终 Chrome 不可用。
+- 中文/英文响应式、资产标签、CSV UI 绑定与刷新恢复、送入编排、Console 和 Network 均为“未取得证据”，不代表发现产品缺陷。
+- 未读取或暴露敏感值，未修改代码、文档或 `data/local-paper-workspace*`。
+- LOOP-009 为 `PARTIAL`，M2 保持 `IN_PROGRESS`；下一步执行 LOOP-010，浏览器证据必须完全由用户手工 Chrome 反馈提供，Agent 禁止再次调用浏览器控制。
 
 ## 目标
 
