@@ -591,6 +591,8 @@ README 中的 `320/320 PASS` 当前已过期。恢复稳定测试基线是后续
 
 验收：一个 Strategy Draft 可以引用服务端登记的数据版本，Validation 能阻止能力不匹配，回测 Evidence 能追溯 Dataset fingerprint。
 
+进度：服务端实现和 328/328 自动化基线已通过；LOOP-006～008 因 Agent Chrome 控制通道不可用未完成可见验收。下一步由 LOOP-009 直接采用用户手工 Chrome 反馈关闭桌面/窄屏、真实性标签、CSV UI 绑定与刷新恢复、Console/Network 项，不进入 M3。
+
 ### M3：实验场 V1
 
 状态：`PLANNED`

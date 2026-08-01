@@ -185,7 +185,8 @@ API: http://127.0.0.1:8787
 - 自动化在本轮首版通过：`npm run check`、`npm run test:ts` 328/328、`npm run build:web`。但 Chrome 控制通道在点击和刷新后两次超时重置，未能完成 LOOP-005 强制的 1440×900/820×760、可见绑定/拒绝、Console 与 Network 验收；不得标记 M2 COMPLETE。
 - LOOP-006（M2 收尾）仍为 `PARTIAL`：本地 Paper 服务成功启动，`npm run check`、`npm run test:ts`（328/328）、`npm run build:web` 与 `git diff --check` 均通过；但 Chrome 控制通道明确不可用，故未执行或声称完成真实 Chrome 的桌面/窄屏、资产标签、CSV 正向 UI 绑定与刷新恢复、负向路径、Console/Network 验收。没有修改产品代码或 `data/local-paper-workspace*`。
 - LOOP-007（M2 Chrome 收尾）仍为 `PARTIAL`：真实 Chrome 已启动，但页面导航控制持续超时；未伪造中文/英文响应式、资产标签、CSV UI 绑定、负向路径或 Console/Network 结论，也未修改产品代码。自动化仍为 328/328 PASS，Runtime 安全边界保持不变。
-- 下一步执行唯一编号 [`LOOP-008`](loop-prompts/loop-008-m2-data-center-chrome-closeout-v2.md)（M2 用户协同 Chrome 收尾，不进入 M3）。如果 Agent 控制通道失败，必须在同一 Loop 内转为用户手工操作和非敏感证据交接，不再原样重复控制链路。
+- LOOP-008（M2 用户协同 Chrome 收尾）仍为 `PARTIAL`：真实 Chrome 控制通道不可用，执行窗口未完成计划中的用户手工交接，因此桌面/窄屏、资产标签、CSV UI 绑定与刷新恢复及 Console/Network 均没有可判定的浏览器证据。Runtime 安全边界与 328/328 自动化基线保持不变；未修改本地 workspace 数据。
+- 下一步执行唯一编号 [`LOOP-009`](loop-prompts/loop-009-m2-user-manual-chrome-acceptance-v1.md)（M2 用户手工 Chrome 验收，不进入 M3）。本轮不再要求 Agent 控制 Chrome：必须先向用户发出逐项验收表并等待回复，不能因控制通道不可用再次提前结束。
 
 完整 Prompt：[`next-loop-prompt.md`](next-loop-prompt.md)。
 

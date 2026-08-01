@@ -3,11 +3,22 @@
 ```text
 Loop ID：LOOP-008
 里程碑：M2 数据中心 V1 收尾
-状态：READY
+状态：PARTIAL
 前置 Loop：LOOP-007（PARTIAL）
 执行环境：本地仓库 + 真实 Chrome；用户手工交接优先
 浏览器要求：必需
 ```
+
+## 实际执行结果（2026-08-01）
+
+- 验收模式：`PARTIAL`。
+- 真实 Chrome 控制通道不可用，未完成中文 1440×900、英文 820×760、资产真实性标签、CSV 正向 UI 绑定与刷新恢复、Console/Network 验收。
+- 未获得用户逐项手工 Chrome 反馈，因此不能把计划中的用户交接步骤记为已验证。
+- Runtime 安全边界保持：`runtimeApplied=false`、Paper Only、`exchangeWriteAllowed=false`。
+- 沿用本轮执行窗口报告的自动化结果：`npm run check`、`npm run test:ts`（328/328）、`npm run build:web`、`git diff --check` 均通过。
+- `npm run dev:paper` 启动时发现 8787 已被既有进程占用；未终止或修改该进程，未修改 `data/local-paper-workspace*`。
+- 本轮执行窗口没有 commit、push 或创建 PR，不符合新增 Git 快照规则；文档收尾及下一 Loop 由当前交接补齐。
+- M2 保持 `IN_PROGRESS`；下一步执行 LOOP-009，不进入 M3。
 
 ## 目标
 
