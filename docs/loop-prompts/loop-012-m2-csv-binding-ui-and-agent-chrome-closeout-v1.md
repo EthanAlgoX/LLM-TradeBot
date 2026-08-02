@@ -3,12 +3,21 @@
 ```text
 Loop ID：LOOP-012
 里程碑：M2 数据中心 V1
-状态：READY
+状态：PARTIAL
 前置 Loop：LOOP-011（PARTIAL，发现 CSV Binding UI 消费路径缺失）
 执行环境：本地仓库 + Agent 直接控制真实 Google Chrome
 浏览器要求：实现后必需；只接受 Agent Chrome 验证，禁止用户手工验收
 验收模式：IMPLEMENTATION_AND_AGENT_CHROME_VERIFIED
 ```
+
+## 执行结果（2026-08-02）
+
+- CSV intent 消费者与可见 Binding UI 已完成；负向 fail-closed 自动化通过。
+- Draft Authority 与服务端刷新恢复已实现，但尚未取得正向浏览器证据。
+- 真实 Agent Chrome 已确认 CSV Historical 资产详情、Binance `unavailable` 真实性标签、待绑定卡片与 Runtime 安全提示。
+- 当前后端没有通过可见 UI 产生 CSV-backed Market/Agent Draft；因此绑定按钮无合格目标，正向绑定、刷新恢复、继续对话、响应式及 Console/Network 未完成。
+- 自动化为 `check` PASS、`test:ts` 329/329 PASS、`build:web` PASS、`diff-check` PASS。
+- 实现提交 `52d27785bfc055c7f6dc2a90b74831853cb45d04` 已推送到 `origin/main`；M2 保持 `IN_PROGRESS`，后续转入唯一编号 LOOP-013。
 
 ## 目标
 
