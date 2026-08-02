@@ -82,6 +82,11 @@ export class SqliteConfigurationDraftRepository implements ConfigurationDraftRep
     return rows.map((row) => ConfigurationDraftVersionSchema.parse(JSON.parse(row.version_json)));
   }
 
+  listStrategyVersionsByActor(actorId: string): ConfigurationDraftVersion[] {
+    const rows = this.database.prepare(`SELECT version_json FROM configuration_draft_versions WHERE kind = 'strategy' ORDER BY created_at DESC, version_id DESC`).all() as unknown as ConfigurationDraftRow[];
+    return rows.map((row) => ConfigurationDraftVersionSchema.parse(JSON.parse(row.version_json))).filter((version) => version.createdByActorId === actorId);
+  }
+
   findLatestStrategyVersionsByPipelineDraftId(
     pipelineDraftId: string,
   ): ConfigurationDraftVersion[] {

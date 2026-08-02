@@ -17,6 +17,7 @@ export interface ConfigurationDraftRepository {
   get(versionId: string): ConfigurationDraftVersion;
   latest(draftId: string): ConfigurationDraftVersion;
   listVersions(draftId: string): ConfigurationDraftVersion[];
+  listStrategyVersionsByActor?(actorId: string): ConfigurationDraftVersion[];
 }
 
 export interface ConfigurationDraftCatalog {
@@ -196,6 +197,10 @@ export class ConfigurationDraftService {
 
   get(versionId: string): ConfigurationDraftVersion {
     return this.repository.get(versionId);
+  }
+
+  listStrategyVersionsByActor(actorId: string): ConfigurationDraftVersion[] {
+    return this.repository.listStrategyVersionsByActor?.(actorId) ?? [];
   }
 
   getLatest(draftId: string): ConfigurationDraftVersion {

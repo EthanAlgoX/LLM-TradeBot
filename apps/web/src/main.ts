@@ -5,6 +5,7 @@ import "./causal-review-api.js";
 import "./comparative-trade-review-api.js";
 import "./strategy-workspace-api.js";
 import "./data-center-api.js";
+import "./experiment-workspace-api.js";
 import "./runtime-dashboard.css";
 import type {
   RuntimeDashboardSnapshot,
@@ -1524,82 +1525,7 @@ function renderActivityRow(event: ActivityEvent): string {
 }
 
 function renderLab(): string {
-  const proposal = state.workspace.proposal;
-  return `
-    <section class="page-intro">
-      <div>
-        <h1>${tr("Agent 实验室", "Agent Lab")}</h1>
-        <p>${tr("用历史证据、最新信息和人工经验创建候选版本。运行中的 Atlas Agent 始终只读。", "Create a Candidate from historical evidence, current context, and human experience. The running Atlas Agent always stays read-only.")}</p>
-      </div>
-      <button type="button" class="secondary-action" id="lab-open-copilot">${tr("让副驾驶准备材料", "Ask Copilot to prepare evidence")}</button>
-    </section>
-    <div class="lab-layout">
-      <section class="candidate-profile">
-        <header>
-          <div><span>${tr("候选策略", "Candidate profile")}</span><h2>Atlas 3.9</h2></div>
-          <code>candidate:b31f09</code>
-        </header>
-        <p>${proposal
-          ? escapeHtml(proposal.reason)
-          : tr("根据三笔亏损复盘，收紧成交量确认并保持现有账户风险上限。", "Tighten volume confirmation from three loss reviews while preserving account risk limits.")}</p>
-        <div class="profile-diff">
-          <div><span>${tr("最低置信度", "Minimum confidence")}</span><del>60</del><ins>${proposal?.minimumConfidence ?? 68}</ins></div>
-          <div><span>${tr("最大杠杆", "Max leverage")}</span><del>1.5×</del><ins>${proposal?.maxLeverage ?? 1.25}×</ins></div>
-          <div><span>${tr("每笔名义金额", "Per-trade notional")}</span><del>1,000</del><ins>${proposal?.perTradeNotional ?? 850} USDT</ins></div>
-          <div><span>${tr("最大持仓数", "Max positions")}</span><del>2</del><ins>1</ins></div>
-        </div>
-        <button type="button" class="secondary-action" id="edit-proposal">${tr("编辑候选提案", "Edit Candidate proposal")}</button>
-      </section>
-
-      <section class="evidence-stack">
-        <header><h2>${tr("候选证据", "Candidate evidence")}</h2><span>${state.workspace.attachedEvidence.length + (state.workspace.thesis ? 1 : 0)}</span></header>
-        ${state.workspace.attachedEvidence.map((evidence) => `<article><strong>${tr("交易复盘", "Trade Review")}</strong><p>${localized(evidence)}</p></article>`).join("")}
-        ${state.workspace.thesis ? `<article><strong>Human Market Thesis</strong><p>${escapeHtml(state.workspace.thesis.marketView)}</p><small>${escapeHtml(state.workspace.thesis.symbols)} / ${state.workspace.thesis.confidence}% / ${escapeHtml(state.workspace.thesis.validUntil)}</small></article>` : ""}
-        <button type="button" class="text-action" data-panel="thesis">${tr("添加人工市场观点", "Add Human Market Thesis")}</button>
-      </section>
-    </div>
-    ${renderLifecycle(true)}
-    <section class="validation-console">
-      <div class="validation-result">
-        <span>${tr("最近回测", "Latest backtest")}</span>
-        <strong>1,240 ${tr("个周期", "cycles")}</strong>
-        <dl>
-          <div><dt>${tr("净收益", "Net return")}</dt><dd>+8.7%</dd></div>
-          <div><dt>${tr("最大回撤", "Max drawdown")}</dt><dd>-4.6%</dd></div>
-          <div><dt>${tr("胜率", "Win rate")}</dt><dd>51.8%</dd></div>
-          <div><dt>${tr("利润因子", "Profit factor")}</dt><dd>1.31</dd></div>
-        </dl>
-      </div>
-      <div class="gate-action">
-        <span>${tr("当前门禁", "Current gate")}</span>
-        <h2>${state.workspace.stage < 2
-          ? tr("必须先完成回测", "Backtest required")
-          : state.workspace.stage === 2
-            ? tr("运行样本外验证", "Run Walk-Forward")
-            : !state.workspace.approvalRequested
-              ? tr("请求人工审批", "Request human approval")
-              : !state.workspace.approvalApproved
-                ? tr("等待人工确认", "Awaiting human confirmation")
-                : !state.workspace.paperReleased
-                  ? tr("审批通过，等待发布", "Approved, ready for release")
-                  : tr("已发布到模拟运行", "Released to Paper")}</h2>
-        <p>${tr("发布到 Paper 之前必须留下回测、样本外验证和审批证据。", "Backtest, Walk-Forward, and approval evidence are required before Paper release.")}</p>
-        ${state.workspace.stage < 2
-          ? `<button type="button" class="primary-action" id="run-backtest">${state.workspace.backtestRunning ? tr("正在回测", "Backtest running") : tr("运行回测", "Run backtest")}</button>`
-          : state.workspace.stage === 2
-            ? `<button type="button" class="primary-action" id="run-walk-forward">${tr("运行样本外验证", "Run Walk-Forward")}</button>`
-            : state.workspace.stage === 3
-              ? !state.workspace.approvalRequested
-                ? `<button type="button" class="primary-action" id="request-approval">${tr("请求人工审批", "Request approval")}</button>`
-                : !state.workspace.approvalApproved
-                  ? `<button type="button" class="primary-action" id="approve-candidate">${tr("人工确认批准", "Human approve")}</button>`
-                  : !state.workspace.paperReleased
-                    ? `<button type="button" class="primary-action" id="deploy-paper">${tr("发布到模拟运行", "Release to Paper")}</button>`
-                    : `<button type="button" class="locked-action" disabled>${tr("已发布到模拟运行", "Released to Paper")}</button>`
-              : ""}
-      </div>
-    </section>
-  `;
+  return `<section class="page-intro"><div><h1>${tr("实验场", "Experiment Arena")}</h1><p>${tr("历史策略版本在服务端锁定并重放；不会审批、部署或改变运行时。", "Historical strategy versions are server-locked and replayed; no approval, deployment, or runtime mutation.")}</p></div></section><div id="experiment-workspace-host"></div>`;
 }
 
 function renderActivity(): string {

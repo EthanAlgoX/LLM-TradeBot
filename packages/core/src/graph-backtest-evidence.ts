@@ -132,6 +132,8 @@ export class RegisteredGraphHistoricalDatasetRegistry {
     return GraphHistoricalDatasetDefinitionSchema.parse(definition);
   }
 
+  list(): GraphHistoricalDatasetDefinition[] { return [...this.definitions.values()].map((item) => GraphHistoricalDatasetDefinitionSchema.parse(item)); }
+
   schedule(datasetId: string, startAt: string, endAt: string): string[] {
     const dataset = this.require(datasetId);
     const sequence = dataset.asOfSequence.filter(
@@ -243,6 +245,7 @@ export class RegisteredGraphWalkForwardPlanRegistry {
     if (!plan) throw new GraphEvidenceError("WALK_FORWARD_PLAN_NOT_REGISTERED", { planId });
     return GraphWalkForwardPlanDefinitionSchema.parse(plan);
   }
+  list(): GraphWalkForwardPlanDefinition[] { return [...this.plans.values()].map((item) => GraphWalkForwardPlanDefinitionSchema.parse(item)); }
 }
 
 export interface GraphBacktestSession {

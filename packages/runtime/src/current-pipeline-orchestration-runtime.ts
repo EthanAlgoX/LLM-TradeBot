@@ -599,6 +599,7 @@ export function createCurrentPipelineOrchestrationRuntime(
     configurationDraftHttpHandler:
       productionStrategyOrchestration.configurationDraftHttpHandler,
     dataCenterHttpHandler,
+    ...(productionStrategyOrchestration.experimentLabHttpHandler ? { experimentLabHttpHandler: productionStrategyOrchestration.experimentLabHttpHandler } : {}),
     ...(productionStrategyOrchestration.strategyEvidenceHttpHandler
       ? {
           strategyEvidenceHttpHandler:

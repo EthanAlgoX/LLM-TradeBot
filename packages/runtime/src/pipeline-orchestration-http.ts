@@ -51,6 +51,7 @@ import type { ConfigurationDraftHttpHandler } from "./configuration-draft-http.j
 import type { StrategyEvidenceHttpHandler } from "./strategy-evidence-http.js";
 import type { HistoricalSemanticEvaluationHttpHandler } from "./historical-semantic-evaluation-http.js";
 import type { DataCenterHttpHandler } from "./data-center-http.js";
+import type { ExperimentLabHttpHandler } from "./experiment-lab.js";
 import {
   CurrentCryptoPaperLaunchError,
   type CurrentCryptoPaperLaunchService,
@@ -88,6 +89,7 @@ export interface PipelineOrchestrationHttpDependencies {
   strategyEvidenceHttpHandler?: StrategyEvidenceHttpHandler;
   historicalSemanticEvaluationHttpHandler?: HistoricalSemanticEvaluationHttpHandler;
   dataCenterHttpHandler?: DataCenterHttpHandler;
+  experimentLabHttpHandler?: ExperimentLabHttpHandler;
   productionWorkspaceCatalog?: object;
   pipelineGraphs?: readonly PipelineGraphVersion[];
   maxBodyBytes?: number;
@@ -336,6 +338,11 @@ export function createPipelineOrchestrationHttpServer(
           return;
         }
         await forwardWebHandler(request, response, dependencies.dataCenterHttpHandler, maxBodyBytes);
+        return;
+      }
+      if (path.startsWith("/api/orchestration/experiments")) {
+        if (!dependencies.experimentLabHttpHandler) { sendError(response, 503, "EXPERIMENT_LAB_UNAVAILABLE", "Registered Graph Evidence scope is required."); return; }
+        await forwardWebHandler(request, response, dependencies.experimentLabHttpHandler, maxBodyBytes);
         return;
       }
       if (

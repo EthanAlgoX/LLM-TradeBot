@@ -1,6 +1,6 @@
 # TradeBot 产品优化规划与进度
 
-> 2026-08-02：M2 已由 LOOP-017 关闭；336/336 自动化及 Agent Chrome 双尺寸、Binding、恢复、Composer、会话隔离与 Runtime safety 通过。当前进入 LOOP-018：M3 实验场 V1。
+> 2026-08-02：M2 已由 LOOP-017 关闭；336/336 自动化及 Agent Chrome 双尺寸、Binding、恢复、Composer、会话隔离与 Runtime safety 通过。LOOP-018 已实现 M3 实验场初版但 Chrome DOM 验收超时；M3 保持 IN_PROGRESS，由 LOOP-019 续办，未进入 M4。
 
 > 文档角色：汇总 2026-08-01 之前的产品讨论，作为后续产品优化、页面收敛和阶段验收的执行入口
 > 最后更新：2026-08-01
@@ -704,8 +704,8 @@ README 中的 `320/320 PASS` 当前已过期。恢复稳定测试基线是后续
 M0 恢复稳定基线和路由
 -> M1 历史对话 V1
 -> M2 数据中心 V1
--> M3 实验场 V1
--> M4 多模拟运行中心
+-> M3 实验场 V1（IN_PROGRESS：等待 Agent Chrome 全链验收）
+-> M4 多模拟运行中心（尚未进入）
 ```
 
 完成 M4 后，TradeBot 将形成首个完整、仍保持 Paper Only 的产品闭环：

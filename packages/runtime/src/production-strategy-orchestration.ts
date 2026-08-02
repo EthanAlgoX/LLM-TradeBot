@@ -42,6 +42,7 @@ import {
 import { SqliteStrategyEvidenceBindingRepository } from "./sqlite-strategy-evidence-bindings.js";
 import { StrategyEvidenceHttpHandler } from "./strategy-evidence-http.js";
 import { HistoricalSemanticEvaluationHttpHandler } from "./historical-semantic-evaluation-http.js";
+import { ExperimentLabHttpHandler, ExperimentLabService, SqliteExperimentRepository } from "./experiment-lab.js";
 
 export interface ProductionHistoricalGraphCompiler {
   compile(
@@ -120,6 +121,7 @@ export interface ProductionStrategyOrchestration {
   strategyEvidenceHttpHandler?: StrategyEvidenceHttpHandler;
   historicalSemanticEvaluationService?: HistoricalSemanticEvaluationService;
   historicalSemanticEvaluationHttpHandler?: HistoricalSemanticEvaluationHttpHandler;
+  experimentLabHttpHandler?: ExperimentLabHttpHandler;
   lessonEvidenceScopes: readonly {
     datasetId: string;
     backtestProfileId: string;
@@ -397,6 +399,9 @@ export function createProductionStrategyOrchestration(
     strategyEvidenceApprovalService,
     dependencies.authenticator,
   );
+  const experimentLabHttpHandler = executableStrategyConfigurationService
+    ? new ExperimentLabHttpHandler(new ExperimentLabService(new SqliteExperimentRepository(dependencies.database), configurationDraftService, executableStrategyConfigurationService, datasets, walkForwardPlans, graphEvidenceJobService, now), dependencies.authenticator)
+    : undefined;
   const primaryDataset = graphEvidence.datasets[0];
   const primaryProfile = graphEvidence.profiles[0];
   const primaryCandidateSet = graphEvidence.profileCandidateSets[0];
@@ -467,6 +472,7 @@ export function createProductionStrategyOrchestration(
     strategyEvidenceBindingRepository,
     strategyEvidenceApprovalService,
     strategyEvidenceHttpHandler,
+    ...(experimentLabHttpHandler ? { experimentLabHttpHandler } : {}),
     ...(historicalSemanticEvaluationService
       ? { historicalSemanticEvaluationService }
       : {}),

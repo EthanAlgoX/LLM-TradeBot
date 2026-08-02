@@ -45,3 +45,4 @@ export * from "./production-csv-graph-evidence.js";
 export * from "./sqlite-semantic-pipeline-executions.js";
 export * from "./registered-configurable-semantic-pipeline-execution.js";
 export * from "./historical-semantic-evaluation-http.js";
+export * from "./experiment-lab.js";
