@@ -191,7 +191,7 @@ accepted_for_validation
 - 本轮浏览器插件验收：以干净 local Paper workspace 完成真实后端连接、第一会话创建与 v2 不可变 Draft、第二会话创建、两会话往返切换隔离、1440 中文和 820 英文无横向溢出、刷新及 Web/API 重启后自动认证与已选会话（2 Turn、v2）恢复；全程 `runtimeApplied=false`，控制台无 warning/error。原有损坏的本地 workspace 已可恢复地移至 `data/local-paper-workspace.backup-20260801T183000`，未删除。
 - 后续真实 Chrome 验收已确认：session、conversation list、turn list 均为 200 且无 401；受控 Copilot 成功创建 Draft Version 3；Console 无 warning/error；`runtimeApplied=false`、Paper Only 与 Exchange writes OFF 保持成立。
 - LOOP-003 保持未完成的历史交接记录。LOOP-004 中用户明确授权 Agent 直接操作真实 Chrome DevTools：localStorage、sessionStorage 与 Cookie 均为空；可见 Composer 触发的 `POST /api/orchestration/copilot/messages` 为 `200`，生成仅 Draft 的 Version 5；清空 Console 并刷新后无 TradeBot 页面 error/warning。没有读取 value、请求载荷或响应。
-- M2 数据中心 V1 为 `IN_PROGRESS`：LOOP-013 已注册真实 CSV Historical Preset/Graph，保持与 Binance Graph 的 exact-set 隔离，并在待绑定卡片提供受认证的可见创建入口。Agent Chrome 已确认中文 1440 宽度下的资产、Draft 创建和启用确认动作；Binding 成功、刷新恢复、继续对话、英文窄屏、Console/Network 收尾仍待完成，因此 M2 不关闭。
+- M2 数据中心 V1 为 `IN_PROGRESS`：LOOP-013 已注册真实 CSV Historical Preset/Graph，保持与 Binance Graph 的 exact-set 隔离，并在待绑定卡片提供受认证的可见创建入口。Agent Chrome 已确认中文 1440 宽度下的资产、Draft 创建和启用确认动作；Binding 完整成功态、权威引用、刷新/会话恢复、继续对话、英文窄屏及 Console/Network 仍待 LOOP-014 诊断与收尾，因此 M2 不关闭。
 ## 2026-07-31：Production Semantic Candidate Persistence
 
 - 状态：`REAL`。Rule Reflection 已生成并持久化严格 Semantic Candidate，Review 与 Materialization 使用同一 append-only Store。

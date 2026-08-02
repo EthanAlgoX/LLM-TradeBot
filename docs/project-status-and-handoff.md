@@ -192,7 +192,8 @@ API: http://127.0.0.1:8787
 - LOOP-010 以 `PARTIAL` 结束：P0 卡死修复已提交并推送为 `7f2017180cc1b15b660e5a66d0ec80b729c8497b`，但独立性能冒烟不替代完整 Agent Chrome CSV 正向绑定、刷新恢复和 Network 证据，M2 仍为 `IN_PROGRESS`。
 - LOOP-011 为 `PARTIAL`：真实 Agent Chrome 已通过性能护栏、中文 1440×900、英文 820×760 和资产真实性；修复的 1440px 顶栏溢出已提交为 `cfe074724a5837872011b5c7eeab865c4a0fc562`。验收同时确认编排侧没有消费 `tradebot:orchestration-data-intent`，“送入编排”只导航，CSV 正向绑定、刷新恢复和 Network 因此未完成。
 - LOOP-012 为 `PARTIAL`：提交 `52d27785bfc055c7f6dc2a90b74831853cb45d04` 已实现 CSV intent 消费者、待绑定卡片、确认 Binding、append-only Conversation Draft Reference 更新与恢复路径；自动化为 329/329 PASS。真实 Agent Chrome 已确认 CSV/Binance 资产真实性、卡片与安全提示，但运行中的后端没有产生 CSV-backed Market/Agent Draft，故正向绑定、刷新恢复、继续对话、响应式和 Console/Network 未取得完整证据。
-- 根因是 Current Crypto recipe/Graph 的注册 data-source set 为 Binance Public；显式请求 CSV 会被正确的 Graph exact-set 校验拒绝。不得放宽该校验。用户禁止人工校验；下一步执行 [`LOOP-013`](loop-prompts/loop-013-m2-csv-compatible-draft-and-agent-chrome-closeout-v1.md)（仍属 M2，不进入 M3），增加真实 CSV-compatible Draft 注册能力与可见创建入口，再由 Agent Chrome 完成收尾。全部通过后才生成 LOOP-014（M3）。
+- 根因是 Current Crypto recipe/Graph 的注册 data-source set 为 Binance Public；显式请求 CSV 会被正确的 Graph exact-set 校验拒绝，不得放宽。LOOP-013 已通过独立 CSV Historical Preset/Graph 和可见创建入口解决该能力缺口，提交 `b7d9fa65a5a9a3220685a5003592a3940c5797ad` 已推送；331/331 自动化通过。Agent Chrome 已确认中文资产、真实 CSV Draft 创建与启用确认动作，但未完成 Binding 成功态、权威引用与刷新恢复、继续对话、英文窄屏及 Console/Network 观察，故 LOOP-013 为 `PARTIAL`、M2 仍为 `IN_PROGRESS`。
+- 用户禁止人工校验；下一步执行 [`LOOP-014`](loop-prompts/loop-014-m2-csv-binding-authority-agent-chrome-closeout-v1.md)，先复现并定位确认 Binding 后的剩余断点，必要时做最小修复，再由 Agent 直接控制真实 Chrome 完成 M2 收尾。全部通过后才生成 LOOP-015（M3）。
 
 完整 Prompt：[`next-loop-prompt.md`](next-loop-prompt.md)。
 

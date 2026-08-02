@@ -593,7 +593,7 @@ README 中的 `320/320 PASS` 当前已过期。恢复稳定测试基线是后续
 
 验收：一个 Strategy Draft 可以引用服务端登记的数据版本，Validation 能阻止能力不匹配，回测 Evidence 能追溯 Dataset fingerprint。
 
-进度：LOOP-013 已注册独立 CSV Historical Preset/Graph，并让待绑定卡片通过受认证 Copilot 入口创建 CSV-compatible Agent Draft；331/331 自动化通过。真实 Chrome 已确认资产、中文创建入口、真实 CSV Draft 与启用的确认绑定动作。绑定请求的严格合同字段已修正，完整成功、恢复、窄屏和 Network 收尾尚待再次 Chrome 验证；M2 保持 `IN_PROGRESS`。
+进度：LOOP-013 已注册独立 CSV Historical Preset/Graph，并让待绑定卡片通过受认证 Copilot 入口创建 CSV-compatible Agent Draft；331/331 自动化通过。真实 Chrome 已确认资产、中文创建入口、真实 CSV Draft 与启用的确认绑定动作，但尚未观察到 Binding 完整成功态，也未完成权威引用、刷新/会话恢复、继续对话、英文窄屏和 Console/Network 证据。下一步执行 LOOP-014，先诊断并最小修复剩余断点，再由 Agent Chrome 收尾；M2 保持 `IN_PROGRESS`。
 
 ### M3：实验场 V1
 
