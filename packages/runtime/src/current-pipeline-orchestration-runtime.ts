@@ -301,12 +301,15 @@ export function createCurrentPipelineOrchestrationRuntime(
       },
       strategyOrchestration,
     );
+  const conversationReplayRepository =
+    new SqliteConversationReplayRepository(database);
   const dataCenterHttpHandler = new DataCenterHttpHandler(
     [...registry.dataSources.values()],
     [...registry.capabilities.values()],
     strategyOrchestration?.graphEvidence?.datasets ?? [],
     productionStrategyOrchestration.configurationDraftService,
     authenticator,
+    conversationReplayRepository,
   );
   const comparativeTradeReviewComposition = options.comparativeTradeReview
     ? new ProductionComparativeTradeReviewComposition({
@@ -352,8 +355,6 @@ export function createCurrentPipelineOrchestrationRuntime(
           : {}),
       })
     : undefined;
-  const conversationReplayRepository =
-    new SqliteConversationReplayRepository(database);
   const orchestrationCopilotService = new OrchestrationCopilotService({
     intentDraftService,
     configurationDraftService:

@@ -7,6 +7,7 @@ import {
   resolveOrchestrationSessionConfiguration,
   type OrchestrationViteEnvironment,
 } from "./orchestration-session.js";
+import { dataCenterBindingIntent, type DataCenterBindingIntent } from "./data-center-intent.js";
 
 type Locale = "zh-CN" | "en";
 type ConnectionMode = "connecting" | "live" | "readonly" | "offline";
@@ -213,6 +214,9 @@ const state: {
   composerValue: string;
   currentDraft?: DraftReference;
   errorCode?: string;
+  bindingIntent?: DataCenterBindingIntent;
+  bindingBusy: boolean;
+  bindingResult?: { versionId: string; fingerprint: string; valid: boolean };
 } = {
   open: false,
   busy: false,
@@ -222,6 +226,7 @@ const state: {
   conversations: [],
   operations: [],
   composerValue: "",
+  bindingBusy: false,
 };
 
 const conversationStorageKey = "tradebot.orchestration.conversation-id.v1";
@@ -507,6 +512,19 @@ function renderSelection(): string {
       `,
     )
     .join("");
+}
+
+function renderBinding(): string {
+  const intent = state.bindingIntent;
+  if (!intent) return "";
+  const text = locale() === "zh-CN" ? {
+    title: "待绑定数据资产", confirm: "确认绑定 Dataset", cancel: "取消", target: "目标 Draft", unavailable: "需要包含 CSV Historical 的 Market 或 Agent Draft", safety: "仅创建不可变 Configuration Draft Version；不会 Apply Runtime、启动 Paper Run 或写入交易所。", success: "绑定成功",
+  } : {
+    title: "Pending data asset binding", confirm: "Confirm Dataset binding", cancel: "Cancel", target: "Target Draft", unavailable: "A Market or Agent Draft containing CSV Historical is required", safety: "Creates an immutable Configuration Draft Version only. It cannot apply Runtime, start a Paper Run, or write to an exchange.", success: "Binding succeeded",
+  };
+  const selected = latestResponse()?.context.selected;
+  const allowed = state.mode === "live" && !state.busy && !state.bindingBusy && !!state.currentDraft && ["data-source:csv-historical"].some((id) => selected?.dataSourceIds.includes(id));
+  return `<section class="copilot-binding" aria-live="polite"><header><span>DATASET BINDING</span><h2>${text.title}</h2></header><dl><div><dt>Asset</dt><dd>${escapeHtml(intent.displayName)}</dd></div><div><dt>Dataset</dt><dd>${escapeHtml(intent.version)} · <code>${escapeHtml(compact(intent.fingerprint))}</code></dd></div><div><dt>Mode</dt><dd>${escapeHtml(intent.mode)}</dd></div><div><dt>${text.target}</dt><dd>${escapeHtml(state.currentDraft?.versionId ?? text.unavailable)}</dd></div></dl><p>${text.safety}</p>${state.bindingResult ? `<p class="copilot-validation-pass">${text.success}: ${escapeHtml(state.bindingResult.versionId)} · <code>${escapeHtml(compact(state.bindingResult.fingerprint))}</code> · ${state.bindingResult.valid ? "VALID" : "VALIDATION_FAILED"} · runtimeApplied=false</p>` : ""}<div><button type="button" data-confirm-dataset-binding ${allowed ? "" : "disabled"}>${state.bindingBusy ? "…" : text.confirm}</button><button type="button" data-cancel-dataset-binding ${state.bindingBusy ? "disabled" : ""}>${text.cancel}</button></div>${allowed ? "" : `<small>${text.unavailable}</small>`}</section>`;
 }
 
 function renderDiff(response: ConversationResponse): string {
@@ -983,6 +1001,7 @@ function render(): void {
         </div>
       </header>
       ${renderJourney()}
+      ${renderBinding()}
       <section class="copilot-context-strip">
         <div>
           <span>${locale() === "zh-CN" ? "当前选择" : "Current selection"}</span>
@@ -1165,6 +1184,28 @@ async function sendMessage(message: string): Promise<void> {
   }
 }
 
+async function confirmBinding(): Promise<void> {
+  const intent = state.bindingIntent;
+  const draft = state.currentDraft;
+  const selected = latestResponse()?.context.selected;
+  if (!intent || !draft || !selected?.dataSourceIds.includes("data-source:csv-historical") || state.bindingBusy || state.mode !== "live") return;
+  state.bindingBusy = true; state.errorCode = undefined; render();
+  try {
+    const data = await request<{ version: { versionId: string; fingerprint: string }; validation: { valid: boolean }; runtimeApplied: false }>("/api/orchestration/data-center/bindings", { method: "POST", body: JSON.stringify({ schemaVersion: "1.0.0", configurationDraftId: draft.draftId, configurationVersionId: draft.versionId, parentFingerprint: draft.fingerprint, ...intent, idempotencyKey: `ui.${draft.versionId}.${intent.fingerprint}`, conversationId: state.conversationId }) });
+    if (data.runtimeApplied !== false) throw new Error("RUNTIME_MUTATION_INVARIANT_FAILED");
+    state.currentDraft = { draftId: draft.draftId, versionId: data.version.versionId, fingerprint: data.version.fingerprint };
+    state.bindingResult = { versionId: data.version.versionId, fingerprint: data.version.fingerprint, valid: data.validation.valid };
+    await refreshHistory();
+  } catch (error) { state.errorCode = error instanceof Error ? error.message : "DATASET_BINDING_FAILED"; }
+  finally { state.bindingBusy = false; render(); }
+}
+
+window.addEventListener("tradebot:orchestration-data-intent", ((event: Event) => {
+  const intent = dataCenterBindingIntent((event as CustomEvent<unknown>).detail);
+  if (!intent) return;
+  state.bindingIntent = intent; state.bindingResult = undefined; state.open = true; render();
+}) as EventListener);
+
 window.addEventListener("tradebot:orchestration-session", (event: Event) => {
   const detail = (event as CustomEvent<{ token?: string }>).detail;
   if (!detail?.token) return;
@@ -1187,6 +1228,8 @@ document.addEventListener(
       close();
       return;
     }
+    if (target.closest("[data-confirm-dataset-binding]")) { void confirmBinding(); return; }
+    if (target.closest("[data-cancel-dataset-binding]")) { state.bindingIntent = undefined; state.bindingResult = undefined; render(); return; }
     const prompt = target.closest<HTMLElement>("[data-copilot-prompt]");
     if (prompt?.dataset.copilotPrompt) {
       void sendMessage(prompt.dataset.copilotPrompt);

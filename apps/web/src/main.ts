@@ -2537,7 +2537,7 @@ function bindEvents(): void {
 }
 
 window.addEventListener("tradebot:data-center-send", ((event: Event) => {
-  const asset = (event as CustomEvent<{ name: string; dataset: { version: string; fingerprint: string } }>).detail;
+  const asset = (event as CustomEvent<unknown>).detail;
   state.view = "orchestration";
   window.history.replaceState(null, "", "#orchestration");
   render();

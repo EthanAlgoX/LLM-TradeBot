@@ -213,6 +213,19 @@ export class SqliteConversationReplayRepository
     return this.getLatestTurn(actorId, conversationId)?.response.draftReference;
   }
 
+  appendDraftReference(actorId: string, conversationId: string, idempotencyKey: string, draftReference: ConversationDraftReference): void {
+    if (this.get({ actorId, conversationId, idempotencyKey })) return;
+    const latest = this.getLatestTurn(actorId, conversationId);
+    if (!latest) throw new Error("CONVERSATION_NOT_FOUND");
+    const record = this.get({ actorId, conversationId, idempotencyKey: latest.idempotencyKey });
+    if (!record) throw new Error("CONVERSATION_NOT_FOUND");
+    const createdAt = new Date().toISOString();
+    this.save({ actorId, conversationId, idempotencyKey }, {
+      command: { ...record.command, idempotencyKey, message: "Dataset binding confirmed.", draftReference },
+      response: { ...record.response, createdAt, assistantMessage: "Dataset binding confirmed. Runtime remains unchanged.", context: { ...record.response.context, selected: { ...record.response.context.selected, draftReference } } },
+    });
+  }
+
   private requireTurn(row: ConversationReplayRow): ConversationTurn {
     try {
       const command = ConversationCommandSchema.parse(JSON.parse(row.command_json));

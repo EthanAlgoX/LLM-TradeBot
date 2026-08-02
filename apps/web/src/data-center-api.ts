@@ -4,6 +4,7 @@ import {
   resolveOrchestrationSessionConfiguration,
   type OrchestrationViteEnvironment,
 } from "./orchestration-session.js";
+import { dataCenterBindingIntent } from "./data-center-intent.js";
 
 type Asset = {
   assetId: string;
@@ -128,9 +129,10 @@ document.addEventListener(
     const asset = assets.find(
       (item) => item.assetId === button.dataset.dcSend,
     );
-    if (!asset?.dataset) return;
+    const intent = dataCenterBindingIntent(asset);
+    if (!intent) return;
     window.dispatchEvent(
-      new CustomEvent("tradebot:data-center-send", { detail: asset }),
+      new CustomEvent("tradebot:data-center-send", { detail: intent }),
     );
   },
   true,

@@ -3,6 +3,7 @@ import type { DataSourceCapability, DataSourceDefinition, GraphHistoricalDataset
 import { DataCenterCatalogSchema } from "../../contracts/src/index.js";
 import type { ConfigurationDraftService } from "../../core/src/configuration-draft-service.js";
 import type { PipelineOrchestrationAuthenticator } from "./pipeline-orchestration-auth.js";
+import type { ConversationReplayRepository } from "../../core/src/orchestration-copilot-service.js";
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } });
@@ -40,13 +41,13 @@ function catalog(
 }
 
 const BindingRequest = z.object({
-  schemaVersion: z.literal("1.0.0"), configurationDraftId: z.string().min(3), configurationVersionId: z.string().min(3), parentFingerprint: z.string().regex(/^sha256:/u), assetId: z.string().min(3), datasetId: z.string().min(3), version: z.string().min(1), fingerprint: z.string().regex(/^sha256:/u), capabilityId: z.string().min(3), mode: z.enum(["latest_snapshot", "pinned_snapshot", "replay"]), idempotencyKey: z.string().min(8).max(160),
+  schemaVersion: z.literal("1.0.0"), configurationDraftId: z.string().min(3), configurationVersionId: z.string().min(3), parentFingerprint: z.string().regex(/^sha256:/u), assetId: z.string().min(3), datasetId: z.string().min(3), version: z.string().min(1), fingerprint: z.string().regex(/^sha256:/u), capabilityId: z.string().min(3), mode: z.enum(["latest_snapshot", "pinned_snapshot", "replay"]), idempotencyKey: z.string().min(8).max(160), conversationId: z.string().min(3).max(240),
 }).strict();
 
 export class DataCenterHttpHandler {
   constructor(
     private readonly sources: readonly DataSourceDefinition[], private readonly capabilities: readonly DataSourceCapability[], private readonly datasets: readonly GraphHistoricalDatasetDefinition[],
-    private readonly configurations: ConfigurationDraftService, private readonly authenticator: PipelineOrchestrationAuthenticator,
+    private readonly configurations: ConfigurationDraftService, private readonly authenticator: PipelineOrchestrationAuthenticator, private readonly replayRepository: ConversationReplayRepository,
   ) {}
 
   async handle(request: Request): Promise<Response> {
@@ -63,8 +64,11 @@ export class DataCenterHttpHandler {
       const available = catalog(this.sources, this.capabilities, this.datasets).assets.find((asset) => asset.assetId === input.assetId && asset.dataset?.datasetId === input.datasetId && asset.dataset.version === input.version && asset.dataset.fingerprint === input.fingerprint && asset.capabilityId === input.capabilityId);
       if (!available || available.sourceId !== (current.payload.dataSourceIds.includes(available.sourceId) ? available.sourceId : "")) return json({ code: "DATASET_BINDING_CAPABILITY_MISMATCH" }, 400);
       const dataBindings = [...(current.payload.dataBindings ?? []).filter((item) => item.assetId !== input.assetId), { assetId: input.assetId, datasetId: input.datasetId, version: input.version, fingerprint: input.fingerprint, capabilityId: input.capabilityId, mode: input.mode }];
+      const existing = this.replayRepository.get({ actorId: actor.actorId, conversationId: input.conversationId, idempotencyKey: `dataset-binding:${input.idempotencyKey}` });
+      if (existing?.response.context.selected.draftReference) return json({ data: { version: this.configurations.get(existing.response.context.selected.draftReference.versionId), validation: this.configurations.validate(existing.response.context.selected.draftReference.versionId), runtimeApplied: false } });
       const version = this.configurations.createVersion(current.draftId, { schemaVersion: "1.0.0", parentFingerprint: current.fingerprint, humanVersion: `${current.humanVersion} + dataset`, payload: { ...current.payload, dataBindings } }, actor.actorId);
       const validation = this.configurations.validate(version.versionId);
+      this.replayRepository.appendDraftReference(actor.actorId, input.conversationId, `dataset-binding:${input.idempotencyKey}`, { draftId: version.draftId, versionId: version.versionId, fingerprint: version.fingerprint });
       return json({ data: { version, validation, runtimeApplied: false } }, 201);
     } catch (error) {
       if (error instanceof z.ZodError) return json({ code: "REQUEST_CONTRACT_INVALID" }, 400);

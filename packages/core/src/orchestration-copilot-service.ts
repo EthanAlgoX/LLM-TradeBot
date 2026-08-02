@@ -94,6 +94,7 @@ export interface ConversationReplayRepository {
     actorId: string,
     conversationId: string,
   ): ConversationDraftReference | undefined;
+  appendDraftReference(actorId: string, conversationId: string, idempotencyKey: string, draftReference: ConversationDraftReference): void;
 }
 
 export interface OrchestrationCopilotServiceDependencies {
@@ -745,6 +746,9 @@ export class OrchestrationCopilotService {
     });
 
     const extractedWindows = extractObservationWindows(command.message);
+    const recipeDataSourceIds = explicitDataSourceId
+      ? [explicitDataSourceId]
+      : recipe.dataSourceIds;
     const requestedWindows =
       extractedWindows.length > 0
         ? extractedWindows
@@ -755,7 +759,7 @@ export class OrchestrationCopilotService {
         requestId: `conversation:${compactId(command.conversationId)}:${compactId(command.idempotencyKey)}`,
         presetId: recipe.presetId,
         marketPackId: recipe.marketPackId,
-        dataSourceIds: [...recipe.dataSourceIds],
+        dataSourceIds: [...recipeDataSourceIds],
         observationWindows: requestedWindows,
         requiredAgentTemplateIds: [recipe.editableAgentTemplateId],
         target: "draft_only",
@@ -774,7 +778,7 @@ export class OrchestrationCopilotService {
               kind: "agent",
               marketPackId: recipe.marketPackId,
               agentTemplateId: recipe.editableAgentTemplateId,
-              dataSourceIds: [...recipe.dataSourceIds],
+              dataSourceIds: [...recipeDataSourceIds],
               observationWindows: requestedWindows,
               parameters: { ...recipe.editableParameters },
             },
@@ -840,7 +844,7 @@ export class OrchestrationCopilotService {
       }, { nextGate: "contract_validation" });
 
       const capabilities = this.capabilitySummaries(
-        recipe.dataSourceIds,
+        recipeDataSourceIds,
         requestedWindows,
       );
       const changes: DraftChange[] = [
@@ -874,7 +878,7 @@ export class OrchestrationCopilotService {
         lifecycleStatus: "draft",
         evidenceStatus: strategyConfiguration.evidenceState.status,
         marketRef: this.marketRef(recipe.marketPackId),
-        sourceRefs: recipe.dataSourceIds.map((id) => this.sourceRef(id)),
+        sourceRefs: recipeDataSourceIds.map((id) => this.sourceRef(id)),
         presetRef: {
           id: pipeline.preset.id,
           humanVersion: pipeline.preset.version,
@@ -930,7 +934,7 @@ export class OrchestrationCopilotService {
         gates: gateSummary(createdAt, pipeline.draft),
         selected: {
           marketPackId: recipe.marketPackId,
-          dataSourceIds: [...recipe.dataSourceIds],
+          dataSourceIds: [...recipeDataSourceIds],
           presetId: recipe.presetId,
           agentTemplateId: recipe.editableAgentTemplateId,
           draftReference: {

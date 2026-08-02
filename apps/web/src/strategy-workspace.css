@@ -1567,3 +1567,9 @@ body.orchestration-copilot-open {
     max-width: 96%;
   }
 }
+ .copilot-binding { margin: 1rem 0; padding: 1rem; border: 1px solid color-mix(in srgb, #47d7ac 55%, transparent); border-radius: .75rem; background: color-mix(in srgb, #47d7ac 8%, transparent); }
+ .copilot-binding header h2 { margin: .15rem 0 .75rem; font-size: 1.1rem; }
+ .copilot-binding dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .55rem; margin: 0; }
+ .copilot-binding dt { font-size: .75rem; opacity: .7; } .copilot-binding dd { margin: .1rem 0 0; overflow-wrap: anywhere; }
+ .copilot-binding button { margin-right: .5rem; }
+ @media (max-width: 680px) { .copilot-binding dl { grid-template-columns: 1fr; } }
