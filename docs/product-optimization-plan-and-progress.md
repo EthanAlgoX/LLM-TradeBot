@@ -1,6 +1,6 @@
 # TradeBot 产品优化规划与进度
 
-> 2026-08-02：M2 已由 LOOP-017 关闭；336/336 自动化及 Agent Chrome 双尺寸、Binding、恢复、Composer、会话隔离与 Runtime safety 通过。LOOP-018 已实现 M3 实验场初版但 Chrome DOM 验收超时；M3 保持 IN_PROGRESS，由 LOOP-019 续办，未进入 M4。
+> 2026-08-02：M2 已由 LOOP-017 关闭；336/336 自动化及 Agent Chrome 双尺寸、Binding、恢复、Composer、会话隔离与 Runtime safety 通过。LOOP-019 已修复 M3 Experiment 的挂载循环、严格投影、Replay/Candidate 和 cursor，但新增自动化与真实 Chrome 全链尚未闭环；M3 保持 IN_PROGRESS，由 LOOP-020 续办，未进入 M4。
 
 > 文档角色：汇总 2026-08-01 之前的产品讨论，作为后续产品优化、页面收敛和阶段验收的执行入口
 > 最后更新：2026-08-01
