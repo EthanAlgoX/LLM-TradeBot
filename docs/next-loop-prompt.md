@@ -8,7 +8,7 @@
 执行环境：本地仓库 + Agent 直接控制真实 Google Chrome
 浏览器要求：必需；只接受 Agent Chrome 验证，禁止用户手工验收或 DevTools 交接
 推荐执行端：具备代码修改、自动化与真实 Chrome 控制能力的执行窗口
-原因：先关闭真实 Chrome CSV Binding 的受控请求合同失败，再由 Agent Chrome 完成完整 M2 回归。
+原因：先用共享 Schema 精确定位并修复真实 Chrome CSV Binding 的请求合同失败，重点验证当前拼接 idempotency key 是否超过 160 字符；随后由 Agent Chrome 完成 Binding、恢复和 Composer 的完整 M2 回归。
 Git 要求：任何代码或文档修改均须 commit 并 push；最终报告包含 commit hash、分支和 push 结果
 ```
 

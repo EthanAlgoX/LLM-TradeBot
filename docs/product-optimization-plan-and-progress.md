@@ -591,12 +591,13 @@ README 中的 `320/320 PASS` 当前已过期。恢复稳定测试基线是后续
 - [x] 补齐“送入编排”在编排工作台的可见 Dataset intent 消费与待绑定确认卡片；
 - [x] 提供可由 UI 确定性创建的 CSV-compatible Agent Draft（真实注册 CSV Graph、exact-set 校验与可见入口）；
 - [x] 完成 CSV Binding 成功、不可变 Draft Version、权威引用与刷新恢复的正向 Chrome 验收；
-- [ ] 修复绑定后继续对话的 `INTERNAL_ORCHESTRATION_ERROR`，并验证新版本保留 Dataset binding；
+- [x] 修复绑定后继续对话的 `INTERNAL_ORCHESTRATION_ERROR`，并通过自动化验证新版本保留 Dataset binding、CSV recipe/Graph 与重启 Authority；
+- [ ] 修复真实 UI Binding 的 `REQUEST_CONTRACT_INVALID`，完成 Binding → 恢复 → Composer 的 Agent Chrome 闭环；
 - [x] 完成真实 Chrome 的桌面、窄屏、绑定成功/拒绝和产品 Console 验收；Network 因 Agent Chrome 工具不提供读取能力，保持 `TOOL_UNAVAILABLE`，禁止人工替代。
 
 验收：一个 Strategy Draft 可以引用服务端登记的数据版本，Validation 能阻止能力不匹配，回测 Evidence 能追溯 Dataset fingerprint。
 
-进度：LOOP-014 已修复 Conversation Replay 未投影 Dataset version/fingerprint 及同毫秒权威 Turn 排序问题；332/332 自动化通过。Agent Chrome 已完成 CSV 正向 Binding、权威引用与刷新恢复、中文 1440×900、英文 820×760、负向 fail-closed 和产品 Console 验收。绑定后继续 Composer 修改仍出现 `INTERNAL_ORCHESTRATION_ERROR`，是当前唯一产品阻塞；Network 为宿主工具不可读而非产品失败。下一步执行 LOOP-015 定位并修复继续对话链路；M2 保持 `IN_PROGRESS`。
+进度：LOOP-015 已定位 CSV Historical Agent Template 缺少 `confidenceThreshold` 允许项及域错误被包装为通用 500，并修复权威 Draft 的 CSV recipe/Graph 精确选择和重启 replay mapping；333/333 自动化通过。真实 Chrome 中 CSV 资产与页面稳定，但确认 Binding 返回 `REQUEST_CONTRACT_INVALID`，因此 Composer 修复尚未取得端到端 Chrome 证据。下一步执行 LOOP-016，以共享 Schema 定位并修复前后端合同差异，再完成 Binding → 恢复 → Composer 闭环；M2 保持 `IN_PROGRESS`。
 
 ### M3：实验场 V1
 
