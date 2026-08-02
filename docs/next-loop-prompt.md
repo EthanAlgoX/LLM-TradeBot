@@ -4,7 +4,7 @@
 当前 Loop：LOOP-020
 里程碑：M3 实验场 V1
 状态：IN_PROGRESS
-前置 Loop：LOOP-018（IN_PROGRESS）
+前置 Loop：LOOP-019（IN_PROGRESS）
 执行环境：本地仓库 + Agent 直接控制真实 Google Chrome
 浏览器要求：必需；只接受 Agent Chrome 验证，禁止用户手工验收或 DevTools 交接
 推荐执行端：具备代码修改、自动化与真实 Chrome 控制能力的执行窗口
