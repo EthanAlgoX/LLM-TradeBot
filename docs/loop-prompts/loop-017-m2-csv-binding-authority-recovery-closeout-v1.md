@@ -3,12 +3,20 @@
 ```text
 Loop ID：LOOP-017
 里程碑：M2 数据中心 V1
-状态：READY
+状态：COMPLETE
 前置 Loop：LOOP-016（PARTIAL，Binding 合同已修复；历史恢复会切换到非 CSV Draft）
 执行环境：本地仓库 + 实现后由 Agent 直接控制真实 Google Chrome
 浏览器要求：实现后必需；禁止用户手工验收或 DevTools 交接
 验收模式：AUTHORITY_RECOVERY_AND_AGENT_CHROME_VERIFIED
 ```
+
+## 执行结果（2026-08-02）
+
+- Authority 根因仅在 Web：Binding POST 与 append-only replay 写入同一 conversation 正确，SQLite `createdAt DESC, idempotencyKey DESC` 的 latest 与 summary 一致；但 `refreshHistory()` 会从全局列表/localStorage 再猜选中会话，且未受保护的旧 `loadConversation()` 响应可覆盖 `currentDraft`。
+- Binding 成功现捕获其 conversation、parent Draft 与 Dataset identity，对精确 conversation 做 read-after-write，并校验服务端 newest Draft/version/fingerprint 与 binding 后才写入 UI；列表刷新只更新 summary。
+- Web 将 newest-first 服务端页显式转换成 oldest-to-newest 展示，Authority 固定取 newest item；conversation/binding epoch 阻止陈旧 A/B 响应、pending/result 和新会话状态串扰。
+- 自动化：`check` PASS；`test:ts` 336/336 PASS；`build:web` PASS；`diff-check` PASS。
+- Agent Chrome：中文 1440×900 与英文 820×760 通过；UI 完成 CSV Draft → Binding → 刷新/本项目服务重启 → `confidenceThreshold=0.72` → 刷新 → A/B 往返，CSV binding、CSV preset/source、Draft v3 与 `runtimeApplied=false` 保留。无 Draft 会话的 Confirm Binding 为 disabled。产品 Console 在修复后无新 error；扩展异步消息错误单独隔离。Network：`TOOL_UNAVAILABLE`。
 
 ## 目标
 

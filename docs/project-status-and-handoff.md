@@ -1,6 +1,6 @@
 # TradeBot 当前状态与接手说明
 
-> 2026-08-02 接手更新：LOOP-016 已修复 CSV Binding 的共享 Schema 合同漂移：旧 `ui.${versionId}.${fingerprint}` idempotency key 会超过服务端 160 字符限制，现为有界稳定 opaque key，正式 handler 回归通过。Agent Chrome 不再显示合同错误，但 Binding 后历史恢复可将当前 Draft 切换到非 CSV 上下文；不得标记 M2 COMPLETE。下一任务为 LOOP-017。
+> 2026-08-02 接手更新：LOOP-017 已关闭 M2。CSV Binding 的服务端排序/写入正确；Web 全局历史重新选择和陈旧 load 响应会覆盖同会话 CSV Authority，现已改为定向 read-after-write、newest Turn Authority 与 epoch 隔离。Agent Chrome 已通过 Binding、刷新、服务重启、Composer、A/B 往返及双尺寸验收；336/336 自动化通过。下一任务为 LOOP-018（M3 实验场 V1）。
 
 > 快照日期：2026-08-01
 > 适用仓库：`/Users/hyx/Documents/workspace/tradebot`

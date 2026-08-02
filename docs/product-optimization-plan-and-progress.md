@@ -579,7 +579,7 @@ README 中的 `320/320 PASS` 当前已过期。恢复稳定测试基线是后续
 
 ### M2：数据中心 V1
 
-状态：`IN_PROGRESS`
+状态：`COMPLETE`
 
 - [x] 增加一级“数据中心”；
 - [x] 首期接入现有 Binance Public 与 CSV Historical；
@@ -593,16 +593,16 @@ README 中的 `320/320 PASS` 当前已过期。恢复稳定测试基线是后续
 - [x] 完成 CSV Binding 成功、不可变 Draft Version、权威引用与刷新恢复的正向 Chrome 验收；
 - [x] 修复绑定后继续对话的 `INTERNAL_ORCHESTRATION_ERROR`，并通过自动化验证新版本保留 Dataset binding、CSV recipe/Graph 与重启 Authority；
 - [x] 以共享严格 Schema 修复真实 UI Binding 的 `REQUEST_CONTRACT_INVALID`（根因：`idempotencyKey` 超过 160 字符）；
-- [ ] 完成 Binding → 刷新/重启恢复 → Composer 的 Agent Chrome Authority 闭环；
+- [x] 完成 Binding → 刷新/重启恢复 → Composer 的 Agent Chrome Authority 闭环；
 - [x] 完成真实 Chrome 的桌面、窄屏、绑定成功/拒绝和产品 Console 验收；Network 因 Agent Chrome 工具不提供读取能力，保持 `TOOL_UNAVAILABLE`，禁止人工替代。
 
 验收：一个 Strategy Draft 可以引用服务端登记的数据版本，Validation 能阻止能力不匹配，回测 Evidence 能追溯 Dataset fingerprint。
 
-进度：LOOP-016 将 Dataset Binding 严格 Schema/类型收拢至共享 contracts，正式 HTTP handler 与 Web helper 共用；根因是旧 `ui.${versionId}.${fingerprint}` 在真实值下超过 160 字符。短 opaque `binding.<uuid>` key 有界、同一 pending Binding 动作稳定并可安全重试；正式 handler 首次 201、重试复用同一 Version，超长/额外字段在写入前 400。真实 Chrome 中合同错误消失且请求进入 Binding，但刷新历史后当前 Draft 可被切换到不属于 CSV 的既有上下文，故 Composer/恢复的可见 Authority 闭环未通过。M2 保持 `IN_PROGRESS`，由 LOOP-017 继续。
+进度：LOOP-017 已关闭 M2。根因是 Web `refreshHistory()` 重新从列表/localStorage 猜测 active conversation，且无 epoch guard 的旧 `loadConversation()` 可覆盖 `currentDraft`，不是服务端 Binding 写入或 Turn 排序错误。Binding 现对原 conversation 定向 read-after-write，并逐项核验 latest Draft/version/fingerprint 与 CSV binding；列表刷新不改变选择。服务端 newest-first 页以显式 oldest-to-newest 展示合并，Authority 始终取 newest item；A/B response、pending/result 以 conversation/binding epoch 隔离。Agent Chrome 完成中文 1440×900、英文 820×760、Binding、刷新、本项目服务重启、Composer `confidenceThreshold=0.72`、刷新、A/B 往返和无 Draft disabled 负向；Draft v3 保留 CSV preset/source/binding，Runtime 保持未应用。自动化 336/336 PASS；Network 为 `TOOL_UNAVAILABLE`。
 
 ### M3：实验场 V1
 
-状态：`PLANNED`
+状态：`READY`
 
 - [ ] 恢复并重构 Agent Lab 为实验场；
 - [ ] 从历史会话或 Strategy Version 创建实验；

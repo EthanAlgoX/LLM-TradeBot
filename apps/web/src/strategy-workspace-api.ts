@@ -14,6 +14,11 @@ import {
   type DataCenterBindingIntent,
 } from "./data-center-intent.js";
 import type { DatasetBindingRequest } from "../../../packages/contracts/src/data-center.js";
+import {
+  authorityFromNewestTurn,
+  canApplyConversationLoad,
+  mergeTurnDisplay,
+} from "./conversation-history-authority.js";
 
 type Locale = "zh-CN" | "en";
 type ConnectionMode = "connecting" | "live" | "readonly" | "offline";
@@ -230,9 +235,12 @@ const state: {
   composerValue: string;
   currentDraft?: DraftReference;
   errorCode?: string;
-  bindingIntent?: DataCenterBindingIntent & { idempotencyKey: string };
+  bindingIntent?: DataCenterBindingIntent & { idempotencyKey: string; conversationId: string };
   bindingBusy: boolean;
-  bindingResult?: { versionId: string; fingerprint: string; valid: boolean };
+  bindingResult?: { conversationId: string; versionId: string; fingerprint: string; valid: boolean };
+  conversationEpoch: number;
+  historyEpoch: number;
+  bindingEpoch: number;
 } = {
   open: false,
   busy: false,
@@ -243,6 +251,9 @@ const state: {
   operations: [],
   composerValue: "",
   bindingBusy: false,
+  conversationEpoch: 0,
+  historyEpoch: 0,
+  bindingEpoch: 0,
 };
 
 const conversationStorageKey = "tradebot.orchestration.conversation-id.v1";
@@ -463,6 +474,22 @@ function latestResponse(): ConversationResponse | undefined {
   return state.operations.at(-1)?.response;
 }
 
+function bindingForActiveConversation():
+  | (DataCenterBindingIntent & { idempotencyKey: string; conversationId: string })
+  | undefined {
+  return state.bindingIntent?.conversationId === state.conversationId
+    ? state.bindingIntent
+    : undefined;
+}
+
+function bindingResultForActiveConversation():
+  | { conversationId: string; versionId: string; fingerprint: string; valid: boolean }
+  | undefined {
+  return state.bindingResult?.conversationId === state.conversationId
+    ? state.bindingResult
+    : undefined;
+}
+
 function viewState(): ConversationViewState {
   return deriveConversationViewState({
     busy: state.busy,
@@ -531,7 +558,8 @@ function renderSelection(): string {
 }
 
 function renderBinding(): string {
-  const intent = state.bindingIntent;
+  const intent = bindingForActiveConversation();
+  const bindingResult = bindingResultForActiveConversation();
   const text = locale() === "zh-CN" ? {
     title: "待绑定数据资产", restoredTitle: "已恢复 Dataset 绑定", confirm: "确认绑定 Dataset", create: "创建 CSV 兼容 Draft", cancel: "取消", target: "目标 Draft", unavailable: "需要包含 CSV Historical 的 Market 或 Agent Draft", safety: "仅创建不可变 Configuration Draft Version；不会 Apply Runtime、启动 Paper Run 或写入交易所。", success: "绑定成功", restored: "已从服务端恢复绑定",
   } : {
@@ -544,7 +572,7 @@ function renderBinding(): string {
   }
   if (!intent) return "";
   const allowed = state.mode === "live" && !state.busy && !state.bindingBusy && !!state.currentDraft && ["data-source:csv-historical"].some((id) => selected?.dataSourceIds.includes(id));
-  return `<section class="copilot-binding" aria-live="polite"><header><span>DATASET BINDING</span><h2>${text.title}</h2></header><dl><div><dt>Asset</dt><dd>${escapeHtml(intent.displayName)}</dd></div><div><dt>Dataset</dt><dd>${escapeHtml(intent.version)} · <code>${escapeHtml(compact(intent.fingerprint))}</code></dd></div><div><dt>Mode</dt><dd>${escapeHtml(intent.mode)}</dd></div><div><dt>${text.target}</dt><dd>${escapeHtml(state.currentDraft?.versionId ?? text.unavailable)}</dd></div></dl><p>${text.safety}</p>${state.bindingResult ? `<p class="copilot-validation-pass">${text.success}: ${escapeHtml(state.bindingResult.versionId)} · <code>${escapeHtml(compact(state.bindingResult.fingerprint))}</code> · ${state.bindingResult.valid ? "VALID" : "VALIDATION_FAILED"} · runtimeApplied=false</p>` : ""}<div>${allowed ? "" : `<button type="button" data-create-csv-compatible-draft ${state.busy || state.bindingBusy || state.mode !== "live" ? "disabled" : ""}>${state.busy ? "…" : text.create}</button>`}<button type="button" data-confirm-dataset-binding ${allowed ? "" : "disabled"}>${state.bindingBusy ? "…" : text.confirm}</button><button type="button" data-cancel-dataset-binding ${state.bindingBusy ? "disabled" : ""}>${text.cancel}</button></div>${allowed ? "" : `<small>${text.unavailable}</small>`}</section>`;
+  return `<section class="copilot-binding" aria-live="polite"><header><span>DATASET BINDING</span><h2>${text.title}</h2></header><dl><div><dt>Asset</dt><dd>${escapeHtml(intent.displayName)}</dd></div><div><dt>Dataset</dt><dd>${escapeHtml(intent.version)} · <code>${escapeHtml(compact(intent.fingerprint))}</code></dd></div><div><dt>Mode</dt><dd>${escapeHtml(intent.mode)}</dd></div><div><dt>${text.target}</dt><dd>${escapeHtml(state.currentDraft?.versionId ?? text.unavailable)}</dd></div></dl><p>${text.safety}</p>${bindingResult ? `<p class="copilot-validation-pass">${text.success}: ${escapeHtml(bindingResult.versionId)} · <code>${escapeHtml(compact(bindingResult.fingerprint))}</code> · ${bindingResult.valid ? "VALID" : "VALIDATION_FAILED"} · runtimeApplied=false</p>` : ""}<div>${allowed ? "" : `<button type="button" data-create-csv-compatible-draft ${state.busy || state.bindingBusy || state.mode !== "live" ? "disabled" : ""}>${state.busy ? "…" : text.create}</button>`}<button type="button" data-confirm-dataset-binding ${allowed ? "" : "disabled"}>${state.bindingBusy ? "…" : text.confirm}</button><button type="button" data-cancel-dataset-binding ${state.bindingBusy ? "disabled" : ""}>${text.cancel}</button></div>${allowed ? "" : `<small>${text.unavailable}</small>`}</section>`;
 }
 
 function renderDiff(response: ConversationResponse): string {
@@ -1096,6 +1124,11 @@ async function connect(): Promise<void> {
       await request("/api/orchestration/session");
       state.mode = "live";
       await refreshHistory();
+      const remembered = window.localStorage.getItem(conversationStorageKey);
+      const initial = state.conversations.find((item) => item.conversationId === remembered)
+        ?? state.conversations.find((item) => item.conversationId === state.conversationId)
+        ?? state.conversations[0];
+      if (initial) selectConversation(initial.conversationId);
     } else {
       state.mode = "readonly";
     }
@@ -1110,39 +1143,66 @@ async function connect(): Promise<void> {
 
 async function refreshHistory(append = false): Promise<void> {
   if (!token) return;
+  const requestEpoch = ++state.historyEpoch;
   const page = await request<ConversationPage<ConversationSummary>>(`/api/orchestration/conversations?limit=20${append && state.conversationsCursor ? `&cursor=${encodeURIComponent(state.conversationsCursor)}` : ""}`);
+  if (requestEpoch !== state.historyEpoch) return;
   state.conversations = dedupeBy(
     append ? [...state.conversations, ...page.items] : page.items,
     (conversation) => conversation.conversationId,
   );
   state.conversationsCursor = page.nextCursor;
-  const remembered = window.localStorage.getItem(conversationStorageKey);
-  const selected = state.conversations.find((item) => item.conversationId === (remembered || state.conversationId));
-  if (selected) await loadConversation(selected.conversationId);
 }
 
-async function loadConversation(conversationId: string, append = false): Promise<void> {
+interface ConversationLoadResult {
+  latestDraft?: DraftReference;
+  datasetBindings?: DatasetBinding[];
+}
+
+async function loadConversation(conversationId: string, append = false): Promise<ConversationLoadResult | undefined> {
+  const requestEpoch = state.conversationEpoch;
   const page = await request<ConversationPage<ConversationTurn>>(`/api/orchestration/conversations/${encodeURIComponent(conversationId)}/turns?limit=20${append && state.turnsCursor ? `&cursor=${encodeURIComponent(state.turnsCursor)}` : ""}`);
   const operations = page.items.map((turn) => ({ id: turn.turnId, message: turn.command.message, response: responseFromTurn(turn) }));
-  state.conversationId = conversationId;
-  window.localStorage.setItem(conversationStorageKey, conversationId);
-  state.operations = dedupeBy(
-    append ? [...operations.reverse(), ...state.operations] : operations.reverse(),
-    (operation) => operation.id,
-  );
+  const newest = page.items[0];
+  const result = {
+    latestDraft: authorityFromNewestTurn(page.items.map((turn) => ({ id: turn.turnId, draft: turn.response.draftReference }))),
+    datasetBindings: newest?.response.selected.datasetBindings,
+  };
+  if (!canApplyConversationLoad({ requestConversationId: conversationId, requestEpoch, activeConversationId: state.conversationId, activeEpoch: state.conversationEpoch })) return result;
+  state.operations = mergeTurnDisplay(operations, state.operations, append);
   state.turnsCursor = page.nextCursor;
-  state.currentDraft = state.operations.at(-1)?.response.context.selected.draftReference;
+  // The first turn is the explicit newest server fact; display order is not authority.
+  if (!append) state.currentDraft = result.latestDraft;
   state.errorCode = undefined;
   render();
+  return result;
 }
 
-function newConversation(): void {
-  state.conversationId = `conversation.${crypto.randomUUID()}`;
+function selectConversation(conversationId: string, load = true): void {
+  state.conversationEpoch += 1;
+  state.bindingEpoch += 1;
+  state.bindingBusy = false;
+  state.conversationId = conversationId;
   window.localStorage.setItem(conversationStorageKey, state.conversationId);
   state.operations = [];
   state.currentDraft = undefined;
   state.turnsCursor = undefined;
+  if (state.bindingIntent?.conversationId !== conversationId) state.bindingIntent = undefined;
+  if (state.bindingResult?.conversationId !== conversationId) state.bindingResult = undefined;
   render();
+  if (load) void loadConversation(conversationId);
+}
+
+function bindingMatchesAuthority(latestDraft: DraftReference | undefined, bindings: DatasetBinding[] | undefined, expected: { draft: DraftReference; intent: DataCenterBindingIntent }): boolean {
+  return latestDraft?.draftId === expected.draft.draftId
+    && latestDraft.versionId === expected.draft.versionId
+    && latestDraft.fingerprint === expected.draft.fingerprint
+    && bindings?.some((binding) => binding.assetId === expected.intent.assetId && binding.datasetId === expected.intent.datasetId && binding.version === expected.intent.version && binding.fingerprint === expected.intent.fingerprint && binding.capabilityId === expected.intent.capabilityId && binding.mode === expected.intent.mode) === true;
+}
+
+function newConversation(): void {
+  // A new client-side conversation has no server Turn yet. Do not issue a
+  // recover request that can only fail before its first Composer submission.
+  selectConversation(`conversation.${crypto.randomUUID()}`, false);
 }
 
 function open(): void {
@@ -1162,6 +1222,8 @@ function close(): void {
 async function sendMessage(message: string): Promise<void> {
   const normalized = message.trim();
   if (!normalized || state.mode !== "live" || state.busy) return;
+  const conversationId = state.conversationId;
+  const requestEpoch = state.conversationEpoch;
   state.composerValue = normalized;
   state.busy = true;
   state.errorCode = undefined;
@@ -1173,7 +1235,7 @@ async function sendMessage(message: string): Promise<void> {
         method: "POST",
         body: JSON.stringify({
           schemaVersion: "1.0.0",
-          conversationId: state.conversationId,
+          conversationId,
           idempotencyKey: `idempotency.${crypto.randomUUID()}`,
           locale: locale(),
           message: normalized,
@@ -1186,13 +1248,16 @@ async function sendMessage(message: string): Promise<void> {
     if (response.runtimeApplied !== false) {
       throw new Error("RUNTIME_MUTATION_INVARIANT_FAILED");
     }
+    if (!canApplyConversationLoad({ requestConversationId: conversationId, requestEpoch, activeConversationId: state.conversationId, activeEpoch: state.conversationEpoch })) return;
     state.currentDraft = response.context.selected.draftReference ?? state.currentDraft;
     state.composerValue = "";
+    await loadConversation(conversationId);
     await refreshHistory();
   } catch (error) {
-    state.composerValue = normalized;
-    state.errorCode =
-      error instanceof Error ? error.message : "COPILOT_MESSAGE_FAILED";
+    if (canApplyConversationLoad({ requestConversationId: conversationId, requestEpoch, activeConversationId: state.conversationId, activeEpoch: state.conversationEpoch })) {
+      state.composerValue = normalized;
+      state.errorCode = error instanceof Error ? error.message : "COPILOT_MESSAGE_FAILED";
+    }
   } finally {
     state.busy = false;
     render();
@@ -1205,26 +1270,42 @@ async function sendMessage(message: string): Promise<void> {
 }
 
 async function confirmBinding(): Promise<void> {
-  const intent = state.bindingIntent;
+  const intent = bindingForActiveConversation();
   const draft = state.currentDraft;
   const selected = latestResponse()?.context.selected;
   if (!intent || !draft || !selected?.dataSourceIds.includes("data-source:csv-historical") || state.bindingBusy || state.mode !== "live") return;
+  const conversationId = state.conversationId;
+  const requestEpoch = state.conversationEpoch;
+  const bindingEpoch = ++state.bindingEpoch;
+  const parent = { ...draft };
   state.bindingBusy = true; state.errorCode = undefined; render();
   try {
-    const payload: DatasetBindingRequest = createDatasetBindingRequest({ schemaVersion: "1.0.0", configurationDraftId: draft.draftId, configurationVersionId: draft.versionId, parentFingerprint: draft.fingerprint, assetId: intent.assetId, datasetId: intent.datasetId, version: intent.version, fingerprint: intent.fingerprint, capabilityId: intent.capabilityId, mode: intent.mode, idempotencyKey: intent.idempotencyKey, conversationId: state.conversationId });
+    const payload: DatasetBindingRequest = createDatasetBindingRequest({ schemaVersion: "1.0.0", configurationDraftId: parent.draftId, configurationVersionId: parent.versionId, parentFingerprint: parent.fingerprint, assetId: intent.assetId, datasetId: intent.datasetId, version: intent.version, fingerprint: intent.fingerprint, capabilityId: intent.capabilityId, mode: intent.mode, idempotencyKey: intent.idempotencyKey, conversationId });
     const data = await request<{ version: { versionId: string; fingerprint: string }; validation: { valid: boolean }; runtimeApplied: false }>("/api/orchestration/data-center/bindings", { method: "POST", body: JSON.stringify(payload) });
     if (data.runtimeApplied !== false) throw new Error("RUNTIME_MUTATION_INVARIANT_FAILED");
-    state.currentDraft = { draftId: draft.draftId, versionId: data.version.versionId, fingerprint: data.version.fingerprint };
-    state.bindingResult = { versionId: data.version.versionId, fingerprint: data.version.fingerprint, valid: data.validation.valid };
+    const bound = { draftId: parent.draftId, versionId: data.version.versionId, fingerprint: data.version.fingerprint };
+    // Binding is read back only from its owning conversation, never selected by
+    // a global history refresh. A stale response may read but cannot mutate UI.
+    const recovered = await loadConversation(conversationId);
+    if (!bindingMatchesAuthority(recovered?.latestDraft, recovered?.datasetBindings, { draft: bound, intent })) throw new Error("DATASET_BINDING_AUTHORITY_CONFLICT");
+    if (!canApplyConversationLoad({ requestConversationId: conversationId, requestEpoch, activeConversationId: state.conversationId, activeEpoch: state.conversationEpoch }) || bindingEpoch !== state.bindingEpoch) return;
+    state.bindingResult = { conversationId, versionId: bound.versionId, fingerprint: bound.fingerprint, valid: data.validation.valid };
+    state.bindingIntent = undefined;
     await refreshHistory();
-  } catch (error) { state.errorCode = error instanceof Error ? error.message : "DATASET_BINDING_FAILED"; }
-  finally { state.bindingBusy = false; render(); }
+  } catch (error) {
+    if (canApplyConversationLoad({ requestConversationId: conversationId, requestEpoch, activeConversationId: state.conversationId, activeEpoch: state.conversationEpoch }) && bindingEpoch === state.bindingEpoch) state.errorCode = error instanceof Error ? error.message : "DATASET_BINDING_FAILED";
+  }
+  finally {
+    if (bindingEpoch === state.bindingEpoch) state.bindingBusy = false;
+    render();
+  }
 }
 
 window.addEventListener("tradebot:orchestration-data-intent", ((event: Event) => {
   const intent = dataCenterBindingIntent((event as CustomEvent<unknown>).detail);
   if (!intent) return;
-  state.bindingIntent = { ...intent, idempotencyKey: createDataCenterBindingIdempotencyKey() }; state.bindingResult = undefined; state.open = true; render();
+  state.bindingEpoch += 1;
+  state.bindingIntent = { ...intent, conversationId: state.conversationId, idempotencyKey: createDataCenterBindingIdempotencyKey() }; state.bindingResult = undefined; state.open = true; render();
 }) as EventListener);
 
 window.addEventListener("tradebot:orchestration-session", (event: Event) => {
@@ -1256,7 +1337,7 @@ document.addEventListener(
         : "Create a CSV Historical Draft using preset.current-crypto-csv-historical and data-source:csv-historical");
       return;
     }
-    if (target.closest("[data-cancel-dataset-binding]")) { state.bindingIntent = undefined; state.bindingResult = undefined; render(); return; }
+    if (target.closest("[data-cancel-dataset-binding]")) { state.bindingEpoch += 1; state.bindingIntent = undefined; state.bindingResult = undefined; render(); return; }
     const prompt = target.closest<HTMLElement>("[data-copilot-prompt]");
     if (prompt?.dataset.copilotPrompt) {
       void sendMessage(prompt.dataset.copilotPrompt);
@@ -1276,7 +1357,7 @@ document.addEventListener(
     }
     const conversation = target.closest<HTMLElement>("[data-conversation-id]");
     if (conversation?.dataset.conversationId) {
-      void loadConversation(conversation.dataset.conversationId);
+      selectConversation(conversation.dataset.conversationId);
     }
   },
   true,
