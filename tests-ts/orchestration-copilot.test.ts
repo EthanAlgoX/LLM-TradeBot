@@ -93,6 +93,29 @@ test("Conversation contracts reject every unknown client-controlled field", () =
   );
 });
 
+test("an explicit CSV Historical preset wins over overlapping Current Crypto aliases", async () => {
+  const { database, runtime } = fixture();
+  try {
+    const response = await runtime.orchestrationCopilotService.handle(
+      {
+        ...currentCommand,
+        conversationId: "conversation.csv-compatible.001",
+        idempotencyKey: "idempotency.csv-compatible.001",
+        locale: "en",
+        message: "Create a CSV Historical Draft using preset.current-crypto-csv-historical and data-source:csv-historical",
+      },
+      actor,
+    );
+    assert.equal(response.status, "proposal");
+    assert.equal(response.context.selected.presetId, "preset.current-crypto-csv-historical");
+    assert.deepEqual(response.context.selected.dataSourceIds, ["data-source:csv-historical"]);
+    assert.equal(response.context.selected.draftReference?.versionId.endsWith(":version:1"), true);
+    assert.equal(response.runtimeApplied, false);
+  } finally {
+    database.close();
+  }
+});
+
 test("registered Crypto preset creates persistent Configuration and Pipeline Drafts", async () => {
   const { database, runtime } = fixture();
   try {

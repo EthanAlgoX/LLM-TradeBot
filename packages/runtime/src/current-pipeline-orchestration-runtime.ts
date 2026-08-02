@@ -19,6 +19,10 @@ import {
   CURRENT_CRYPTO_PIPELINE_GRAPH,
 } from "../../core/src/current-crypto-pipeline-graph.js";
 import {
+  CURRENT_CRYPTO_SEMANTIC_CSV_PIPELINE_GRAPH,
+  CURRENT_CRYPTO_SEMANTIC_HISTORICAL_REGISTRY_SEED,
+} from "../../core/src/current-crypto-semantic-historical-graph.js";
+import {
   ApprovedPaperPlanService,
   type ApprovedPaperPlanPolicy,
 } from "../../core/src/approved-paper-plan-service.js";
@@ -169,6 +173,15 @@ function implementationBindings() {
   });
 }
 
+function withoutDuplicateIds<T extends object, K extends keyof T>(
+  additions: readonly T[],
+  existing: readonly T[] | undefined,
+  id: K,
+): T[] {
+  const ids = new Set((existing ?? []).map((item) => item[id]));
+  return additions.filter((item) => !ids.has(item[id]));
+}
+
 export function createCurrentPipelineOrchestrationRuntime(
   options: CurrentPipelineOrchestrationRuntimeOptions = {},
 ): CurrentPipelineOrchestrationRuntime {
@@ -208,14 +221,29 @@ export function createCurrentPipelineOrchestrationRuntime(
     ],
     agentTemplates: [
       ...CURRENT_CRYPTO_AGENT_TEMPLATES,
+      ...withoutDuplicateIds(
+        CURRENT_CRYPTO_SEMANTIC_HISTORICAL_REGISTRY_SEED.agentTemplates ?? [],
+        registrySeed.agentTemplates,
+        "templateId",
+      ),
       ...(registrySeed.agentTemplates ?? []),
     ],
     agentConfigs: [
       ...CURRENT_CRYPTO_AGENT_CONFIGS,
+      ...withoutDuplicateIds(
+        CURRENT_CRYPTO_SEMANTIC_HISTORICAL_REGISTRY_SEED.agentConfigs ?? [],
+        registrySeed.agentConfigs,
+        "agentConfigId",
+      ),
       ...(registrySeed.agentConfigs ?? []),
     ],
     implementationBindings: [
       ...implementationBindings(),
+      ...withoutDuplicateIds(
+        CURRENT_CRYPTO_SEMANTIC_HISTORICAL_REGISTRY_SEED.implementationBindings ?? [],
+        registrySeed.implementationBindings,
+        "agentConfigId",
+      ),
       ...(registrySeed.implementationBindings ?? []),
     ],
   });
@@ -237,6 +265,12 @@ export function createCurrentPipelineOrchestrationRuntime(
         graph: CURRENT_CRYPTO_PIPELINE_GRAPH,
         marketPackIds: [CURRENT_CRYPTO_MARKET_PACK.marketPackId],
         dataSourceIds: CURRENT_CRYPTO_PIPELINE_GRAPH.dataSourceRefs,
+      },
+      {
+        presetId: "preset.current-crypto-csv-historical",
+        graph: CURRENT_CRYPTO_SEMANTIC_CSV_PIPELINE_GRAPH,
+        marketPackIds: [CURRENT_CRYPTO_MARKET_PACK.marketPackId],
+        dataSourceIds: CURRENT_CRYPTO_SEMANTIC_CSV_PIPELINE_GRAPH.dataSourceRefs,
       },
     ],
     validateGraph: validator,
@@ -401,6 +435,19 @@ export function createCurrentPipelineOrchestrationRuntime(
           confidenceThreshold: 0.6,
           lookbackPeriods: 48,
         },
+      },
+      {
+        presetId: "preset.current-crypto-csv-historical",
+        aliases: ["csv historical", "csv", "历史 csv", "历史数据"],
+        marketPackId: CURRENT_CRYPTO_MARKET_PACK.marketPackId,
+        dataSourceIds: CURRENT_CRYPTO_SEMANTIC_CSV_PIPELINE_GRAPH.dataSourceRefs,
+        defaultObservationWindows: [
+          { kind: "bar_interval", unit: "minute", value: 5 },
+          { kind: "bar_interval", unit: "minute", value: 15 },
+          { kind: "bar_interval", unit: "hour", value: 1 },
+        ],
+        editableAgentTemplateId: "agent-template:semantic-historical:timeframe-analysis:v1",
+        editableParameters: { confidenceThreshold: 0.6, lookbackPeriods: 48 },
       },
     ],
   });
@@ -568,6 +615,11 @@ export function createCurrentPipelineOrchestrationRuntime(
       productionStrategyOrchestration.workspaceCatalog,
     pipelineGraphs: [
       CURRENT_CRYPTO_PIPELINE_GRAPH,
+      ...withoutDuplicateIds(
+        [CURRENT_CRYPTO_SEMANTIC_CSV_PIPELINE_GRAPH],
+        options.pipelineGraphs,
+        "pipelineGraphId",
+      ),
       ...(options.pipelineGraphs ?? []),
     ],
     ...(options.maxBodyBytes ? { maxBodyBytes: options.maxBodyBytes } : {}),

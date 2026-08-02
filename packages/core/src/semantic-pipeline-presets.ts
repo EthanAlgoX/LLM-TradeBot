@@ -131,6 +131,30 @@ const dailyPreset = SemanticPipelinePresetDefinitionSchema.parse({
   compatibilityTarget: { kind: "contract_template", reference: "single-window-daily" },
 });
 
+/**
+ * This is deliberately a separate preset rather than a CSV flag on the live
+ * recipe.  The two graphs have different registered source sets, so keeping
+ * the binding explicit preserves the compiler's exact-set guard.
+ */
+const csvHistoricalPreset = SemanticPipelinePresetDefinitionSchema.parse({
+  ...currentCryptoPreset,
+  id: "preset.current-crypto-csv-historical",
+  displayName: "Current Crypto CSV Historical",
+  description:
+    "Registered CSV Historical semantic pipeline. It accepts only the registered CSV OHLCV source and retains the native 5m, 15m and 1h windows.",
+  fingerprint: fingerprint("e"),
+  defaultDataSourceIds: ["data-source:csv-historical"],
+  graphVersionRef: {
+    id: "pipeline-graph:current-crypto-semantic-csv",
+    version: "1.0.0",
+    fingerprint: fingerprint("f"),
+  },
+  compatibilityTarget: {
+    kind: "contract_template",
+    reference: "current-crypto-csv-historical",
+  },
+});
+
 const eventOnlyPreset = SemanticPipelinePresetDefinitionSchema.parse({
   schemaVersion: "1.0.0",
   id: "preset.event-only-research",
@@ -164,7 +188,7 @@ const eventOnlyPreset = SemanticPipelinePresetDefinitionSchema.parse({
   compatibilityTarget: { kind: "contract_template", reference: "event-only-research" },
 });
 
-const registeredPresets = [currentCryptoPreset, dailyPreset, eventOnlyPreset] as const;
+const registeredPresets = [currentCryptoPreset, csvHistoricalPreset, dailyPreset, eventOnlyPreset] as const;
 
 export interface RegisteredSemanticPipelinePresetCatalog {
   list(): SemanticPipelinePresetDefinition[];

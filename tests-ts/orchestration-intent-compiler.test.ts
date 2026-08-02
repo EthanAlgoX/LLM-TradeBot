@@ -10,6 +10,7 @@ import {
   CURRENT_CRYPTO_MARKET_PACK,
   CURRENT_CRYPTO_PIPELINE_GRAPH,
 } from "../packages/core/src/current-crypto-pipeline-graph.js";
+import { CURRENT_CRYPTO_SEMANTIC_CSV_PIPELINE_GRAPH } from "../packages/core/src/current-crypto-semantic-historical-graph.js";
 import { OrchestrationIntentError } from "../packages/core/src/orchestration-intent-compiler.js";
 import { createCurrentPipelineOrchestrationRuntime } from "../packages/runtime/src/current-pipeline-orchestration-runtime.js";
 
@@ -82,6 +83,29 @@ test("registered Crypto intent compiles to an authoritative validated Draft with
     assert.ok(result.draft.graph.nodes.some((node) => node.nodeId === "risk"));
     assert.ok(result.draft.graph.nodes.some((node) => node.nodeId === "execution"));
     assert.ok(result.draft.graph.nodes.some((node) => node.nodeId === "reflection"));
+  } finally {
+    database.close();
+  }
+});
+
+test("registered CSV Historical preset creates an exact-set validated draft without runtime mutation", () => {
+  const { database, runtime } = fixture();
+  try {
+    const result = runtime.intentDraftService.createDraft({
+      ...currentIntent,
+      requestId: "request.csv-historical.001",
+      presetId: "preset.current-crypto-csv-historical",
+      dataSourceIds: ["data-source:csv-historical"],
+      requiredAgentTemplateIds: ["agent-template:semantic-historical:timeframe-analysis:v1"],
+    });
+    assert.equal(result.validation.valid, true);
+    assert.equal(result.draft.graphId, CURRENT_CRYPTO_SEMANTIC_CSV_PIPELINE_GRAPH.pipelineGraphId);
+    assert.deepEqual(result.intent.dataSourceIds, ["data-source:csv-historical"]);
+    assert.equal(result.runtimeApplied, false);
+    assert.throws(
+      () => runtime.intentDraftService.createDraft({ ...currentIntent, requestId: "request.csv-historical.invalid", dataSourceIds: ["data-source:csv-historical"] }),
+      (error) => error instanceof OrchestrationIntentError && error.code === "DATA_SOURCE_SET_NOT_SUPPORTED_BY_GRAPH",
+    );
   } finally {
     database.close();
   }

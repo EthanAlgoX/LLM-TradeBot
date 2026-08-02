@@ -518,13 +518,13 @@ function renderBinding(): string {
   const intent = state.bindingIntent;
   if (!intent) return "";
   const text = locale() === "zh-CN" ? {
-    title: "待绑定数据资产", confirm: "确认绑定 Dataset", cancel: "取消", target: "目标 Draft", unavailable: "需要包含 CSV Historical 的 Market 或 Agent Draft", safety: "仅创建不可变 Configuration Draft Version；不会 Apply Runtime、启动 Paper Run 或写入交易所。", success: "绑定成功",
+    title: "待绑定数据资产", confirm: "确认绑定 Dataset", create: "创建 CSV 兼容 Draft", cancel: "取消", target: "目标 Draft", unavailable: "需要包含 CSV Historical 的 Market 或 Agent Draft", safety: "仅创建不可变 Configuration Draft Version；不会 Apply Runtime、启动 Paper Run 或写入交易所。", success: "绑定成功",
   } : {
-    title: "Pending data asset binding", confirm: "Confirm Dataset binding", cancel: "Cancel", target: "Target Draft", unavailable: "A Market or Agent Draft containing CSV Historical is required", safety: "Creates an immutable Configuration Draft Version only. It cannot apply Runtime, start a Paper Run, or write to an exchange.", success: "Binding succeeded",
+    title: "Pending data asset binding", confirm: "Confirm Dataset binding", create: "Create CSV-compatible Draft", cancel: "Cancel", target: "Target Draft", unavailable: "A Market or Agent Draft containing CSV Historical is required", safety: "Creates an immutable Configuration Draft Version only. It cannot apply Runtime, start a Paper Run, or write to an exchange.", success: "Binding succeeded",
   };
   const selected = latestResponse()?.context.selected;
   const allowed = state.mode === "live" && !state.busy && !state.bindingBusy && !!state.currentDraft && ["data-source:csv-historical"].some((id) => selected?.dataSourceIds.includes(id));
-  return `<section class="copilot-binding" aria-live="polite"><header><span>DATASET BINDING</span><h2>${text.title}</h2></header><dl><div><dt>Asset</dt><dd>${escapeHtml(intent.displayName)}</dd></div><div><dt>Dataset</dt><dd>${escapeHtml(intent.version)} · <code>${escapeHtml(compact(intent.fingerprint))}</code></dd></div><div><dt>Mode</dt><dd>${escapeHtml(intent.mode)}</dd></div><div><dt>${text.target}</dt><dd>${escapeHtml(state.currentDraft?.versionId ?? text.unavailable)}</dd></div></dl><p>${text.safety}</p>${state.bindingResult ? `<p class="copilot-validation-pass">${text.success}: ${escapeHtml(state.bindingResult.versionId)} · <code>${escapeHtml(compact(state.bindingResult.fingerprint))}</code> · ${state.bindingResult.valid ? "VALID" : "VALIDATION_FAILED"} · runtimeApplied=false</p>` : ""}<div><button type="button" data-confirm-dataset-binding ${allowed ? "" : "disabled"}>${state.bindingBusy ? "…" : text.confirm}</button><button type="button" data-cancel-dataset-binding ${state.bindingBusy ? "disabled" : ""}>${text.cancel}</button></div>${allowed ? "" : `<small>${text.unavailable}</small>`}</section>`;
+  return `<section class="copilot-binding" aria-live="polite"><header><span>DATASET BINDING</span><h2>${text.title}</h2></header><dl><div><dt>Asset</dt><dd>${escapeHtml(intent.displayName)}</dd></div><div><dt>Dataset</dt><dd>${escapeHtml(intent.version)} · <code>${escapeHtml(compact(intent.fingerprint))}</code></dd></div><div><dt>Mode</dt><dd>${escapeHtml(intent.mode)}</dd></div><div><dt>${text.target}</dt><dd>${escapeHtml(state.currentDraft?.versionId ?? text.unavailable)}</dd></div></dl><p>${text.safety}</p>${state.bindingResult ? `<p class="copilot-validation-pass">${text.success}: ${escapeHtml(state.bindingResult.versionId)} · <code>${escapeHtml(compact(state.bindingResult.fingerprint))}</code> · ${state.bindingResult.valid ? "VALID" : "VALIDATION_FAILED"} · runtimeApplied=false</p>` : ""}<div>${allowed ? "" : `<button type="button" data-create-csv-compatible-draft ${state.busy || state.bindingBusy || state.mode !== "live" ? "disabled" : ""}>${state.busy ? "…" : text.create}</button>`}<button type="button" data-confirm-dataset-binding ${allowed ? "" : "disabled"}>${state.bindingBusy ? "…" : text.confirm}</button><button type="button" data-cancel-dataset-binding ${state.bindingBusy ? "disabled" : ""}>${text.cancel}</button></div>${allowed ? "" : `<small>${text.unavailable}</small>`}</section>`;
 }
 
 function renderDiff(response: ConversationResponse): string {
@@ -1191,7 +1191,7 @@ async function confirmBinding(): Promise<void> {
   if (!intent || !draft || !selected?.dataSourceIds.includes("data-source:csv-historical") || state.bindingBusy || state.mode !== "live") return;
   state.bindingBusy = true; state.errorCode = undefined; render();
   try {
-    const data = await request<{ version: { versionId: string; fingerprint: string }; validation: { valid: boolean }; runtimeApplied: false }>("/api/orchestration/data-center/bindings", { method: "POST", body: JSON.stringify({ schemaVersion: "1.0.0", configurationDraftId: draft.draftId, configurationVersionId: draft.versionId, parentFingerprint: draft.fingerprint, ...intent, idempotencyKey: `ui.${draft.versionId}.${intent.fingerprint}`, conversationId: state.conversationId }) });
+    const data = await request<{ version: { versionId: string; fingerprint: string }; validation: { valid: boolean }; runtimeApplied: false }>("/api/orchestration/data-center/bindings", { method: "POST", body: JSON.stringify({ schemaVersion: "1.0.0", configurationDraftId: draft.draftId, configurationVersionId: draft.versionId, parentFingerprint: draft.fingerprint, assetId: intent.assetId, datasetId: intent.datasetId, version: intent.version, fingerprint: intent.fingerprint, capabilityId: intent.capabilityId, mode: intent.mode, idempotencyKey: `ui.${draft.versionId}.${intent.fingerprint}`, conversationId: state.conversationId }) });
     if (data.runtimeApplied !== false) throw new Error("RUNTIME_MUTATION_INVARIANT_FAILED");
     state.currentDraft = { draftId: draft.draftId, versionId: data.version.versionId, fingerprint: data.version.fingerprint };
     state.bindingResult = { versionId: data.version.versionId, fingerprint: data.version.fingerprint, valid: data.validation.valid };
@@ -1229,6 +1229,12 @@ document.addEventListener(
       return;
     }
     if (target.closest("[data-confirm-dataset-binding]")) { void confirmBinding(); return; }
+    if (target.closest("[data-create-csv-compatible-draft]")) {
+      void sendMessage(locale() === "zh-CN"
+        ? "使用 preset.current-crypto-csv-historical 和 data-source:csv-historical 创建 CSV Historical Draft"
+        : "Create a CSV Historical Draft using preset.current-crypto-csv-historical and data-source:csv-historical");
+      return;
+    }
     if (target.closest("[data-cancel-dataset-binding]")) { state.bindingIntent = undefined; state.bindingResult = undefined; render(); return; }
     const prompt = target.closest<HTMLElement>("[data-copilot-prompt]");
     if (prompt?.dataset.copilotPrompt) {

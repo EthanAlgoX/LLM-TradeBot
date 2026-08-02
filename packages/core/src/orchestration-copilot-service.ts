@@ -697,13 +697,18 @@ export class OrchestrationCopilotService {
         { agentTemplateId: explicitAgentTemplateId },
       );
     }
-    const recipe = this.dependencies.recipes.find(
-      (candidate) =>
-        candidate.presetId === explicitPresetId ||
+    // An explicit registered preset is authoritative.  Alias matching is only
+    // a convenience fallback; otherwise "current-crypto" inside the CSV
+    // preset ID would incorrectly select the live Current Crypto recipe.
+    const recipe = explicitPresetId
+      ? this.dependencies.recipes.find(
+        (candidate) => candidate.presetId === explicitPresetId,
+      )
+      : this.dependencies.recipes.find((candidate) =>
         candidate.aliases.some((alias) =>
           normalized.includes(alias.toLocaleLowerCase()),
         ),
-    );
+      );
     if (!recipe) {
       return this.unavailable(
         command,

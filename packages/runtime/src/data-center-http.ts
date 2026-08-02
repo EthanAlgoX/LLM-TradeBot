@@ -55,14 +55,14 @@ export class DataCenterHttpHandler {
       const actor = this.authenticator.authenticate(request.headers.get("authorization") ?? undefined);
       const path = new URL(request.url).pathname;
       if (request.method === "GET" && path === "/api/orchestration/data-center/assets") return json({ data: catalog(this.sources, this.capabilities, this.datasets) });
-      if (request.method !== "POST" || path !== "/api/orchestration/data-center/bindings") return json({ code: "ROUTE_NOT_FOUND" }, 404);
+      if (request.method !== "POST" || path !== "/api/orchestration/data-center/bindings") return json({ error: { code: "ROUTE_NOT_FOUND" } }, 404);
       const raw = await request.json();
       const input = BindingRequest.parse(raw);
       const current = this.configurations.get(input.configurationVersionId);
-      if (current.draftId !== input.configurationDraftId || current.createdByActorId !== actor.actorId || current.fingerprint !== input.parentFingerprint) return json({ code: "DATASET_BINDING_FORBIDDEN" }, 403);
-      if (current.payload.kind !== "market" && current.payload.kind !== "agent") return json({ code: "DATASET_BINDING_DRAFT_KIND_UNSUPPORTED" }, 400);
+      if (current.draftId !== input.configurationDraftId || current.createdByActorId !== actor.actorId || current.fingerprint !== input.parentFingerprint) return json({ error: { code: "DATASET_BINDING_FORBIDDEN" } }, 403);
+      if (current.payload.kind !== "market" && current.payload.kind !== "agent") return json({ error: { code: "DATASET_BINDING_DRAFT_KIND_UNSUPPORTED" } }, 400);
       const available = catalog(this.sources, this.capabilities, this.datasets).assets.find((asset) => asset.assetId === input.assetId && asset.dataset?.datasetId === input.datasetId && asset.dataset.version === input.version && asset.dataset.fingerprint === input.fingerprint && asset.capabilityId === input.capabilityId);
-      if (!available || available.sourceId !== (current.payload.dataSourceIds.includes(available.sourceId) ? available.sourceId : "")) return json({ code: "DATASET_BINDING_CAPABILITY_MISMATCH" }, 400);
+      if (!available || available.sourceId !== (current.payload.dataSourceIds.includes(available.sourceId) ? available.sourceId : "")) return json({ error: { code: "DATASET_BINDING_CAPABILITY_MISMATCH" } }, 400);
       const dataBindings = [...(current.payload.dataBindings ?? []).filter((item) => item.assetId !== input.assetId), { assetId: input.assetId, datasetId: input.datasetId, version: input.version, fingerprint: input.fingerprint, capabilityId: input.capabilityId, mode: input.mode }];
       const existing = this.replayRepository.get({ actorId: actor.actorId, conversationId: input.conversationId, idempotencyKey: `dataset-binding:${input.idempotencyKey}` });
       if (existing?.response.context.selected.draftReference) return json({ data: { version: this.configurations.get(existing.response.context.selected.draftReference.versionId), validation: this.configurations.validate(existing.response.context.selected.draftReference.versionId), runtimeApplied: false } });
@@ -71,9 +71,9 @@ export class DataCenterHttpHandler {
       this.replayRepository.appendDraftReference(actor.actorId, input.conversationId, `dataset-binding:${input.idempotencyKey}`, { draftId: version.draftId, versionId: version.versionId, fingerprint: version.fingerprint });
       return json({ data: { version, validation, runtimeApplied: false } }, 201);
     } catch (error) {
-      if (error instanceof z.ZodError) return json({ code: "REQUEST_CONTRACT_INVALID" }, 400);
+      if (error instanceof z.ZodError) return json({ error: { code: "REQUEST_CONTRACT_INVALID" } }, 400);
       const code = error instanceof Error ? error.message : "DATA_CENTER_REQUEST_FAILED";
-      return json({ code }, code.startsWith("AUTHORIZATION_") ? 401 : 400);
+      return json({ error: { code } }, code.startsWith("AUTHORIZATION_") ? 401 : 400);
     }
   }
 }

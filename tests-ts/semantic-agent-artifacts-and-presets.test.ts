@@ -393,11 +393,12 @@ test("Semantic Decision remains an intent and requires Portfolio/Risk chain", ()
   assert.equal("order" in parsed, false);
 });
 
-test("registered Preset Catalog contains current Crypto, daily and event-only baselines", () => {
+test("registered Preset Catalog contains current Crypto, CSV Historical, daily and event-only baselines", () => {
   const catalog = createRegisteredSemanticPipelinePresetCatalog();
   const presets = catalog.list();
   assert.deepEqual(presets.map((preset) => preset.id), [
     "preset.current-crypto-multi-agent",
+    "preset.current-crypto-csv-historical",
     "preset.single-window-daily",
     "preset.event-only-research",
   ]);

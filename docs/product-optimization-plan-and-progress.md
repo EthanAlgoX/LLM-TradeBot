@@ -587,12 +587,13 @@ README 中的 `320/320 PASS` 当前已过期。恢复稳定测试基线是后续
 - [x] 服务端不可变 Dataset Binding 合同、版本/fingerprint/capability 校验和 actor fail-closed；
 - [x] Market Radar 首版仅展示当前已证实维度；当前 Regime、Mover、Volume、Funding/OI 均明确 unavailable；
 - [x] 补齐“送入编排”在编排工作台的可见 Dataset intent 消费与待绑定确认卡片；
-- [ ] 提供可由 UI 确定性创建的 CSV-compatible Market/Agent Draft，并完成不可变 Draft Version、权威引用与刷新恢复的正向验收；
+- [x] 提供可由 UI 确定性创建的 CSV-compatible Agent Draft（真实注册 CSV Graph、exact-set 校验与可见入口）；
+- [ ] 完成 CSV Binding 成功、不可变 Draft Version、权威引用、刷新恢复与继续对话的正向 Chrome 验收；
 - [ ] 完成真实 Chrome 的桌面、窄屏、绑定成功/拒绝和 Console/Network 验收。
 
 验收：一个 Strategy Draft 可以引用服务端登记的数据版本，Validation 能阻止能力不匹配，回测 Evidence 能追溯 Dataset fingerprint。
 
-进度：服务端实现和 329/329 自动化基线已通过。MutationObserver 自循环和 1440px 顶栏 25px 溢出已修复。LOOP-012 已补齐 CSV intent 消费者、待绑定卡片、服务端 Draft Reference 更新与恢复代码，真实 Chrome 也确认资产详情、真实性标签和安全提示；但当前注册 Current Crypto Graph 只支持 Binance source，尚无可由 UI 确定性产生的 CSV-backed Market/Agent Draft，因此正向绑定与恢复未验收。下一步执行 LOOP-013，注册真实 CSV-compatible Draft 能力并完成 Agent Chrome 收尾；M2 仍不得关闭。
+进度：LOOP-013 已注册独立 CSV Historical Preset/Graph，并让待绑定卡片通过受认证 Copilot 入口创建 CSV-compatible Agent Draft；331/331 自动化通过。真实 Chrome 已确认资产、中文创建入口、真实 CSV Draft 与启用的确认绑定动作。绑定请求的严格合同字段已修正，完整成功、恢复、窄屏和 Network 收尾尚待再次 Chrome 验证；M2 保持 `IN_PROGRESS`。
 
 ### M3：实验场 V1
 
