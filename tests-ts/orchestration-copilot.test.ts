@@ -7,11 +7,14 @@ import test from "node:test";
 import {
   ConversationAssistantResponseSchema,
   ConversationCommandSchema,
+  DatasetBindingRequestSchema,
+  type GraphHistoricalDatasetDefinition,
   ToolActivityListSchema,
   projectToolActivity,
   type ConversationCommand,
   type OrchestrationActor,
 } from "../packages/contracts/src/index.js";
+import { createDatasetBindingRequest } from "../apps/web/src/data-center-intent.js";
 import {
   BINANCE_FUTURES_PUBLIC_CAPABILITY,
 } from "../packages/adapters/src/data-source-capability-manifests.js";
@@ -22,6 +25,8 @@ import {
   ConversationReplayReadError,
   SqliteConversationReplayRepository,
 } from "../packages/runtime/src/sqlite-conversation-replay-repository.js";
+import { DataCenterHttpHandler } from "../packages/runtime/src/data-center-http.js";
+import { LocalBearerAuthenticator } from "../packages/runtime/src/pipeline-orchestration-auth.js";
 import {
   assessObservationWindowCapability,
 } from "../packages/core/src/pipeline-graph-validator.js";
@@ -135,6 +140,79 @@ test("CSV Dataset Binding is replayed with the server Draft authority", async ()
     assert.deepEqual(replayed.response.selected.draftReference, parent);
     assert.deepEqual(replayed.response.selected.datasetBindings, datasetBindings);
     assert.equal(replayed.runtimeApplied, false);
+  } finally {
+    await runtime.close();
+    database.close();
+  }
+});
+
+test("shared Dataset Binding contract accepts the Web payload once and rejects unsafe retries without side effects", async () => {
+  const { database, runtime } = fixture();
+  try {
+    const fingerprint = "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+    const dataset = {
+      id: "dataset:csv-historical:http-test",
+      version: "1.0.0+http-test",
+      fingerprint,
+      dataSourceRef: { id: "data-source:csv-historical" },
+      asOfSequence: ["2026-08-02T00:00:00.000Z"],
+    } as unknown as GraphHistoricalDatasetDefinition;
+    const handler = new DataCenterHttpHandler(
+      [...runtime.registry.dataSources.values()],
+      [...runtime.registry.capabilities.values()],
+      [dataset],
+      runtime.productionStrategyOrchestration.configurationDraftService,
+      new LocalBearerAuthenticator([{ token: "test-operator-token", actor }]),
+      new SqliteConversationReplayRepository(database),
+    );
+    const created = await runtime.orchestrationCopilotService.handle(
+      {
+        ...currentCommand,
+        conversationId: "conversation.csv-binding-http.001",
+        idempotencyKey: "idempotency.csv-binding-http.create.001",
+        locale: "en",
+        message: "Create a CSV Historical Draft using preset.current-crypto-csv-historical and data-source:csv-historical",
+      },
+      actor,
+    );
+    const parent = created.context.selected.draftReference!;
+    const catalogResponse = await handler.handle(new Request("http://localhost/api/orchestration/data-center/assets", { headers: { authorization: "Bearer test-operator-token" } }));
+    assert.equal(catalogResponse.status, 200);
+    const catalog = (await catalogResponse.json()) as { data: { assets: Array<{ assetId: string; dataset?: { datasetId: string; version: string; fingerprint: string }; capabilityId: string }> } };
+    const asset = catalog.data.assets.find((item) => item.assetId === "asset:csv-historical")!;
+    assert.ok(asset.dataset);
+    const request = createDatasetBindingRequest({
+      schemaVersion: "1.0.0",
+      configurationDraftId: parent.draftId,
+      configurationVersionId: parent.versionId,
+      parentFingerprint: parent.fingerprint,
+      assetId: asset.assetId,
+      datasetId: asset.dataset!.datasetId,
+      version: asset.dataset!.version,
+      fingerprint: asset.dataset!.fingerprint,
+      capabilityId: asset.capabilityId,
+      mode: "pinned_snapshot",
+      idempotencyKey: "binding.018f1a40-0123-4567-89ab-0123456789ab",
+      conversationId: "conversation.csv-binding-http.001",
+    });
+    assert.equal(request.idempotencyKey.length < 160, true);
+    assert.equal(request.idempotencyKey.includes(request.fingerprint), false);
+    const bindingRequest = (body: unknown) => new Request("http://localhost/api/orchestration/data-center/bindings", { method: "POST", headers: { authorization: "Bearer test-operator-token", "content-type": "application/json" }, body: JSON.stringify(body) });
+    const first = await handler.handle(bindingRequest(request));
+    assert.equal(first.status, 201);
+    const firstPayload = (await first.json()) as { data: { version: { versionId: string }; runtimeApplied: false } };
+    assert.equal(firstPayload.data.runtimeApplied, false);
+    const retry = await handler.handle(bindingRequest(request));
+    assert.equal(retry.status, 200);
+    const retryPayload = (await retry.json()) as { data: { version: { versionId: string }; runtimeApplied: false } };
+    assert.equal(retryPayload.data.version.versionId, firstPayload.data.version.versionId);
+    assert.equal(runtime.orchestrationCopilotService.listTurns(actor.actorId, request.conversationId, { schemaVersion: "1.0.0", limit: 20 }).items.length, 2);
+
+    const rejected = DatasetBindingRequestSchema.safeParse({ ...request, idempotencyKey: `ui.${"v".repeat(100)}.${request.fingerprint}`, unexpected: true });
+    assert.equal(rejected.success, false);
+    const malformed = await handler.handle(bindingRequest({ ...request, idempotencyKey: `ui.${"v".repeat(100)}.${request.fingerprint}` }));
+    assert.equal(malformed.status, 400);
+    assert.equal(runtime.orchestrationCopilotService.listTurns(actor.actorId, request.conversationId, { schemaVersion: "1.0.0", limit: 20 }).items.length, 2);
   } finally {
     await runtime.close();
     database.close();

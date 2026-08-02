@@ -193,7 +193,7 @@ accepted_for_validation
 - 本轮浏览器插件验收：以干净 local Paper workspace 完成真实后端连接、第一会话创建与 v2 不可变 Draft、第二会话创建、两会话往返切换隔离、1440 中文和 820 英文无横向溢出、刷新及 Web/API 重启后自动认证与已选会话（2 Turn、v2）恢复；全程 `runtimeApplied=false`，控制台无 warning/error。原有损坏的本地 workspace 已可恢复地移至 `data/local-paper-workspace.backup-20260801T183000`，未删除。
 - 后续真实 Chrome 验收已确认：session、conversation list、turn list 均为 200 且无 401；受控 Copilot 成功创建 Draft Version 3；Console 无 warning/error；`runtimeApplied=false`、Paper Only 与 Exchange writes OFF 保持成立。
 - LOOP-003 保持未完成的历史交接记录。LOOP-004 中用户明确授权 Agent 直接操作真实 Chrome DevTools：localStorage、sessionStorage 与 Cookie 均为空；可见 Composer 触发的 `POST /api/orchestration/copilot/messages` 为 `200`，生成仅 Draft 的 Version 5；清空 Console 并刷新后无 TradeBot 页面 error/warning。没有读取 value、请求载荷或响应。
-- M2 数据中心 V1 为 `IN_PROGRESS`：LOOP-015 已修复 CSV Agent 允许字段、域错误映射、权威 recipe/Graph 选择与重启 mapping，333/333 自动化通过。Agent Chrome 中文页面稳定且 CSV 资产可见，但可见 Binding 返回 `REQUEST_CONTRACT_INVALID`，因此完整 Binding → Composer 尚未验证。LOOP-016 将以共享 Schema 修复 UI/HTTP 合同并完成 Chrome 闭环；Network 工具限制继续记录为 `TOOL_UNAVAILABLE`，不要求人工补验。
+- M2 数据中心 V1 为 `IN_PROGRESS`：LOOP-016 已通过共享严格 Schema 消除 UI/HTTP Binding 合同漂移；旧长拼接 `idempotencyKey` 超过 160 字符，已替换为有界稳定 opaque key，自动化与正式 handler 验证通过。Agent Chrome 不再显示 `REQUEST_CONTRACT_INVALID`，但 Binding 后的历史恢复会切换到非 CSV Draft 上下文，完整 Composer/恢复闭环仍未通过。LOOP-017 继续 M2；Network 工具限制继续记录为 `TOOL_UNAVAILABLE`。
 ## 2026-07-31：Production Semantic Candidate Persistence
 
 - 状态：`REAL`。Rule Reflection 已生成并持久化严格 Semantic Candidate，Review 与 Materialization 使用同一 append-only Store。

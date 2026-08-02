@@ -40,3 +40,40 @@ export const DataCenterCatalogSchema = z.object({
 
 export type DataCenterAsset = z.infer<typeof DataCenterAssetSchema>;
 export type DataCenterCatalog = z.infer<typeof DataCenterCatalogSchema>;
+
+/**
+ * The only client-supplied facts needed to append a Dataset binding to a
+ * Configuration Draft.  Keep this contract shared: the Web UI builds it and
+ * the HTTP boundary validates it without maintaining a second copy.
+ */
+export const DatasetBindingModeSchema = z.enum([
+  "latest_snapshot",
+  "pinned_snapshot",
+  "replay",
+]);
+
+export const DatasetBindingIdempotencyKeySchema = z
+  .string()
+  .min(8)
+  .max(160)
+  .regex(/^[A-Za-z0-9._:-]+$/u, "dataset_binding_idempotency_key_format");
+
+export const DatasetBindingRequestSchema = z
+  .object({
+    schemaVersion: z.literal(SemanticArtifactSchemaVersion),
+    configurationDraftId: z.string().min(3),
+    configurationVersionId: z.string().min(3),
+    parentFingerprint: ArtifactFingerprintSchema,
+    assetId: Id,
+    datasetId: Id,
+    version: z.string().min(1).max(80),
+    fingerprint: ArtifactFingerprintSchema,
+    capabilityId: Id,
+    mode: DatasetBindingModeSchema,
+    idempotencyKey: DatasetBindingIdempotencyKeySchema,
+    conversationId: z.string().min(3).max(240),
+  })
+  .strict();
+
+export type DatasetBindingRequest = z.infer<typeof DatasetBindingRequestSchema>;
+export type DatasetBindingMode = z.infer<typeof DatasetBindingModeSchema>;

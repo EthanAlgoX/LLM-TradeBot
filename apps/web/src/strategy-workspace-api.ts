@@ -7,7 +7,13 @@ import {
   resolveOrchestrationSessionConfiguration,
   type OrchestrationViteEnvironment,
 } from "./orchestration-session.js";
-import { dataCenterBindingIntent, type DataCenterBindingIntent } from "./data-center-intent.js";
+import {
+  createDataCenterBindingIdempotencyKey,
+  createDatasetBindingRequest,
+  dataCenterBindingIntent,
+  type DataCenterBindingIntent,
+} from "./data-center-intent.js";
+import type { DatasetBindingRequest } from "../../../packages/contracts/src/data-center.js";
 
 type Locale = "zh-CN" | "en";
 type ConnectionMode = "connecting" | "live" | "readonly" | "offline";
@@ -224,7 +230,7 @@ const state: {
   composerValue: string;
   currentDraft?: DraftReference;
   errorCode?: string;
-  bindingIntent?: DataCenterBindingIntent;
+  bindingIntent?: DataCenterBindingIntent & { idempotencyKey: string };
   bindingBusy: boolean;
   bindingResult?: { versionId: string; fingerprint: string; valid: boolean };
 } = {
@@ -1205,7 +1211,8 @@ async function confirmBinding(): Promise<void> {
   if (!intent || !draft || !selected?.dataSourceIds.includes("data-source:csv-historical") || state.bindingBusy || state.mode !== "live") return;
   state.bindingBusy = true; state.errorCode = undefined; render();
   try {
-    const data = await request<{ version: { versionId: string; fingerprint: string }; validation: { valid: boolean }; runtimeApplied: false }>("/api/orchestration/data-center/bindings", { method: "POST", body: JSON.stringify({ schemaVersion: "1.0.0", configurationDraftId: draft.draftId, configurationVersionId: draft.versionId, parentFingerprint: draft.fingerprint, assetId: intent.assetId, datasetId: intent.datasetId, version: intent.version, fingerprint: intent.fingerprint, capabilityId: intent.capabilityId, mode: intent.mode, idempotencyKey: `ui.${draft.versionId}.${intent.fingerprint}`, conversationId: state.conversationId }) });
+    const payload: DatasetBindingRequest = createDatasetBindingRequest({ schemaVersion: "1.0.0", configurationDraftId: draft.draftId, configurationVersionId: draft.versionId, parentFingerprint: draft.fingerprint, assetId: intent.assetId, datasetId: intent.datasetId, version: intent.version, fingerprint: intent.fingerprint, capabilityId: intent.capabilityId, mode: intent.mode, idempotencyKey: intent.idempotencyKey, conversationId: state.conversationId });
+    const data = await request<{ version: { versionId: string; fingerprint: string }; validation: { valid: boolean }; runtimeApplied: false }>("/api/orchestration/data-center/bindings", { method: "POST", body: JSON.stringify(payload) });
     if (data.runtimeApplied !== false) throw new Error("RUNTIME_MUTATION_INVARIANT_FAILED");
     state.currentDraft = { draftId: draft.draftId, versionId: data.version.versionId, fingerprint: data.version.fingerprint };
     state.bindingResult = { versionId: data.version.versionId, fingerprint: data.version.fingerprint, valid: data.validation.valid };
@@ -1217,7 +1224,7 @@ async function confirmBinding(): Promise<void> {
 window.addEventListener("tradebot:orchestration-data-intent", ((event: Event) => {
   const intent = dataCenterBindingIntent((event as CustomEvent<unknown>).detail);
   if (!intent) return;
-  state.bindingIntent = intent; state.bindingResult = undefined; state.open = true; render();
+  state.bindingIntent = { ...intent, idempotencyKey: createDataCenterBindingIdempotencyKey() }; state.bindingResult = undefined; state.open = true; render();
 }) as EventListener);
 
 window.addEventListener("tradebot:orchestration-session", (event: Event) => {

@@ -1,6 +1,6 @@
 # TradeBot 当前状态与接手说明
 
-> 2026-08-02 接手更新：LOOP-015 服务端 Composer 回归已修复并通过 333/333 自动化；Agent Chrome 中文 1440×900 中 CSV Binding 返回 `REQUEST_CONTRACT_INVALID`，不得标记 M2 COMPLETE。下一任务为 LOOP-016。
+> 2026-08-02 接手更新：LOOP-016 已修复 CSV Binding 的共享 Schema 合同漂移：旧 `ui.${versionId}.${fingerprint}` idempotency key 会超过服务端 160 字符限制，现为有界稳定 opaque key，正式 handler 回归通过。Agent Chrome 不再显示合同错误，但 Binding 后历史恢复可将当前 Draft 切换到非 CSV 上下文；不得标记 M2 COMPLETE。下一任务为 LOOP-017。
 
 > 快照日期：2026-08-01
 > 适用仓库：`/Users/hyx/Documents/workspace/tradebot`

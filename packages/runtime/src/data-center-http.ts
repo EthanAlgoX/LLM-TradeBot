@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { DataSourceCapability, DataSourceDefinition, GraphHistoricalDatasetDefinition } from "../../contracts/src/index.js";
-import { DataCenterCatalogSchema } from "../../contracts/src/index.js";
+import { DataCenterCatalogSchema, DatasetBindingRequestSchema } from "../../contracts/src/index.js";
 import type { ConfigurationDraftService } from "../../core/src/configuration-draft-service.js";
 import type { PipelineOrchestrationAuthenticator } from "./pipeline-orchestration-auth.js";
 import type { ConversationReplayRepository } from "../../core/src/orchestration-copilot-service.js";
@@ -40,10 +40,6 @@ function catalog(
   });
 }
 
-const BindingRequest = z.object({
-  schemaVersion: z.literal("1.0.0"), configurationDraftId: z.string().min(3), configurationVersionId: z.string().min(3), parentFingerprint: z.string().regex(/^sha256:/u), assetId: z.string().min(3), datasetId: z.string().min(3), version: z.string().min(1), fingerprint: z.string().regex(/^sha256:/u), capabilityId: z.string().min(3), mode: z.enum(["latest_snapshot", "pinned_snapshot", "replay"]), idempotencyKey: z.string().min(8).max(160), conversationId: z.string().min(3).max(240),
-}).strict();
-
 export class DataCenterHttpHandler {
   constructor(
     private readonly sources: readonly DataSourceDefinition[], private readonly capabilities: readonly DataSourceCapability[], private readonly datasets: readonly GraphHistoricalDatasetDefinition[],
@@ -57,7 +53,7 @@ export class DataCenterHttpHandler {
       if (request.method === "GET" && path === "/api/orchestration/data-center/assets") return json({ data: catalog(this.sources, this.capabilities, this.datasets) });
       if (request.method !== "POST" || path !== "/api/orchestration/data-center/bindings") return json({ error: { code: "ROUTE_NOT_FOUND" } }, 404);
       const raw = await request.json();
-      const input = BindingRequest.parse(raw);
+      const input = DatasetBindingRequestSchema.parse(raw);
       const current = this.configurations.get(input.configurationVersionId);
       if (current.draftId !== input.configurationDraftId || current.createdByActorId !== actor.actorId || current.fingerprint !== input.parentFingerprint) return json({ error: { code: "DATASET_BINDING_FORBIDDEN" } }, 403);
       if (current.payload.kind !== "market" && current.payload.kind !== "agent") return json({ error: { code: "DATASET_BINDING_DRAFT_KIND_UNSUPPORTED" } }, 400);
