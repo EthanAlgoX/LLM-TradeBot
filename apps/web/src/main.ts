@@ -24,14 +24,17 @@ import {
 import {
   proposalById,
   renderAgentCenter,
+  renderConnectionSettingsPreview,
   renderDataCenterPrelude,
   renderExperimentHandoff,
   renderMyStrategyApps,
   renderStrategyAdvisor,
   renderStrategyAppDetail,
   renderStrategyOverview,
+  renderStrategyWorkbench,
   renderTradeCenterPreview,
   type AgentCategory,
+  type ConnectionPreviewTab,
   type StrategyDetailTab,
   type StrategyDetailTarget,
 } from "./strategy-app-preview.js";
@@ -197,6 +200,7 @@ interface AppState {
   agentCenterCategory: AgentCategory;
   selectedPreviewAgentId: string;
   agentCenterSearch: string;
+  connectionPreviewTab: ConnectionPreviewTab;
   experimentHandoffAppName?: string;
 }
 
@@ -218,9 +222,10 @@ function initialLocale(): Locale {
 
 function initialView(): ViewId {
   const hashView = window.location.hash.slice(1);
-  return ["overview", "advisor", "strategy-apps", "strategy-app-detail", "agent-center", "trade-center", "data-center", "orchestration", "lab", "experiment", "activity", "connections"].includes(hashView)
-    ? hashView as ViewId
-    : "overview";
+  if (["advisor", "strategy-apps", "strategy-app-detail", "orchestration"].includes(hashView)) return "orchestration";
+  if (["data-center", "connections"].includes(hashView)) return "connections";
+  if (hashView === "agent-center") return "agent-center";
+  return "trade-center";
 }
 
 const state: AppState = {
@@ -248,6 +253,7 @@ const state: AppState = {
   agentCenterCategory: "input",
   selectedPreviewAgentId: "market-input",
   agentCenterSearch: "",
+  connectionPreviewTab: "data",
   workspace: {
     stage: 2,
     backtestRunning: false,
@@ -1037,36 +1043,26 @@ function activityKind(kind: ActivityKind): string {
 function renderHeader(): string {
   return `
     <header class="command-bar">
-      <button class="brand" type="button" data-view="overview" aria-label="${tr("返回策略应用总览", "Return to Strategy App overview")}">
+      <button class="brand" type="button" data-view="trade-center" aria-label="${tr("返回模拟交易", "Return to Simulation Trading")}">
         <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
-        <span><strong>TRADEBOT</strong><small>${tr("策略操作台", "STRATEGY CONSOLE")}</small></span>
+        <span><strong>TRADEBOT</strong><small>${tr("多 Agent 模拟交易", "MULTI-AGENT SIMULATION")}</small></span>
       </button>
 
       <nav class="primary-nav" aria-label="${tr("主要导航", "Primary navigation")}">
         ${[
-          ["overview", tr("总览", "Overview")],
-          ["advisor", tr("策略助手", "Strategy Advisor")],
-          ["strategy-apps", tr("我的策略应用", "My Strategy Apps")],
+          ["trade-center", tr("模拟交易", "Simulation")],
+          ["orchestration", tr("编排工作台", "Workbench")],
           ["agent-center", tr("Agent 中心", "Agent Center")],
-          ["data-center", tr("数据中心", "Data Center")],
-          ["experiment", tr("实验场", "Experiment Arena")],
-          ["trade-center", tr("交易中心", "Trade Center")],
+          ["connections", tr("连接配置", "Connections")],
         ].map(([id, label]) => `
           <button type="button" data-view="${id}" class="${state.view === id ? "is-active" : ""}" ${state.view === id ? 'aria-current="page"' : ""}>${label}</button>
         `).join("")}
       </nav>
 
       <div class="command-actions">
+        <span class="preview-mode-chip"><i></i>${tr("仅模拟", "SIMULATION ONLY")}</span>
         <button class="language-toggle" type="button" id="toggle-language" aria-label="${state.locale === "zh-CN" ? "切换为英文" : "Switch to Chinese"}">
           ${state.locale === "zh-CN" ? "英文" : "ZH"}
-        </button>
-        <button class="copilot-trigger ${state.copilotOpen ? "is-active" : ""}" type="button" id="open-copilot">
-          ${tr("编排 Copilot", "Orchestration Copilot")} <kbd>⌘K</kbd>
-        </button>
-        <button class="risk-control ${runtimeDashboard.canResume ? "is-armed" : ""}" type="button" id="pause-openings" data-runtime-emergency ${runtimeDashboard.canPause || runtimeDashboard.canResume ? "" : "disabled"}>
-          <span class="risk-control__desktop" data-runtime-emergency-label>${runtimeDashboard.canResume ? tr("恢复新开仓", "RESUME OPENINGS") : tr("暂停新开仓", "PAUSE OPENINGS")}</span>
-          <span class="risk-control__mobile" data-runtime-emergency-mobile-label>${runtimeDashboard.canResume ? tr("恢复开仓", "RESUME") : tr("暂停开仓", "PAUSE")}</span>
-          <small>${tr("紧急风险控制", "Emergency risk control")}</small>
         </button>
       </div>
     </header>
@@ -1255,6 +1251,7 @@ function renderOverview(): string {
       agentCategory: state.agentCenterCategory,
       selectedAgentId: state.selectedPreviewAgentId,
       agentSearch: state.agentCenterSearch,
+      connectionTab: state.connectionPreviewTab,
       experimentHandoffAppName: state.experimentHandoffAppName,
     })}
     <section class="legacy-surface-divider"><span>EXISTING PAPER / RUNTIME SURFACE</span><p>${tr("下方保留既有运行控制台；其真实状态与产品预览严格分开。", "The existing runtime console remains below; its real state is strictly separate from the product preview.")}</p></section>
@@ -1538,33 +1535,7 @@ function renderProductLoop(): string {
 }
 
 function renderOrchestration(): string {
-  return `
-    <section class="page-intro orchestration-intro">
-      <div>
-        <h1>${tr("编排 Agent", "Orchestration Agent")}</h1>
-        <p>${tr("直接说出交易思路、子 Agent 的连接关系和策略要求。系统会在对话中生成 Workflow 草案，并引导你完成试运行、回测与审批上线。", "Describe the trading idea, sub-Agent connections, and strategy requirements. The system generates a Workflow draft in the conversation and guides it through dry validation, backtesting, and approved release.")}</p>
-      </div>
-      <div class="orchestration-intro-actions">
-        <button type="button" class="secondary-action" data-view="connections">${tr("数据输入与接口", "Data inputs & interfaces")}</button>
-        <div class="orchestration-version">
-          <span>${tr("运行时边界", "Runtime boundary")}</span>
-          <strong>${tr("草案未应用", "Draft not applied")}</strong>
-          <small>runtimeApplied=false</small>
-        </div>
-      </div>
-    </section>
-
-    <section class="orchestration-workbench-shell" aria-labelledby="orchestration-workbench-title">
-      <header class="orchestration-workbench-heading">
-        <div>
-          <span>CONVERSATION-FIRST ORCHESTRATION</span>
-          <h2 id="orchestration-workbench-title">${tr("从一句需求到可验证的 Agent Workflow", "From one request to a verifiable Agent Workflow")}</h2>
-          <p>${tr("先对话生成方案，再确认策略与连接；所有变更只进入 Draft，不会直接修改运行中的交易 Agent。", "Generate the plan through conversation, then confirm its strategy and connections. Every change remains a Draft and never mutates the running Trading Agent directly.")}</p>
-        </div>
-      </header>
-      <div id="orchestration-workspace-host" class="orchestration-workspace-host"></div>
-    </section>
-  `;
+  return renderStrategyWorkbench(strategyPreviewContext());
 }
 
 function strategyPreviewContext() {
@@ -1577,6 +1548,7 @@ function strategyPreviewContext() {
     agentCategory: state.agentCenterCategory,
     selectedAgentId: state.selectedPreviewAgentId,
     agentSearch: state.agentCenterSearch,
+    connectionTab: state.connectionPreviewTab,
     experimentHandoffAppName: state.experimentHandoffAppName,
   };
 }
@@ -1605,7 +1577,7 @@ function renderExperiment(): string {
 }
 
 function renderTradeCenter(): string {
-  return `${renderTradeCenterPreview(state.locale)}<section class="legacy-surface-divider"><span>PAPER / SHADOW FACT CENTER · EXISTING M4 / M5</span><p>${tr("下方保留现有多 Paper Runtime 与 Shadow / Promotion 只读页面；它们不属于本轮 Prototype 创建路径。", "The existing multi-Paper Runtime and read-only Shadow / Promotion surfaces remain below; they are outside this Prototype creation path.")}</p></section>${renderSimulationCenterHost()}`;
+  return renderTradeCenterPreview(state.locale);
 }
 
 function renderActivity(): string {
@@ -2150,7 +2122,7 @@ function render(): void {
                       ? renderExperiment()
                       : state.view === "activity"
                         ? renderActivity()
-                        : renderConnections();
+                        : renderConnectionSettingsPreview(state.locale, state.connectionPreviewTab);
   app.innerHTML = `
     <!--
     THESIS: One Trading Agent narrows a broad universe to one auditable symbol. It refuses fixed coin tabs and equal-weight dashboard cards.
@@ -2162,12 +2134,8 @@ function render(): void {
     <div class="app-shell" id="app-shell">
       <a class="skip-link" href="#main-content">${tr("跳到主要内容", "Skip to main content")}</a>
       ${renderHeader()}
-      <div class="mock-banner environment-banner ${runtimeDashboard.connectionMode === "live" ? "is-live" : runtimeDashboard.connectionMode === "readonly" ? "is-readonly" : ""}" data-environment-banner>${environmentBannerLabel()}</div>
-      <nav class="legacy-view-nav" aria-label="${tr("既有工作区", "Existing workspaces")}">
-        <span>${tr("既有工作区", "Existing workspaces")}</span>
-        ${[["orchestration", tr("编排 Agent", "Orchestration")], ["lab", tr("实验场旧入口", "Experiment legacy entry")], ["activity", tr("审计记录", "Audit Log")], ["connections", tr("连接配置", "Connections")]].map(([id, label]) => `<button type="button" data-view="${id}" class="${state.view === id ? "is-active" : ""}">${label}</button>`).join("")}
-      </nav>
-      <main class="page-frame" id="main-content" tabindex="-1" data-product-preview="${["advisor", "strategy-apps", "strategy-app-detail", "agent-center", "data-center", "experiment", "trade-center"].includes(state.view)}">${view}</main>
+      <div class="mock-banner preview-environment-banner">${tr("模拟环境 · 页面预览不会下单或连接真实交易", "SIMULATION ENVIRONMENT · this preview cannot place live orders")}</div>
+      <main class="page-frame" id="main-content" tabindex="-1" data-product-preview="${["trade-center", "orchestration", "agent-center", "connections"].includes(state.view)}">${view}</main>
     </div>
     ${renderCopilot()}
     ${renderPanel()}
@@ -2329,6 +2297,10 @@ function bindEvents(): void {
     document.querySelector<HTMLButtonElement>("[data-preview-scenario]")?.focus();
   });
 
+  document.querySelector<HTMLButtonElement>("[data-preview-recommend]")?.addEventListener("click", () => {
+    showToast("已根据当前描述刷新推荐方案", "Recommendation refreshed from the current description");
+  });
+
   document.querySelectorAll<HTMLButtonElement>("[data-preview-proposal]").forEach((button) => {
     button.addEventListener("click", () => {
       state.strategyPreview = selectPreviewProposal(state.strategyPreview, button.dataset.previewProposal ?? "hk-quality-trend");
@@ -2382,6 +2354,7 @@ function bindEvents(): void {
         input: "market-input",
         analysis: "quality-analysis",
         decision: "decision-synthesis",
+        reflection: "reflection-agent",
       };
       state.selectedPreviewAgentId = firstAgentByCategory[state.agentCenterCategory];
       state.agentCenterSearch = "";
@@ -2402,6 +2375,13 @@ function bindEvents(): void {
     const query = input.value.trim().toLowerCase();
     document.querySelectorAll<HTMLElement>(".preview-agent-card").forEach((card) => {
       card.hidden = Boolean(query) && !card.textContent?.toLowerCase().includes(query);
+    });
+  });
+
+  document.querySelectorAll<HTMLButtonElement>("[data-connection-preview-tab]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.connectionPreviewTab = (button.dataset.connectionPreviewTab ?? "data") as ConnectionPreviewTab;
+      render();
     });
   });
 
@@ -2676,11 +2656,6 @@ function applyActivityFilter(query: string): void {
 }
 
 document.addEventListener("keydown", (event) => {
-  if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
-    event.preventDefault();
-    if (state.copilotOpen) closeOverlay();
-    else openCopilot();
-  }
   if (event.key === "Escape" && (state.copilotOpen || state.panel)) {
     closeOverlay();
   }
@@ -2706,9 +2681,9 @@ document.addEventListener("click", (event) => {
   state.strategyPreview = createPrototypeStrategyApp(state.strategyPreview, proposal);
   state.strategyDetailTarget = "app";
   state.strategyDetailTab = "overview";
-  state.view = "strategy-app-detail";
-  window.history.replaceState(null, "", "#strategy-app-detail");
-  render();
+  state.view = "orchestration";
+  window.history.replaceState(null, "", "#orchestration");
+  showToast("多 Agent 策略方案已生成，可放入模拟槽位", "Multi-Agent strategy generated and ready for a simulation slot");
 });
 
 render();

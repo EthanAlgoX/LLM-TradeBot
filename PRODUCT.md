@@ -113,12 +113,14 @@ TradeBot 使用快慢双循环：
 
 ## Web 产品结构
 
-Web 首期收敛为四个工作区：
+Web 首期只保留四个普通用户页面：
 
-1. **运行控制台**：运行状态、当前选中标的、持仓、风险、策略阶段与人工待办。
-2. **系统编排**：Data Source/Agent Catalog、Pipeline Canvas、右侧编排 Copilot 与结构化草案。
-3. **研究与验证**：Draft、Backtest、Walk-Forward、Approval、Paper Running 的统一生命周期。
-4. **连接与基础设施**：Market Pack、数据源、LLM Provider、Paper/只读账户、Secret Vault 和权限。
+1. **模拟交易**：作为默认首页，最多同时比较三个模拟策略的收益、回撤、最近决策和运行状态；不提供 Live 或交易所写入入口。
+2. **编排工作台**：用户用自然语言描述目标，系统从 Agent 中心推荐受约束的多 Agent 方案；“应用方案”只生成可审阅策略，不直接启动 Runtime。
+3. **Agent 中心**：分别管理 Input、Analysis、Decision、Reflection 四类 Agent，作为编排工作台唯一可引用的能力目录。
+4. **连接配置**：合并数据源与模型 API 配置，只显示连接状态和安全边界；Secret 仅保存在后端。
+
+Strategy App 列表折叠进编排工作台，策略比较折叠进模拟交易。Data Center、Experiment、Audit、复杂 Runtime 控制和内部运维工具不再占用一级导航；后端事实、验证与审计能力继续保留，但只在相应详情或开发者入口中渐进展示。
 
 界面需要支持完整中英文切换。中文模式尽量使用中文；市场代码、标的代码、产品名和通用交易缩写可以保留英文。
 

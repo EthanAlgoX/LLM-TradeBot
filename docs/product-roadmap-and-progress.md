@@ -1,6 +1,6 @@
 # TradeBot 产品路线图与当前进度
 
-> 2026-08-02：LOOP-026 已交付 R0 Strategy App 产品预览框架并等待用户产品评审。新增页面均是显式 `SAMPLE` / `PROTOTYPE` 页面内存状态，未接入推荐、Blueprint、Strategy App 物化、Runtime 或交易服务；M5 真实 Shadow 和 Paper Only 边界未改变。
+> 2026-08-02：LOOP-027 已将产品预览收敛为四个一级页面：模拟交易、编排工作台、Agent 中心、连接配置。页面仍是显式 `SAMPLE / PROTOTYPE`，未接入真实推荐、Strategy App 物化、Runtime 或交易服务；M5 Shadow 与 Paper Only 边界未改变。
 
 > 文档角色：当前完成度、剩余缺口和交付顺序的权威快照
 > 最后更新：2026-08-02
@@ -35,6 +35,7 @@ npm run dev:paper   STARTED
 | Crypto Paper Runtime | `REAL` | 服务端注册 Binding、Preflight、Lease、Heartbeat、Fencing、Close-only、Drain、Safe Stop 和持久化运行记录 |
 | M5 Shadow / Promotion Recommendation | `REAL` | 仅消费明确 M4 persisted cycle/artifact snapshot；独立 append-only Shadow facts、cursor history、同 scope 对比和 terminal read-only recommendation；无 Execution Port |
 | R0 Strategy App Product Preview | `PROTOTYPE_ONLY` | Advisor、Strategy App、Agent Center、Market Radar、Experiment handoff 与三槽位信息架构；刷新恢复 Sample，不调用 LLM、API、SQLite、Runtime 或交易 |
+| R1 Four-page Product Preview | `PROTOTYPE_ONLY` | 只保留 Simulation、Workbench、Agent Center、Connections；自然语言推荐与方案库合并，Agent 拆为四类，数据源与模型配置合并 |
 | Exchange 写入 | `UNAVAILABLE` | Paper Only，`exchangeWriteAllowed=false`，没有 Binance 或其他交易所写接口 |
 | Market/Data/Agent Registry | `REAL` | Market Pack、Data Source Capability、Agent Template、Preset 均由服务端注册；客户端不能上传实现 |
 | Pipeline Graph 与 Validator | `REAL` | 检查 Schema、Observation Window、Lineage、权限链、Release Gate 和注册实现 |
@@ -223,6 +224,15 @@ accepted_for_validation
 - Simulation Capacity 清晰表达为 `2 / 3 Running` Sample；第四个启动意图在纯产品状态层被拒绝且没有 Runtime 调用。Live 区域固定显示 `LIVE UNAVAILABLE / NOT AUTHORIZED / Exchange writes OFF`。
 - 验证：`npm run check`、`npm run test:ts`、`npm run build:web`、`git diff --check` 通过。Agent Chrome 在中文 1440×900 走完 Advisor → Proposal → Prototype → My Apps → Experiment handoff → Trade Center；英文 820×760 验证七个详情 Tab、可用导航和 `scrollWidth=clientWidth=820`。Console clear 与 Network 为 `TOOL_UNAVAILABLE`。
 - 下一步：`AWAITING_USER_PRODUCT_REVIEW`；不创建详细后端 Loop，也不恢复 M6。
+
+## 2026-08-02：R1 四页简化产品预览
+
+- 状态：`PROTOTYPE_ONLY / READY_FOR_USER_REVIEW`。LOOP-027 只修改前端信息架构、页面内存交互和展示，不新增 API、SQLite、LLM、Runtime Apply 或交易所写入。
+- 一级导航固定为模拟交易、编排工作台、Agent 中心、连接配置；旧产品入口不再出现在普通用户界面。
+- 模拟交易只呈现三个容量槽位；编排工作台通过 Sample 自然语言需求推荐现有 Agent 组合并可生成页面内存版本；Agent 中心明确四类；连接配置只分数据源与模型 API。
+- 验证：中文 1440×900、英文 820×760 均无横向溢出；应用方案、Reflection 分类、数据源/模型切换通过，Console error 0。`npm run check`、受影响测试 2/2、`npm run build:web`、`git diff --check` 通过。
+- 已清理 7 组、最长超过三小时的历史测试残留进程；它们不是产品服务。完整套件仍暴露既有 `orchestration-copilot` 测试结束后的异步 SQLite 关闭问题，需单独修复后再恢复完整全绿基线。
+- 下一步：`AWAITING_USER_PRODUCT_REVIEW`；用户确认四页结构后再为单页细化生成唯一编号 Loop。
 ## 2026-07-31：Production Semantic Candidate Persistence
 
 - 状态：`REAL`。Rule Reflection 已生成并持久化严格 Semantic Candidate，Review 与 Materialization 使用同一 append-only Store。

@@ -941,7 +941,7 @@ function renderRuntimeControl(): void {
     control.innerHTML = html;
   }
 
-  const banner = shell.querySelector<HTMLElement>(".mock-banner");
+  const banner = shell.querySelector<HTMLElement>(".mock-banner[data-environment-banner]");
   const bannerText = text.banner[state.mode];
   if (banner && banner.textContent !== bannerText) {
     banner.textContent = bannerText;

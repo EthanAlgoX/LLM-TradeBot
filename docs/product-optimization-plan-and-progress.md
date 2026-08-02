@@ -1,6 +1,6 @@
 # TradeBot 产品优化规划与进度
 
-> 2026-08-02：LOOP-026 已完成 R0 Strategy App 产品预览框架。策略助手、Strategy App、Agent 中心、Market Radar、实验场 handoff 与三个 Simulation Slot 均为显式 `SAMPLE` / `PROTOTYPE` 页面内存预览；没有新增后端、Runtime 或交易副作用。M5 真实 Shadow 边界保持不变；在用户评审前不进入 M6。
+> 2026-08-02：LOOP-027 已按用户评审将 R0 收敛为四页 R1 预览：模拟交易、编排工作台、Agent 中心、连接配置。旧总览、My Apps、Data Center、Experiment 和 Runtime 运维入口退出一级导航；预览仍为 `SAMPLE / PROTOTYPE / PAGE MEMORY`，没有 Runtime 或交易副作用。
 
 > 文档角色：汇总 2026-08-01 之前的产品讨论，作为后续产品优化、页面收敛和阶段验收的执行入口
 > 最后更新：2026-08-02
@@ -662,6 +662,19 @@ README 中的 `320/320 PASS` 当前已过期。恢复稳定测试基线是后续
 - [x] 未来 Live Champion 仍为 `NOT AUTHORIZED`，产品预览固定 `runtimeApplied=false`、Paper Only、`exchangeWriteAllowed=false`。
 
 验收：新增纯状态测试覆盖最多三个 active simulation slot、第四个意图拒绝且 `runtimeCall=none`、Sample / Prototype 标签和页面内存创建。真实 Agent Chrome 已完成中文 1440×900 主路径及英文 820×760 七 Tab / 无横向滚动；Data Center、Experiment 与现有 Paper / Shadow 入口可达。Console clear 与 Network 读取不可用，记录为 `TOOL_UNAVAILABLE`；没有用户手工验收替代。
+
+### R1：四页简化产品预览
+
+状态：`COMPLETE`（LOOP-027；`PROTOTYPE_ONLY / AWAITING_USER_PRODUCT_REVIEW`）
+
+- [x] 默认首页改为“模拟交易”，只显示最多三个模拟槽位、对比曲线、收益、回撤和最近决策；移除 Live 与真实交易入口；
+- [x] “策略助手”和“我的策略应用”合并为“编排工作台”：自然语言需求、受约束推荐、四段 Agent 流程、应用方案和最近方案在同一页；
+- [x] Agent 中心拆成输入、分析、决策、反思四类目录；
+- [x] 数据中心与连接页面合并为“连接配置”，只保留数据源与模型 API 两个 Tab；
+- [x] 旧总览、实验场、审计、复杂 Runtime 控制和 Outbox Monitor 退出普通用户一级界面；后端实现和安全合同未删除；
+- [x] 应用方案只生成当前页面内存 `PROTOTYPE`，`runtimeApplied=false`、`exchangeWriteAllowed=false`。
+
+验收：Agent Chrome 在中文 1440×900 验证模拟首页与应用方案，在中英文 820×760 验证四类 Agent、数据源/模型切换和无横向滚动；Console error 为 0。`npm run check`、受影响预览测试 2/2、`npm run build:web` 和 `git diff --check` 通过。完整测试套件仍有既有 `orchestration-copilot` 异步 SQLite 关闭问题，不将其伪报为本轮全绿；本轮未修改该后端测试链。
 
 ### M6：受控 Live 与 Canary
 

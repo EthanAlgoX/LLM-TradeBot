@@ -1,6 +1,6 @@
 # TradeBot 当前状态与接手说明
 
-> 2026-08-02 接手更新：LOOP-026 已完成 R0 Strategy App 产品预览框架。Advisor、Strategy App、Agent Center、Market Radar、Experiment handoff 和三个 Simulation Slot 都是显式 `SAMPLE` / `PROTOTYPE` 页面内存预览；M0～M5 真实页面与 M5 Shadow 边界未修改。当前状态是 `AWAITING_USER_PRODUCT_REVIEW`，不得自行恢复 LOOP-025 或 M6。
+> 2026-08-02 接手更新：LOOP-027 已完成 R1 四页简化预览。普通用户只看到模拟交易、编排工作台、Agent 中心和连接配置；所有新内容仍是显式 `SAMPLE / PROTOTYPE / PAGE MEMORY`，M0～M5 后端与 M5 Shadow 边界未修改。当前状态为 `AWAITING_USER_PRODUCT_REVIEW`。
 
 > 快照日期：2026-08-02
 > 适用仓库：`/Users/hyx/Documents/workspace/tradebot`
@@ -21,7 +21,7 @@
 - 覆盖或回退无关修改
 - 未经明确要求提交 Git
 
-当前最新完成 Loop 是 **R0 Strategy App 产品预览框架（LOOP-026）**。它不复用或修改 M4/M5 runtime：所有 Strategy App Sample / Prototype 只在当前页面内存中存在，刷新恢复初始 Sample；证据缺失、fingerprint 漂移或 source scope 模糊的 M5 真实边界仍 fail closed，不从 latest 或客户端输入猜测事实。
+当前最新完成 Loop 是 **R1 四页简化产品预览（LOOP-027）**。它不复用或修改 M4/M5 runtime：模拟曲线、推荐、Agent 和连接状态均是显式 Sample；应用方案只在当前页面内存中创建 Prototype。M5 真实边界继续 fail closed。
 
 ## 2. 当前可运行链路
 
@@ -132,10 +132,12 @@ POST /api/orchestration/paper-deployments/:deploymentId/shadows
 - Contract Validation Handoff 状态与稳定 issue code。
 - M5 Shadow / Promotion assessment：真实 source scope、lineage、data quality/health、evidence gaps、描述性 diff、只读 recommendation 和有限历史分页。
 
-R0 页面内存预览（非真实 API）：
+R1 页面内存预览（非真实 API）：
 
-- Strategy Advisor 的三组 Sample Intent / Proposal、My Strategy Apps、七 Tab 详情与 Agent Center；
-- Market Radar Sample、Experiment handoff 和 2/3 Simulation Capacity Sample；
+- 模拟交易：两个运行 Sample、一个空闲槽位、对比曲线和最近决策；
+- 编排工作台：三组自然语言 Sample、四段 Agent 推荐流程、应用方案与最近方案；
+- Agent 中心：Input、Analysis、Decision、Reflection 四类；
+- 连接配置：数据源与模型 API 两个 Tab；
 - 所有内容都标记 `SAMPLE`、`PROTOTYPE`、`NOT CONNECTED` 或 `UNAVAILABLE`，不混入真实 Data / Paper / Shadow facts；
 - 创建 Prototype 不写 Storage、Cookie、API、SQLite、Runtime 或交易；第四 Simulation Start intent 只返回页面状态拒绝，`runtimeCall=none`。
 
@@ -163,14 +165,14 @@ Comparative Evidence 当前由 active production composition 的内存索引支�
 
 ## 6. 最新验证
 
-LOOP-026 R0 完成后的最新完整基线：
+LOOP-027 R1 完成后的最新验证：
 
 ```text
 npm run check       PASS
-npm run test:ts     PASS
+npm run test:ts     PARTIAL（既有 orchestration-copilot 异步 SQLite 关闭问题）
 npm run build:web   PASS
 git diff --check    PASS
-npm run dev:web     STARTED（仅用于 Agent Chrome 产品预览）
+npm run dev:paper   STARTED（Web/API 已存在）
 ```
 
 启动地址：
@@ -180,16 +182,16 @@ Web: http://127.0.0.1:5174/
 API: http://127.0.0.1:8787
 ```
 
-产品预览不启动 Runtime、Worker 或额外后台程序；Chrome 仅访问本地 Vite Web，仍显示 `runtimeApplied=false`、Paper Only、`exchangeWriteAllowed=false`。
+产品预览不启动 Runtime、Worker 或额外后台程序；应用方案仍显示 `runtimeApplied=false`、`exchangeWriteAllowed=false`。受影响的预览状态测试为 2/2 PASS。
 
-浏览器状态：LOOP-026 Agent 直接控制真实 Chrome，在中文 1440×900 走完 Advisor → Proposal → Prototype → My Apps → Experiment handoff → Trade Center；英文 820×760 验证七个详情 Tab、导航与 `scrollWidth=clientWidth=820`。Data Center、Experiment 与现有 Paper / Shadow 入口均可达；Prototype 刷新后恢复 Sample。Console clear 与 Network 读取为 `TOOL_UNAVAILABLE`，不要求用户人工替代。
+浏览器状态：LOOP-027 Agent 直接控制真实 Chrome。中文 1440×900 验证模拟首页、编排工作台和应用方案；中文/英文 820×760 验证 Agent 四分类、连接配置两个 Tab，所有页面 `scrollWidth=clientWidth`，Console error 0。页面已留在中文模拟交易首页。
 
 ## 7. 下一阶段
 
 状态为 **AWAITING_USER_PRODUCT_REVIEW**：
 
-1. 等待用户确认 Strategy Advisor、Strategy App、Agent Center、Data Center、Experiment 与 Trade Center 的页面命名、信息架构和主路径；
-2. 在确认前不创建详细后端 Loop，不实现 LLM 推荐、Blueprint 匹配、Strategy App 物化、Runtime Apply、Live、Canary 或 M6；
+1. 等待用户确认模拟交易、编排工作台、Agent 中心、连接配置四页结构；
+2. 在确认前不细化单页功能，不实现真实 LLM 推荐、Strategy App 物化、Runtime Apply、Live、Canary 或 M6；
 3. 保持 M0～M5 runtime、M5 Shadow、账户和交易所写边界不变。
 
 ### LOOP-021 审计与验证（2026-08-02）
