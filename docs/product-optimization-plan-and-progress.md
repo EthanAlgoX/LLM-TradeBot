@@ -1,6 +1,6 @@
 # TradeBot 产品优化规划与进度
 
-> 2026-08-02：LOOP-027 已按用户评审将 R0 收敛为四页 R1 预览：模拟交易、编排工作台、Agent 中心、连接配置。旧总览、My Apps、Data Center、Experiment 和 Runtime 运维入口退出一级导航；预览仍为 `SAMPLE / PROTOTYPE / PAGE MEMORY`，没有 Runtime 或交易副作用。
+> 2026-08-03：LOOP-028 已按用户反馈细化 R1 的两个核心对话面：模拟页恢复子 Agent 多轮运行对话，编排工作台改为“对话即编排结果”，不再用固定右侧 Workflow。预览仍为 `SAMPLE / PROTOTYPE / PAGE MEMORY`，没有 Runtime 或交易副作用。
 
 > 文档角色：汇总 2026-08-01 之前的产品讨论，作为后续产品优化、页面收敛和阶段验收的执行入口
 > 最后更新：2026-08-02
@@ -675,6 +675,19 @@ README 中的 `320/320 PASS` 当前已过期。恢复稳定测试基线是后续
 - [x] 应用方案只生成当前页面内存 `PROTOTYPE`，`runtimeApplied=false`、`exchangeWriteAllowed=false`。
 
 验收：Agent Chrome 在中文 1440×900 验证模拟首页与应用方案，在中英文 820×760 验证四类 Agent、数据源/模型切换和无横向滚动；Console error 为 0。`npm run check`、受影响预览测试 2/2、`npm run build:web` 和 `git diff --check` 通过。完整测试套件仍有既有 `orchestration-copilot` 异步 SQLite 关闭问题，不将其伪报为本轮全绿；本轮未修改该后端测试链。
+
+### R1.1：模拟与编排对话面
+
+状态：`COMPLETE`（LOOP-028；`PROTOTYPE_ONLY / AWAITING_USER_PRODUCT_REVIEW`）
+
+- [x] 从历史实现恢复子 Agent Artifact 对话的核心表达：轮次、生成时间、回复上游、发送下游、成功/降级；
+- [x] 模拟页底部可在两个运行策略间切换各自的 Agent 对话；
+- [x] 编排工作台取消固定右侧流程，以单一聊天线程承载用户需求、助手推荐和动态 Agent 拓扑；
+- [x] 不同策略返回不同的 Agent 数量、分支和汇聚关系，修改自然语言后追加新的推荐，而不是改写一张固定图；
+- [x] 应用方案后显示预上线检查、回测、模拟槽位三个门槛，但全部保持 Preview Pending；
+- [x] 所有行为仍为页面内存 Sample/Prototype，`runtimeApplied=false`、`exchangeWriteAllowed=false`。
+
+验收：Agent Chrome 在 1440×900 完成 Simulation Dialogue、Workbench 动态 Crypto 推荐与 Apply，在 820×760 验证零横向溢出和 US Earnings Dialogue 切换；Console error 0。自动化与构建通过，未新增后端、持久化、LLM 或 Runtime 调用。
 
 ### M6：受控 Live 与 Canary
 

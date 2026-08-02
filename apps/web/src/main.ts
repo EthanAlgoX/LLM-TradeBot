@@ -13,6 +13,7 @@ import type {
   RuntimeDashboardSnapshot,
 } from "./runtime-operation-session.js";
 import {
+  appendWorkbenchExchange,
   createInitialStrategyAppPreviewState,
   createPrototypeStrategyApp,
   selectPreviewApp,
@@ -33,6 +34,7 @@ import {
   renderStrategyOverview,
   renderStrategyWorkbench,
   renderTradeCenterPreview,
+  inferWorkbenchScenarioId,
   type AgentCategory,
   type ConnectionPreviewTab,
   type StrategyDetailTab,
@@ -202,6 +204,8 @@ interface AppState {
   agentCenterSearch: string;
   connectionPreviewTab: ConnectionPreviewTab;
   experimentHandoffAppName?: string;
+  workbenchDraft: string;
+  simulationDialogueId: string;
 }
 
 const appRoot = document.querySelector<HTMLDivElement>("#app");
@@ -254,6 +258,8 @@ const state: AppState = {
   selectedPreviewAgentId: "market-input",
   agentCenterSearch: "",
   connectionPreviewTab: "data",
+  workbenchDraft: "",
+  simulationDialogueId: "hk-quality-trend",
   workspace: {
     stage: 2,
     backtestRunning: false,
@@ -1253,6 +1259,7 @@ function renderOverview(): string {
       agentSearch: state.agentCenterSearch,
       connectionTab: state.connectionPreviewTab,
       experimentHandoffAppName: state.experimentHandoffAppName,
+      workbenchDraft: state.workbenchDraft,
     })}
     <section class="legacy-surface-divider"><span>EXISTING PAPER / RUNTIME SURFACE</span><p>${tr("下方保留既有运行控制台；其真实状态与产品预览严格分开。", "The existing runtime console remains below; its real state is strictly separate from the product preview.")}</p></section>
     ${renderAgentIdentity()}
@@ -1550,6 +1557,7 @@ function strategyPreviewContext() {
     agentSearch: state.agentCenterSearch,
     connectionTab: state.connectionPreviewTab,
     experimentHandoffAppName: state.experimentHandoffAppName,
+    workbenchDraft: state.workbenchDraft,
   };
 }
 
@@ -1577,7 +1585,7 @@ function renderExperiment(): string {
 }
 
 function renderTradeCenter(): string {
-  return renderTradeCenterPreview(state.locale);
+  return renderTradeCenterPreview(state.locale, state.simulationDialogueId);
 }
 
 function renderActivity(): string {
@@ -2289,6 +2297,7 @@ function bindEvents(): void {
         scenarioId,
         initialProposalByScenario[scenarioId] ?? "hk-quality-trend",
       );
+      state.workbenchDraft = "";
       render();
     });
   });
@@ -2298,7 +2307,39 @@ function bindEvents(): void {
   });
 
   document.querySelector<HTMLButtonElement>("[data-preview-recommend]")?.addEventListener("click", () => {
-    showToast("已根据当前描述刷新推荐方案", "Recommendation refreshed from the current description");
+    const prompt = document.querySelector<HTMLTextAreaElement>("[data-workbench-prompt]")?.value.trim() ?? "";
+    if (!prompt) {
+      showToast("请先描述策略目标", "Describe the strategy goal first");
+      document.querySelector<HTMLTextAreaElement>("[data-workbench-prompt]")?.focus();
+      return;
+    }
+    const scenarioId = inferWorkbenchScenarioId(prompt);
+    const proposalByScenario: Record<string, string> = {
+      "hk-low-risk": "hk-quality-trend",
+      "us-earnings": "us-earnings-event",
+      "crypto-trend": "crypto-trend-guard",
+    };
+    state.strategyPreview = appendWorkbenchExchange(state.strategyPreview, {
+      scenarioId,
+      proposalId: proposalByScenario[scenarioId] ?? "hk-quality-trend",
+      prompt,
+    });
+    state.workbenchDraft = prompt;
+    render();
+    window.requestAnimationFrame(() => document.querySelector(".workbench-thread")?.scrollTo({ top: 100_000, behavior: "smooth" }));
+    showToast("已在对话中生成新的动态编排方案", "A new dynamic plan was generated in the conversation");
+  });
+
+  document.querySelectorAll<HTMLButtonElement>("[data-simulation-dialogue]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.simulationDialogueId = button.dataset.simulationDialogue ?? "hk-quality-trend";
+      render();
+      document.querySelector(".simulation-dialogue")?.scrollIntoView({ block: "start" });
+    });
+  });
+
+  document.querySelector<HTMLButtonElement>("[data-preview-validation]")?.addEventListener("click", () => {
+    showToast("预上线检查与回测将在下一阶段接入", "Preflight and backtest checks will be connected in the next stage");
   });
 
   document.querySelectorAll<HTMLButtonElement>("[data-preview-proposal]").forEach((button) => {

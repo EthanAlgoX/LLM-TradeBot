@@ -33,6 +33,15 @@ export interface StrategyAppPreviewState {
   selectedProposalId: string;
   selectedAppId: string;
   createdCount: number;
+  workbenchExchanges: readonly WorkbenchExchange[];
+  nextWorkbenchExchange: number;
+}
+
+export interface WorkbenchExchange {
+  id: number;
+  scenarioId: string;
+  proposalId: string;
+  prompt?: string;
 }
 
 export interface SimulationStartIntent {
@@ -91,6 +100,8 @@ export function createInitialStrategyAppPreviewState(): StrategyAppPreviewState 
     selectedProposalId: "hk-quality-trend",
     selectedAppId: initialApps[0]!.id,
     createdCount: 0,
+    workbenchExchanges: [{ id: 1, scenarioId: "hk-low-risk", proposalId: "hk-quality-trend" }],
+    nextWorkbenchExchange: 2,
   };
 }
 
@@ -100,6 +111,22 @@ export function selectPreviewScenario(
   proposalId: string,
 ): StrategyAppPreviewState {
   return { ...state, selectedScenarioId: scenarioId, selectedProposalId: proposalId };
+}
+
+export function appendWorkbenchExchange(
+  state: StrategyAppPreviewState,
+  exchange: Omit<WorkbenchExchange, "id">,
+): StrategyAppPreviewState {
+  return {
+    ...state,
+    selectedScenarioId: exchange.scenarioId,
+    selectedProposalId: exchange.proposalId,
+    workbenchExchanges: [
+      ...state.workbenchExchanges,
+      { ...exchange, id: state.nextWorkbenchExchange },
+    ].slice(-4),
+    nextWorkbenchExchange: state.nextWorkbenchExchange + 1,
+  };
 }
 
 export function selectPreviewProposal(

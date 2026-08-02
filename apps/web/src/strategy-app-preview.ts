@@ -24,6 +24,7 @@ export interface StrategyPreviewRenderContext {
   agentSearch: string;
   connectionTab: ConnectionPreviewTab;
   experimentHandoffAppName?: string;
+  workbenchDraft: string;
 }
 
 type Copy = { zh: string; en: string };
@@ -58,10 +59,33 @@ type Agent = {
   version: string;
   refs: number;
 };
+type WorkbenchNode = {
+  id: string;
+  kind: AgentCategory;
+  name: Copy;
+  description: Copy;
+  downstream: string[];
+};
+type SimulationMessage = {
+  id: string;
+  cycle: number;
+  agent: Copy;
+  completedAt: string;
+  summary: Copy;
+  sourceIds: string[];
+  status: "success" | "fallback";
+};
 
 const copy = (locale: PreviewLocale, value: Copy): string => locale === "zh-CN" ? value.zh : value.en;
 const esc = (value: string): string => value.replace(/[&<>"']/gu, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" })[character]!);
 const t = (locale: PreviewLocale, zh: string, en: string): string => locale === "zh-CN" ? zh : en;
+
+export function inferWorkbenchScenarioId(prompt: string): string {
+  const normalized = prompt.toLowerCase();
+  if (/(btc|eth|crypto|bitcoin|加密|币圈|资金费率)/u.test(normalized)) return "crypto-trend";
+  if (/(us stock|u\.s\.|美股|nasdaq|nyse|earnings|财报事件)/u.test(normalized)) return "us-earnings";
+  return "hk-low-risk";
+}
 
 const proposals: readonly Proposal[] = [
   {
@@ -151,66 +175,94 @@ export function renderStrategyAdvisor(context: StrategyPreviewRenderContext): st
     <section class="proposal-section" aria-labelledby="proposal-title"><header><div><span>RECOMMENDATIONS · SAMPLE</span><h2 id="proposal-title">${t(locale, "Strategy App Proposal", "Strategy App proposals")}</h2></div><small>${t(locale, "推荐基于演示场景，不是模型输出或策略匹配结果。", "Suggestions are scenario samples, not model output or strategy-matching results.")}</small></header><div class="proposal-grid">${scenarioProposals.map((proposal) => renderProposalCard(locale, proposal)).join("")}</div></section>`;
 }
 
-function workbenchFlow(locale: PreviewLocale, scenarioId: string): Array<[string, string, string]> {
+function workbenchFlow(scenarioId: string): WorkbenchNode[] {
   if (scenarioId === "us-earnings") {
     return [
-      ["INPUT", t(locale, "美股财报输入", "US earnings input"), t(locale, "财报日历与公告", "Calendar + filings")],
-      ["ANALYSIS", t(locale, "事件分析", "Event analysis"), t(locale, "识别可验证事件窗口", "Find verifiable event windows")],
-      ["DECISION", t(locale, "交易决策", "Trade decision"), t(locale, "生成限时行动建议", "Create time-bounded advice")],
-      ["REFLECTION", t(locale, "风险反思", "Risk reflection"), t(locale, "检查跳空与流动性", "Review gap and liquidity risk")],
+      { id: "event-input", kind: "input", name: { zh: "财报事件输入", en: "Earnings Event Input" }, description: { zh: "整理财报日历与公告时间", en: "Normalizes calendar and filing times" }, downstream: ["event-analysis", "liquidity-analysis"] },
+      { id: "event-analysis", kind: "analysis", name: { zh: "事件窗口分析", en: "Event Window Analysis" }, description: { zh: "识别可验证的事件窗口", en: "Finds verifiable event windows" }, downstream: ["event-decision"] },
+      { id: "liquidity-analysis", kind: "analysis", name: { zh: "流动性分析", en: "Liquidity Analysis" }, description: { zh: "检查盘前盘后成交约束", en: "Checks extended-hours constraints" }, downstream: ["event-decision"] },
+      { id: "event-decision", kind: "decision", name: { zh: "限时决策", en: "Time-bounded Decision" }, description: { zh: "汇总事件与流动性证据", en: "Combines event and liquidity evidence" }, downstream: ["event-reflection"] },
+      { id: "event-reflection", kind: "reflection", name: { zh: "跳空风险反思", en: "Gap-risk Reflection" }, description: { zh: "复核跳空风险与策略失效", en: "Reviews gap risk and strategy expiry" }, downstream: [] },
     ];
   }
   if (scenarioId === "crypto-trend") {
     return [
-      ["INPUT", t(locale, "加密行情输入", "Crypto market input"), t(locale, "价格、成交量与资金费率", "Price, volume, and funding")],
-      ["ANALYSIS", t(locale, "趋势分析", "Trend analysis"), t(locale, "识别趋势与流动性", "Read trend and liquidity")],
-      ["DECISION", t(locale, "交易决策", "Trade decision"), t(locale, "输出受约束的方向建议", "Produce constrained direction advice")],
-      ["REFLECTION", t(locale, "风险反思", "Risk reflection"), t(locale, "复核数据质量与敞口", "Review data quality and exposure")],
+      { id: "crypto-market", kind: "input", name: { zh: "加密行情输入", en: "Crypto Market Input" }, description: { zh: "整理价格与成交量", en: "Structures price and volume" }, downstream: ["trend-analysis", "liquidity-analysis"] },
+      { id: "funding-input", kind: "input", name: { zh: "资金费率输入", en: "Funding Input" }, description: { zh: "独立标记资金费率与缺口", en: "Separates funding and missing data" }, downstream: ["liquidity-analysis"] },
+      { id: "trend-analysis", kind: "analysis", name: { zh: "趋势分析", en: "Trend Analysis" }, description: { zh: "判断趋势方向与持续性", en: "Reads direction and persistence" }, downstream: ["crypto-decision"] },
+      { id: "liquidity-analysis", kind: "analysis", name: { zh: "流动性分析", en: "Liquidity Analysis" }, description: { zh: "检查滑点与资金费率风险", en: "Reviews slippage and funding risk" }, downstream: ["crypto-decision"] },
+      { id: "crypto-decision", kind: "decision", name: { zh: "交易决策", en: "Trade Decision" }, description: { zh: "输出受约束的方向建议", en: "Produces constrained direction advice" }, downstream: ["crypto-reflection"] },
+      { id: "crypto-reflection", kind: "reflection", name: { zh: "风险反思", en: "Risk Reflection" }, description: { zh: "复核数据质量与敞口", en: "Reviews data quality and exposure" }, downstream: [] },
     ];
   }
   return [
-    ["INPUT", t(locale, "港股行情与财报输入", "HK market + filing input"), t(locale, "整理日线与财报事实", "Prepare daily bars and filings")],
-    ["ANALYSIS", t(locale, "质量趋势分析", "Quality trend analysis"), t(locale, "筛选基本面与趋势", "Filter quality and trend")],
-    ["DECISION", t(locale, "交易决策", "Trade decision"), t(locale, "生成低换手建议", "Create low-turnover advice")],
-    ["REFLECTION", t(locale, "风险反思", "Risk reflection"), t(locale, "检查集中度与数据缺口", "Review concentration and data gaps")],
+    { id: "hk-market", kind: "input", name: { zh: "港股行情输入", en: "HK Market Input" }, description: { zh: "整理日线与成交量", en: "Structures daily bars and volume" }, downstream: ["quality-analysis", "trend-analysis"] },
+    { id: "hk-filing", kind: "input", name: { zh: "财报输入", en: "Filing Input" }, description: { zh: "提取财报质量事实", en: "Extracts earnings-quality facts" }, downstream: ["quality-analysis"] },
+    { id: "quality-analysis", kind: "analysis", name: { zh: "质量分析", en: "Quality Analysis" }, description: { zh: "筛选基本面与财报变化", en: "Filters fundamentals and filing changes" }, downstream: ["hk-decision"] },
+    { id: "trend-analysis", kind: "analysis", name: { zh: "趋势分析", en: "Trend Analysis" }, description: { zh: "判断趋势与换手节奏", en: "Reads trend and turnover cadence" }, downstream: ["hk-decision"] },
+    { id: "hk-decision", kind: "decision", name: { zh: "低换手决策", en: "Low-turnover Decision" }, description: { zh: "合并质量与趋势证据", en: "Combines quality and trend evidence" }, downstream: ["hk-reflection"] },
+    { id: "hk-reflection", kind: "reflection", name: { zh: "风险反思", en: "Risk Reflection" }, description: { zh: "检查集中度与数据缺口", en: "Reviews concentration and data gaps" }, downstream: [] },
   ];
+}
+
+function renderWorkbenchFlow(locale: PreviewLocale, scenarioId: string): string {
+  const nodes = workbenchFlow(scenarioId);
+  const nodeById = new Map(nodes.map((node) => [node.id, node]));
+  const stages: Array<[AgentCategory, string, string]> = [
+    ["input", "输入", "INPUT"],
+    ["analysis", "分析", "ANALYSIS"],
+    ["decision", "决策", "DECISION"],
+    ["reflection", "反思", "REFLECTION"],
+  ];
+  return `<div class="chat-agent-flow" aria-label="${t(locale, "推荐 Agent 编排关系", "Recommended Agent topology")}">
+    ${stages.map(([kind, zh, en]) => {
+      const stageNodes = nodes.filter((node) => node.kind === kind);
+      return `<section class="chat-agent-stage chat-agent-stage--${kind}"><header><span>${t(locale, zh, en)}</span><small>${stageNodes.length} AGENT${stageNodes.length === 1 ? "" : "S"}</small></header>${stageNodes.map((node) => {
+        const downstream = node.downstream.map((id) => nodeById.get(id)).filter((item): item is WorkbenchNode => Boolean(item));
+        return `<article><strong>${esc(copy(locale, node.name))}</strong><p>${esc(copy(locale, node.description))}</p><footer><span>→</span>${downstream.length ? downstream.map((item) => `<b>${esc(copy(locale, item.name))}</b>`).join("") : `<b>${t(locale, "流程结束", "End of flow")}</b>`}</footer></article>`;
+      }).join("")}</section>`;
+    }).join("")}
+  </div>`;
 }
 
 export function renderStrategyWorkbench(context: StrategyPreviewRenderContext): string {
   const { locale, preview } = context;
   const scenario = scenarios.find((item) => item.id === preview.selectedScenarioId) ?? scenarios[0]!;
-  const proposal = proposalById(scenario.proposalIds[0]!);
-  const generatedApp = preview.apps.find((app) => app.origin === "PROTOTYPE" && app.proposalId === proposal.id);
-  const flow = workbenchFlow(locale, scenario.id);
+  const composerValue = context.workbenchDraft || copy(locale, scenario.request);
   return `${previewHeader(
     locale,
     "STRATEGY WORKBENCH · PROTOTYPE",
     t(locale, "编排工作台", "Strategy Workbench"),
-    t(locale, "用自然语言描述目标，系统从 Agent 中心推荐一套可理解、可应用的多 Agent 方案。", "Describe the goal in natural language. The system recommends an understandable Multi-Agent plan from the Agent Center."),
+    t(locale, "整个工作台就是一段策略对话。每次回复都会带回一张新的 Agent 编排方案，不使用固定流程画布。", "The workbench is one strategy conversation. Every reply carries a new Agent plan instead of relying on a fixed workflow canvas."),
     badge("SAMPLE"),
   )}
-    <section class="workbench-shell">
-      <div class="workbench-brief">
-        <header><span>${t(locale, "你的想法", "Your idea")}</span><strong>${t(locale, "先说目标，不用画工作流", "Describe the goal, not the workflow")}</strong></header>
-        <div class="workbench-scenarios" aria-label="${t(locale, "示例策略需求", "Sample strategy requests")}">
-          ${scenarios.map((item) => `<button type="button" data-preview-scenario="${item.id}" aria-pressed="${item.id === scenario.id}">${esc(copy(locale, item.title))}</button>`).join("")}
-        </div>
-        <label class="workbench-prompt"><span>${t(locale, "策略描述", "Strategy description")}</span><textarea rows="6">${esc(copy(locale, scenario.request))}</textarea></label>
-        <button type="button" class="primary-action" data-preview-recommend>${t(locale, "生成推荐方案", "Generate recommendation")}</button>
-        <small>SAMPLE · ${t(locale, "当前不调用模型，也不会启动模拟", "No model call or simulation start in this preview")}</small>
+    <section class="workbench-conversation" aria-label="${t(locale, "策略编排对话", "Strategy orchestration conversation")}">
+      <header class="workbench-conversation__bar"><div><span></span><strong>${t(locale, "策略助手在线", "Strategy Advisor online")}</strong></div><small>${t(locale, "只推荐 Agent 中心已有能力", "Catalog Agents only")}</small></header>
+      <div class="workbench-thread" role="log" aria-live="polite">
+        <article class="workbench-message is-assistant is-intro"><div class="workbench-message__avatar">AI</div><div><header><strong>${t(locale, "策略助手", "Strategy Advisor")}</strong><time>${t(locale, "开始对话", "Conversation started")}</time></header><p>${t(locale, "告诉我你想做哪个市场、什么类型的策略和风险偏好。我会推荐 Agent 组合，但不会直接启动模拟或下单。", "Tell me the market, strategy style, and risk preference. I will recommend an Agent combination without starting a simulation or placing an order.")}</p></div></article>
+        ${preview.workbenchExchanges.map((exchange, index) => {
+          const exchangeScenario = scenarios.find((item) => item.id === exchange.scenarioId) ?? scenarios[0]!;
+          const proposal = proposalById(exchange.proposalId);
+          const prompt = exchange.prompt || copy(locale, exchangeScenario.request);
+          const generatedApp = preview.apps.find((app) => app.origin === "PROTOTYPE" && app.proposalId === proposal.id);
+          return `<article class="workbench-message is-user"><div><header><strong>${t(locale, "你", "You")}</strong><time>${t(locale, `第 ${index + 1} 次需求`, `Request ${index + 1}`)}</time></header><p>${esc(prompt)}</p></div><div class="workbench-message__avatar">ME</div></article>
+            <article class="workbench-message is-assistant"><div class="workbench-message__avatar">AI</div><div><header><strong>${t(locale, "策略助手", "Strategy Advisor")}</strong><time>${t(locale, `推荐 ${index + 1}`, `Recommendation ${index + 1}`)}</time></header><p>${esc(copy(locale, proposal.fit))}</p>
+              <section class="workbench-plan" aria-label="${t(locale, "编排好的策略方案", "Orchestrated strategy plan")}">
+                <header><div><span>${t(locale, "推荐方案", "Recommended plan")}</span><h2>${esc(proposal.name)}</h2></div><span class="preview-evidence">SAMPLE · DYNAMIC</span></header>
+                ${renderWorkbenchFlow(locale, exchangeScenario.id)}
+                <dl class="blueprint-facts"><div><dt>${t(locale, "市场", "Market")}</dt><dd>${esc(proposal.market)}</dd></div><div><dt>${t(locale, "运行频率", "Frequency")}</dt><dd>${esc(proposal.frequency)}</dd></div><div><dt>${t(locale, "风险限制", "Risk")}</dt><dd>${esc(proposal.risk)}</dd></div><div><dt>${t(locale, "使用能力", "Capabilities")}</dt><dd>${workbenchFlow(exchangeScenario.id).length} Agents · ${t(locale, "来自 Agent 中心", "from Agent Center")}</dd></div></dl>
+                <footer class="blueprint-action"><div><strong>${generatedApp ? t(locale, "方案已应用为策略草案", "Plan applied as a strategy draft") : t(locale, "是否应用这个编排方案？", "Apply this orchestrated plan?")}</strong><small>${generatedApp ? `${esc(generatedApp.name)} · ${esc(generatedApp.version)} · PAGE MEMORY` : t(locale, "应用只生成候选系统，不启动 Runtime", "Apply creates a candidate system without starting Runtime")}</small></div><button type="button" class="primary-action" data-preview-create="${proposal.id}">${generatedApp ? t(locale, "生成新版本", "Create new version") : t(locale, "应用此方案", "Apply this plan")}</button></footer>
+                ${generatedApp ? `<div class="workbench-gates"><div><span>${t(locale, "预上线检查", "Preflight")}</span><strong>${t(locale, "待运行", "PENDING")}</strong></div><div><span>${t(locale, "回测检查", "Backtest")}</span><strong>${t(locale, "待运行", "PENDING")}</strong></div><div><span>${t(locale, "模拟槽位", "Simulation slot")}</span><strong>${t(locale, "尚未加入", "NOT ASSIGNED")}</strong></div><button type="button" class="secondary-action" data-preview-validation>${t(locale, "进入检查 · 预览", "Open checks · preview")}</button></div>` : ""}
+              </section>
+            </div></article>`;
+        }).join("")}
       </div>
-
-      <div class="workbench-blueprint">
-        <header><div><span>${t(locale, "推荐方案", "Recommended plan")}</span><h2>${esc(proposal.name)}</h2><p>${esc(copy(locale, proposal.fit))}</p></div><span class="preview-evidence">SAMPLE</span></header>
-        <div class="agent-blueprint" aria-label="${t(locale, "推荐 Agent 流程", "Recommended Agent flow")}">
-          ${flow.map(([kind, name, description], index) => `<article><span>${index + 1} · ${kind}</span><strong>${esc(name)}</strong><small>${esc(description)}</small></article>`).join("")}
-        </div>
-        <dl class="blueprint-facts"><div><dt>${t(locale, "市场", "Market")}</dt><dd>${esc(proposal.market)}</dd></div><div><dt>${t(locale, "运行频率", "Frequency")}</dt><dd>${esc(proposal.frequency)}</dd></div><div><dt>${t(locale, "风险限制", "Risk")}</dt><dd>${esc(proposal.risk)}</dd></div><div><dt>${t(locale, "默认模型", "Default model")}</dt><dd>DeepSeek Chat · SAMPLE</dd></div></dl>
-        <div class="blueprint-action"><div><strong>${generatedApp ? t(locale, "方案已经生成", "Plan generated") : t(locale, "确认后生成多 Agent 系统", "Confirm to generate the Multi-Agent system")}</strong><small>${generatedApp ? `${esc(generatedApp.name)} · ${esc(generatedApp.version)} · PAGE MEMORY` : t(locale, "只创建预览方案，不调用 Runtime", "Creates a preview plan only; Runtime is untouched")}</small></div><button type="button" class="primary-action" data-preview-create="${proposal.id}">${generatedApp ? t(locale, "重新生成版本", "Generate another version") : t(locale, "应用此方案", "Apply this plan")}</button></div>
-      </div>
-    </section>
-
-    <section class="saved-strategies" aria-labelledby="saved-strategies-title"><header><div><span>${t(locale, "已保存方案", "Saved plans")}</span><h2 id="saved-strategies-title">${t(locale, "最近的多 Agent 系统", "Recent Multi-Agent systems")}</h2></div><small>${t(locale, "集中在工作台中，不再单独设置“我的策略应用”页面。", "Kept inside the workbench; there is no separate My Strategy Apps page.")}</small></header><div>${preview.apps.slice(0, 3).map((app) => `<article><div>${badge(app.origin)}<strong>${esc(app.name)}</strong></div><span>${esc(app.market)}</span><code>${esc(app.version)}</code><small>${app.status}</small></article>`).join("")}</div></section>`;
+      <footer class="workbench-composer">
+        <div class="workbench-scenarios" aria-label="${t(locale, "示例策略需求", "Sample strategy requests")}">${scenarios.map((item) => `<button type="button" data-preview-scenario="${item.id}" aria-pressed="${item.id === scenario.id}">${esc(copy(locale, item.title))}</button>`).join("")}</div>
+        <label class="workbench-prompt"><span>${t(locale, "继续描述或修改策略", "Describe or revise the strategy")}</span><textarea rows="4" data-workbench-prompt>${esc(composerValue)}</textarea></label>
+        <div class="workbench-composer__actions"><small>SAMPLE · ${t(locale, "规则匹配预览，不调用模型", "Rule-matched preview; no model call")}</small><button type="button" class="primary-action" data-preview-recommend>${t(locale, "发送并生成方案", "Send and generate plan")}</button></div>
+      </footer>
+    </section>`;
 }
 
 function renderProposalCard(locale: PreviewLocale, proposal: Proposal): string {
@@ -272,7 +324,43 @@ export function renderExperimentHandoff(locale: PreviewLocale, appName?: string)
   return `<section class="experiment-handoff"><div><span>STRATEGY APP HANDOFF · ${appName ? "PROTOTYPE" : "NOT CONNECTED"}</span><h2>${appName ? esc(appName) : t(locale, "Strategy App 未来比较对象", "Strategy App future comparison object")}</h2><p>${appName ? t(locale, "此 handoff 只提供可见的页面上下文，不会启动 Backtest、Walk-Forward、Candidate 或 Runtime。", "This handoff carries visible page context only; it will not start Backtest, Walk-Forward, Candidate, or Runtime.") : t(locale, "从 Strategy App 详情进入后，所选应用会在此显示为页面内存上下文。", "When entered from Strategy App detail, the selected app appears here as page-memory context.")}</p></div><code>PROTOTYPE / NOT CONNECTED</code></section>`;
 }
 
-export function renderTradeCenterPreview(locale: PreviewLocale): string {
+const simulationDialogues: Record<string, readonly SimulationMessage[]> = {
+  "hk-quality-trend": [
+    { id: "hk-18-market", cycle: 18, agent: { zh: "港股行情输入 Agent", en: "HK Market Input Agent" }, completedAt: "2026-08-03T09:31:08+08:00", summary: { zh: "已完成 0700.HK 日线与成交量窗口清洗；价格位于 20 日均线上方，但量能只达到近 20 日中位数的 0.91 倍。", en: "Cleaned the daily and volume windows for 0700.HK. Price is above the 20-day average, while volume is 0.91× its 20-day median." }, sourceIds: [], status: "success" },
+    { id: "hk-18-filing", cycle: 18, agent: { zh: "财报输入 Agent", en: "Filing Input Agent" }, completedAt: "2026-08-03T09:31:12+08:00", summary: { zh: "最近一期收入与自由现金流字段完整；未发现本轮新增财报，沿用已登记快照并标记时效。", en: "The latest revenue and free-cash-flow fields are complete. No new filing arrived this round, so the registered snapshot remains with freshness marked." }, sourceIds: [], status: "success" },
+    { id: "hk-18-quality", cycle: 18, agent: { zh: "质量分析 Agent", en: "Quality Analysis Agent" }, completedAt: "2026-08-03T09:31:18+08:00", summary: { zh: "盈利质量保持稳定，现金流未恶化；由于财报不是本轮新增信息，质量信号置信度维持 0.72。", en: "Earnings quality remains stable and cash flow has not deteriorated. Since the filing is not new this round, confidence stays at 0.72." }, sourceIds: ["hk-18-market", "hk-18-filing"], status: "success" },
+    { id: "hk-18-trend", cycle: 18, agent: { zh: "趋势分析 Agent", en: "Trend Analysis Agent" }, completedAt: "2026-08-03T09:31:19+08:00", summary: { zh: "中期上行结构仍在，但短期成交量确认不足，不建议追涨。", en: "The medium-term uptrend remains intact, but short-term volume confirmation is insufficient; avoid chasing." }, sourceIds: ["hk-18-market"], status: "success" },
+    { id: "hk-18-decision", cycle: 18, agent: { zh: "低换手决策 Agent", en: "Low-turnover Decision Agent" }, completedAt: "2026-08-03T09:31:25+08:00", summary: { zh: "综合质量与趋势证据：继续观察 0700.HK，维持现有模拟仓位，本轮不加仓。", en: "Combined quality and trend evidence: keep watching 0700.HK, retain the simulated position, and do not add this round." }, sourceIds: ["hk-18-quality", "hk-18-trend"], status: "success" },
+    { id: "hk-18-reflection", cycle: 18, agent: { zh: "风险反思 Agent", en: "Risk Reflection Agent" }, completedAt: "2026-08-03T09:31:29+08:00", summary: { zh: "决策未忽略数据时效与成交量缺口。候选经验：只有量能恢复到阈值以上，才重新评估加仓。", en: "The decision accounted for freshness and the volume gap. Lesson candidate: reconsider adding only after volume recovers above threshold." }, sourceIds: ["hk-18-decision"], status: "success" },
+    { id: "hk-19-market", cycle: 19, agent: { zh: "港股行情输入 Agent", en: "HK Market Input Agent" }, completedAt: "2026-08-03T10:01:06+08:00", summary: { zh: "新一轮价格变化有限，成交量确认仍未达到策略阈值。", en: "Price movement is limited in the new round and volume confirmation remains below the strategy threshold." }, sourceIds: ["hk-18-reflection"], status: "success" },
+    { id: "hk-19-decision", cycle: 19, agent: { zh: "低换手决策 Agent", en: "Low-turnover Decision Agent" }, completedAt: "2026-08-03T10:01:20+08:00", summary: { zh: "维持 HOLD；没有新的开仓或加仓动作。", en: "Maintain HOLD; no new opening or add action." }, sourceIds: ["hk-19-market"], status: "success" },
+  ],
+  "us-earnings-event": [
+    { id: "us-7-event", cycle: 7, agent: { zh: "财报事件输入 Agent", en: "Earnings Event Input Agent" }, completedAt: "2026-08-03T09:35:04+08:00", summary: { zh: "确认下一财报窗口尚未进入策略观察期；公告时间来自已登记 Sample 日历。", en: "The next earnings window has not entered the strategy observation period. The announcement time comes from the registered sample calendar." }, sourceIds: [], status: "success" },
+    { id: "us-7-analysis", cycle: 7, agent: { zh: "事件窗口分析 Agent", en: "Event Window Analysis Agent" }, completedAt: "2026-08-03T09:35:11+08:00", summary: { zh: "当前不满足事件触发条件，暂不构造方向信号。", en: "Current conditions do not meet the event trigger, so no directional signal is formed." }, sourceIds: ["us-7-event"], status: "success" },
+    { id: "us-7-liquidity", cycle: 7, agent: { zh: "流动性分析 Agent", en: "Liquidity Analysis Agent" }, completedAt: "2026-08-03T09:35:12+08:00", summary: { zh: "盘后流动性字段未连接，按策略规则降级为只观察。", en: "After-hours liquidity is not connected, so the strategy falls back to observe-only." }, sourceIds: ["us-7-event"], status: "fallback" },
+    { id: "us-7-decision", cycle: 7, agent: { zh: "限时决策 Agent", en: "Time-bounded Decision Agent" }, completedAt: "2026-08-03T09:35:18+08:00", summary: { zh: "等待下一财报窗口；本轮不建立模拟仓位。", en: "Wait for the next earnings window; do not open a simulated position this round." }, sourceIds: ["us-7-analysis", "us-7-liquidity"], status: "success" },
+    { id: "us-7-reflection", cycle: 7, agent: { zh: "跳空风险反思 Agent", en: "Gap-risk Reflection Agent" }, completedAt: "2026-08-03T09:35:23+08:00", summary: { zh: "只观察符合缺失数据规则。上线前必须补齐盘后流动性来源并重新回测。", en: "Observe-only follows the missing-data rule. Extended-hours liquidity must be connected and backtested before release." }, sourceIds: ["us-7-decision"], status: "success" },
+  ],
+};
+
+function renderSimulationDialogue(locale: PreviewLocale, dialogueId: string): string {
+  const messages = simulationDialogues[dialogueId] ?? simulationDialogues["hk-quality-trend"]!;
+  const byId = new Map(messages.map((message) => [message.id, message]));
+  const children = new Map<string, SimulationMessage[]>();
+  for (const message of messages) for (const sourceId of message.sourceIds) children.set(sourceId, [...(children.get(sourceId) ?? []), message]);
+  const cycles = [...new Set(messages.map((message) => message.cycle))].sort((left, right) => left - right);
+  const anchors = new Map(messages.map((message) => [message.id, `preview-${message.id}`]));
+  const formatTime = (value: string): string => new Date(value).toLocaleString(locale === "zh-CN" ? "zh-CN" : "en-US", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });
+  const renderMessage = (message: SimulationMessage): string => {
+    const parents = message.sourceIds.map((id) => byId.get(id)).filter((item): item is SimulationMessage => Boolean(item));
+    const next = children.get(message.id) ?? [];
+    return `<article class="runtime-agent-room-message" id="${anchors.get(message.id)}" data-status="${message.status}"><div class="runtime-agent-room-message__avatar" aria-hidden="true">${esc(copy(locale, message.agent).slice(0, 1).toUpperCase())}</div><div class="runtime-agent-room-message__turn"><header><strong>${esc(copy(locale, message.agent))}</strong><span class="runtime-agent-room-message__cycle">${t(locale, `第 ${message.cycle} 轮`, `ROUND ${message.cycle}`)}</span><time datetime="${esc(message.completedAt)}">${t(locale, "生成于", "Generated")} ${esc(formatTime(message.completedAt))}</time><span>${message.status === "success" ? t(locale, "完成", "COMPLETE") : t(locale, "降级", "FALLBACK")}</span></header>${parents.length ? `<div class="runtime-agent-room-message__reply">↳ ${t(locale, "回复", "Replying to")} ${parents.map((parent) => `<a href="#${anchors.get(parent.id)}">${esc(copy(locale, parent.agent))}</a>`).join(t(locale, "、", ", "))}</div>` : ""}<div class="runtime-agent-room-message__bubble"><p>${esc(copy(locale, message.summary))}</p></div><footer><span>→ ${t(locale, "发送给", "Send to")}</span>${next.length ? next.map((child) => `<a href="#${anchors.get(child.id)}">${esc(copy(locale, child.agent))}</a>`).join("") : `<span>${t(locale, "无下游 Agent", "No downstream Agent")}</span>`}</footer></div></article>`;
+  };
+  return `<section class="simulation-dialogue" aria-labelledby="simulation-dialogue-title"><header><div><span>${t(locale, "多轮运行 · 子 Agent 对话", "MULTI-ROUND · SUB-AGENT DIALOGUE")}</span><h2 id="simulation-dialogue-title">${t(locale, "模拟策略正在怎样思考", "How the simulation is reasoning")}</h2><p>${t(locale, "像聊天记录一样查看每个子 Agent 在哪一轮输出、回复了谁、以及把结果交给哪个下游 Agent。", "Read each sub-Agent output like a chat: its round, upstream reply, timestamp, and downstream recipient.")}</p></div><span class="preview-evidence">SAMPLE · ARTIFACT SHAPE</span></header><nav aria-label="${t(locale, "选择模拟策略对话", "Choose a simulation dialogue")}"><button type="button" data-simulation-dialogue="hk-quality-trend" aria-pressed="${dialogueId === "hk-quality-trend"}">SLOT 01 · HK Quality Trend</button><button type="button" data-simulation-dialogue="us-earnings-event" aria-pressed="${dialogueId === "us-earnings-event"}">SLOT 02 · US Earnings Event</button></nav><div class="runtime-agent-room" role="log"><div class="runtime-agent-room__status"><span></span>${t(locale, "Agent 语义频道", "Agent semantic channel")} · ${cycles.length} ${t(locale, "轮", "rounds")} · ${messages.length} artifacts</div>${cycles.map((cycle, index) => `<section class="runtime-agent-round ${index === cycles.length - 1 ? "is-current" : ""}"><header class="runtime-agent-round__marker"><span>${t(locale, `第 ${cycle} 轮`, `ROUND ${cycle}`)}</span><strong>${index === cycles.length - 1 ? t(locale, "最新一轮", "LATEST ROUND") : t(locale, "已完成", "COMPLETED")}</strong><small>${messages.filter((message) => message.cycle === cycle).length} ${t(locale, "条 Agent 输出", "AGENT MESSAGES")}</small></header>${messages.filter((message) => message.cycle === cycle).map(renderMessage).join("")}</section>`).join("")}</div></section>`;
+}
+
+export function renderTradeCenterPreview(locale: PreviewLocale, dialogueId = "hk-quality-trend"): string {
   const slots = [
     { id: "01", name: "HK Quality Trend", version: "v0.3", status: t(locale, "运行中", "Running"), returnValue: "+2.4%", drawdown: "-1.8%", decision: t(locale, "继续观察 0700.HK，暂不加仓", "Hold 0700.HK; no add"), color: "accent" },
     { id: "02", name: "US Earnings Event", version: "v0.2", status: t(locale, "运行中", "Running"), returnValue: "+0.8%", drawdown: "-2.2%", decision: t(locale, "等待下一财报窗口", "Wait for the next earnings window"), color: "context" },
@@ -294,7 +382,8 @@ export function renderTradeCenterPreview(locale: PreviewLocale): string {
       ${slots.map((slot) => `<article class="simulation-slot simulation-slot--${slot.color}"><header><span>SLOT ${slot.id}</span><strong>${esc(slot.status)}</strong></header><h3>${slot.name} <code>${slot.version}</code></h3><div class="slot-metrics"><div><span>${t(locale, "收益", "Return")}</span><strong>${slot.returnValue}</strong></div><div><span>${t(locale, "最大回撤", "Max drawdown")}</span><strong>${slot.drawdown}</strong></div></div><p><span>${t(locale, "最近决策", "Latest decision")}</span>${esc(slot.decision)}</p><footer><small>PAPER · SAMPLE</small><button type="button" class="secondary-action" disabled>${t(locale, "查看详情 · 预览", "View details · preview")}</button></footer></article>`).join("")}
       <article class="simulation-slot simulation-slot--empty"><header><span>SLOT 03</span><strong>${t(locale, "空闲", "Available")}</strong></header><div><h3>${t(locale, "运行另一个策略", "Run another strategy")}</h3><p>${t(locale, "先在编排工作台生成方案，再放入这个模拟槽位。", "Generate a plan in the workbench, then place it in this slot.")}</p></div><button type="button" class="primary-action" data-view="orchestration">${t(locale, "去编排工作台", "Open workbench")}</button></article>
     </section>
-    <section class="simulation-safety"><strong>${t(locale, "只有模拟交易", "Simulation only")}</strong><span>runtimeApplied=false · exchangeWriteAllowed=false</span><small>${t(locale, "真实交易入口已从本预览移除", "Live trading is removed from this preview")}</small></section>`;
+    <section class="simulation-safety"><strong>${t(locale, "只有模拟交易", "Simulation only")}</strong><span>runtimeApplied=false · exchangeWriteAllowed=false</span><small>${t(locale, "真实交易入口已从本预览移除", "Live trading is removed from this preview")}</small></section>
+    ${renderSimulationDialogue(locale, dialogueId)}`;
 }
 
 export function renderConnectionSettingsPreview(locale: PreviewLocale, tab: ConnectionPreviewTab): string {

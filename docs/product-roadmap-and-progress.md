@@ -1,6 +1,6 @@
 # TradeBot 产品路线图与当前进度
 
-> 2026-08-02：LOOP-027 已将产品预览收敛为四个一级页面：模拟交易、编排工作台、Agent 中心、连接配置。页面仍是显式 `SAMPLE / PROTOTYPE`，未接入真实推荐、Strategy App 物化、Runtime 或交易服务；M5 Shadow 与 Paper Only 边界未改变。
+> 2026-08-03：LOOP-028 已完成四页预览的两项对话面细化：模拟页恢复多轮子 Agent 语义对话，编排工作台改为对话内返回动态 Agent 拓扑。页面仍是显式 `SAMPLE / PROTOTYPE`，未接入真实推荐、Strategy App 物化、Runtime 或交易服务；M5 Shadow 与 Paper Only 边界未改变。
 
 > 文档角色：当前完成度、剩余缺口和交付顺序的权威快照
 > 最后更新：2026-08-02
@@ -233,6 +233,14 @@ accepted_for_validation
 - 验证：中文 1440×900、英文 820×760 均无横向溢出；应用方案、Reflection 分类、数据源/模型切换通过，Console error 0。`npm run check`、受影响测试 2/2、`npm run build:web`、`git diff --check` 通过。
 - 已清理 7 组、最长超过三小时的历史测试残留进程；它们不是产品服务。完整套件仍暴露既有 `orchestration-copilot` 测试结束后的异步 SQLite 关闭问题，需单独修复后再恢复完整全绿基线。
 - 下一步：`AWAITING_USER_PRODUCT_REVIEW`；用户确认四页结构后再为单页细化生成唯一编号 Loop。
+
+## 2026-08-03：R1 对话面细化预览
+
+- 状态：`PROTOTYPE_ONLY / READY_FOR_USER_REVIEW`。LOOP-028 从 Git 历史中复用原有 Runtime Artifact 对话的语义模型，在模拟页底部恢复轮次、时间、上游回复、并行汇聚和下游 Agent；两个 Sample 模拟策略可切换查看。
+- 编排工作台移除固定左右分栏和常驻右侧 Workflow，改为单一聊天线程。每次自然语言请求均在助手回复中带回独立拓扑，港股、美股财报和加密趋势 Sample 的 Agent 数量与连接关系不同。
+- “应用此方案”仍只创建页面内存 Prototype；应用后仅显示预上线检查、回测和模拟槽位三个待执行门槛，不调用真实检查、Evidence、Runtime 或交易接口。
+- 验证：`npm run check`、`npm run build:web`、受影响状态测试和 `git diff --check` 通过。Agent Chrome 在中文 1440×900 验证两页结构、动态生成 Crypto 新拓扑和应用门槛；820×760 无横向溢出、Simulation Dialogue 切换成功，Console error 为 0。
+- 下一步：继续 `AWAITING_USER_PRODUCT_REVIEW`；优先确认这两个对话面的产品方向，再决定真实后端接入顺序。
 ## 2026-07-31：Production Semantic Candidate Persistence
 
 - 状态：`REAL`。Rule Reflection 已生成并持久化严格 Semantic Candidate，Review 与 Materialization 使用同一 append-only Store。

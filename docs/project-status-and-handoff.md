@@ -1,6 +1,6 @@
 # TradeBot 当前状态与接手说明
 
-> 2026-08-02 接手更新：LOOP-027 已完成 R1 四页简化预览。普通用户只看到模拟交易、编排工作台、Agent 中心和连接配置；所有新内容仍是显式 `SAMPLE / PROTOTYPE / PAGE MEMORY`，M0～M5 后端与 M5 Shadow 边界未修改。当前状态为 `AWAITING_USER_PRODUCT_REVIEW`。
+> 2026-08-03 接手更新：LOOP-028 已在 R1 四页预览上完成模拟/编排对话面细化。模拟页恢复多轮子 Agent 语义对话，编排工作台改为对话内返回动态拓扑；所有新内容仍是显式 `SAMPLE / PROTOTYPE / PAGE MEMORY`，M0～M5 后端与 M5 Shadow 边界未修改。当前状态为 `AWAITING_USER_PRODUCT_REVIEW`。
 
 > 快照日期：2026-08-02
 > 适用仓库：`/Users/hyx/Documents/workspace/tradebot`
@@ -21,7 +21,7 @@
 - 覆盖或回退无关修改
 - 未经明确要求提交 Git
 
-当前最新完成 Loop 是 **R1 四页简化产品预览（LOOP-027）**。它不复用或修改 M4/M5 runtime：模拟曲线、推荐、Agent 和连接状态均是显式 Sample；应用方案只在当前页面内存中创建 Prototype。M5 真实边界继续 fail closed。
+当前最新完成 Loop 是 **R1 对话面细化预览（LOOP-028）**。它只在页面内存中恢复 Runtime Artifact 对话的表达形态，并用规则匹配展示动态推荐拓扑；没有复用或修改 M4/M5 runtime。应用方案只创建 Prototype，M5 真实边界继续 fail closed。
 
 ## 2. 当前可运行链路
 
@@ -185,6 +185,14 @@ API: http://127.0.0.1:8787
 产品预览不启动 Runtime、Worker 或额外后台程序；应用方案仍显示 `runtimeApplied=false`、`exchangeWriteAllowed=false`。受影响的预览状态测试为 2/2 PASS。
 
 浏览器状态：LOOP-027 Agent 直接控制真实 Chrome。中文 1440×900 验证模拟首页、编排工作台和应用方案；中文/英文 820×760 验证 Agent 四分类、连接配置两个 Tab，所有页面 `scrollWidth=clientWidth`，Console error 0。页面已留在中文模拟交易首页。
+
+LOOP-028 R1.1 完成后的最新验证：
+
+- 模拟交易底部复用旧 Runtime Evidence 的 Artifact lineage 表达，两个 Sample 策略均显示 Agent 输出轮次、时间、上游与下游；
+- 编排工作台变为单一聊天线程，修改为 Crypto 需求后追加 `Crypto Trend Guard`，其 6-Agent 拓扑不同于原 HK 方案；
+- 应用 Crypto 方案后出现 Preflight、Backtest、Simulation Slot 三个 Pending 门槛，未启动 Runtime；
+- Agent Chrome 1440×900 与 820×760 均为零横向溢出，US Dialogue 切换成功，Console error 0；
+- `npm run check`、`npm run build:web`、受影响测试和 `git diff --check` 通过。
 
 ## 7. 下一阶段
 
