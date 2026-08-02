@@ -1,6 +1,6 @@
 # TradeBot 当前状态与接手说明
 
-> 2026-08-02 接手更新：LOOP-023 已将 M4 标记为 `COMPLETE`。两个不同 Strategy Version 的 deployment-scoped Paper 实例已通过唯一 `Decision -> Portfolio -> Risk -> Execution` 动作链产生独立事实；Agent Chrome 验证 close-only、刷新、重启恢复、中英文双尺寸与 Paper Only 边界。下一任务为 LOOP-024 的 M5 Shadow 与晋升建议。
+> 2026-08-02 接手更新：LOOP-024 已将 M5 标记为 `COMPLETE`。真实 M4 deployment/run/cycle 持久事实现可被独立、只读 Shadow 记录消费，输出相同 scope Champion/Challenger 的描述性比较和不可执行 Promotion Recommendation；Agent Chrome 验证 A/B 切换、双尺寸、刷新与 Web/API 重启恢复。下一任务仅为 LOOP-025 的 M6 授权门槛准备，未授权 Live、Canary、账户或交易所写入。
 
 > 快照日期：2026-08-01
 > 适用仓库：`/Users/hyx/Documents/workspace/tradebot`
@@ -21,7 +21,7 @@
 - 覆盖或回退无关修改
 - 未经明确要求提交 Git
 
-当前最新完成 Loop 是 **Approved Lesson Semantic Materialization**。它复用现有语义合同，并在缺少完整 Reflection Semantic Candidate 时 fail closed，不从 recommendations 猜测正文或失败模式。
+当前最新完成 Loop 是 **M5 Shadow 与晋升建议**。它不复用或修改 M4 runtime，而是用独立 append-only Shadow facts 读取明确 source run/cycle；证据缺失、fingerprint 漂移或 source scope 模糊均 fail closed，不从 latest 或客户端输入猜测事实。
 
 ## 2. 当前可运行链路
 
@@ -48,6 +48,7 @@ Registered Crypto Preset
 -> Approved Lesson Artifact (Decision Context NOT_APPLIED)
 -> ApprovedReflectionLesson Materialization (production facts currently unavailable)
 -> Shadow Decision Context (NOT_APPLIED)
+-> M5 Shadow snapshot comparison / terminal read-only recommendation (NOT_APPLIED)
 ```
 
 Draft、Review、Handoff 和 Approval 都不会自动修改 Runtime。
@@ -88,6 +89,20 @@ POST /api/orchestration/lesson-candidates/approvals/status
 POST /api/orchestration/lesson-candidates/materializations
 ```
 
+### M5 Shadow
+
+真实只读路由：
+
+```text
+GET  /api/orchestration/paper-deployments/:deploymentId/shadows
+POST /api/orchestration/paper-deployments/:deploymentId/shadows
+```
+
+- POST 只接受 idempotency key 与明确的 source run/cycle；actor、deployment、Champion/Challenger、策略/数据/图/执行/风险 fingerprint、adapter 和 policy 均由服务端解析。
+- M4 `cycle`/`artifact` projection 仅通过精确 fact key 读取。Shadow facts 落在独立的不可更新、不可删除 `shadow_definitions`、`shadow_events`、`shadow_projection_events`。
+- registered `CurrentCryptoReadOnlyShadowAdapter` 没有 Execution Port，`runtimeApplied=false`、`exchangeWriteAllowed=false`、`executionReachable=false`；没有账户、position、order、fill、journal、risk/safety 或 Artifact 写入路径。
+- recommendation 只会是 `insufficient_data`、`observe` 或 `recommend_validation`，并始终 `readOnly=true`、`terminal=true`；它不能批准、部署、替换 Champion、启动、停止、归档、Apply Runtime 或写交易所。
+
 当前行为：
 
 - Comparative Evidence 从 Paper Account 读取真实 closed trade outcome。
@@ -115,6 +130,7 @@ POST /api/orchestration/lesson-candidates/materializations
 - Causal Run/Cycle/Trade Review。
 - Comparative Evidence、Candidate Review、Review History。
 - Contract Validation Handoff 状态与稳定 issue code。
+- M5 Shadow / Promotion assessment：真实 source scope、lineage、data quality/health、evidence gaps、描述性 diff、只读 recommendation 和有限历史分页。
 
 必须区分：
 
@@ -131,21 +147,20 @@ Copilot 没有 Runtime Apply、Start、Pause、Safe Stop 或下单工具。Runti
 
 ## 5. 当前不可用或未闭环
 
-- Approved Lesson 的持久化、Evidence/Approval 和 Decision Context 生产闭环。
 - 通用 Graph Paper Runtime。
 - 第二真实市场垂直切片。
-- 交易所写接口。
+- M6 Live/Canary、账户权限、交易所写接口、自动晋升、Champion 替换或持仓迁移（均未授权）。
 - Slack、Email、Webhook 实际发送适配器。
 
 Comparative Evidence 当前由 active production composition 的内存索引支持 Review 命令；Review History 持久化，但重启后旧 Comparative Evidence 本身不能凭客户端 ID 恢复。后续若持久化 Evidence，必须复用现有 Evidence 事实和 fingerprint，不建立第二套证据模型。
 
 ## 6. 最新验证
 
-LOOP-023 M4 完成后的最新完整基线：
+LOOP-024 M5 完成后的最新完整基线：
 
 ```text
 npm run check       PASS
-npm run test:ts     PASS (380 declared `test()` cases)
+npm run test:ts     PASS
 npm run build:web   PASS
 git diff --check    PASS
 npm run dev:paper   STARTED
@@ -158,18 +173,17 @@ Web: http://127.0.0.1:5174/
 API: http://127.0.0.1:8787
 ```
 
-启动日志确认 Comparative Trade Review、Runtime Evidence 与 Orchestration/API 已启用，exchange write capability disabled。
+启动日志确认 Comparative Trade Review、Runtime Evidence、M5 Shadow API 与 Orchestration/API 已启用，exchange write capability disabled。
 
-浏览器状态：M1、M2 已完成各自真实 Chrome 验收；M3 已由 Agent Chrome 完成中文 1440×900、英文 820×760、受控/Open Class、Backtest、Walk-Forward、Replay、Candidate、刷新与服务重启恢复。Network 在 M2/M3 均为 `TOOL_UNAVAILABLE`；不得要求用户人工替代。
+浏览器状态：LOOP-024 Agent Chrome 已在中文 1440×900 与英文 820×760 读取真实 M4 A/B 实例的 Shadow 记录，验证快速切换、Simulation/Live 无副作用切换、刷新及 Web/API 重启恢复；Network 和 Console clear 为 `TOOL_UNAVAILABLE`，可读取的 Console warning/error 为零。不得要求用户人工替代。
 
 ## 7. 下一阶段
 
-执行 **M5 Shadow 与晋升建议**（LOOP-024）：
+执行 **M6 授权门槛准备**（LOOP-025）：
 
-1. 为一个 M4 Paper deployment 建立独立、只读的 Shadow decision/evidence context。
-2. 绑定 immutable Strategy/Dataset/Graph/Execution/Risk 与账户快照；任一漂移 fail closed。
-3. 对 Champion/Challenger 输出版本化、可审计的 Promotion Recommendation，不执行自动批准、Runtime Apply、Paper/Live 下单或 Champion 替换。
-4. 保持 M4 已验证的多实例 Paper 调度、close-only、projection 和安全边界不回归。
+1. 只产出 Live/Canary 的安全评审输入、能力缺口和显式授权清单，不实现 Execution Port、账户接入、Canary 或交易所写入。
+2. 以 M4/M5 persisted evidence 说明候选范围、fail-closed 条件、人工审批、Close-only、Safe Stop、reconciliation、rollback 和 incident 的可验证要求。
+3. 保持 M0-M5 runtime、M5 Shadow、账户和交易所写边界不变；若没有用户的明确授权，LOOP-025 只能形成 `NOT_AUTHORIZED` 结论。
 
 ### LOOP-021 审计与验证（2026-08-02）
 
@@ -192,6 +206,15 @@ API: http://127.0.0.1:8787
 - Agent Chrome 在中文 1440×900 从两个可见 Strategy Version 创建、预检和启动 A/B；观察独立 account/equity/heartbeat/curve/artifact，停止 A 后受控平仓且 B 持续。刷新与 Web/API 重启后 B 恢复、A 保持 stopped。英文 820×760 无横向滚动且 keyboard focus 可见。
 - `npm run check`、`npm run test:ts`（全量通过；当前 380 个 `test()` 用例）、`npm run build:web` 与 `git diff --check` 通过。Runtime 始终为 Paper Only、`runtimeApplied=false`、`exchangeWriteAllowed=false`；Network 和 Console clear 为 `TOOL_UNAVAILABLE`，日志仅见 Chrome 扩展异步消息错误。
 - M4 为 `COMPLETE`；下一步执行 [`LOOP-024`](loop-prompts/loop-024-m5-shadow-promotion-recommendations-v1.md)。
+
+### LOOP-024 审计与验证（2026-08-02）
+
+- 新增 shared Shadow/Promotion contracts、独立 SQLite `shadow_definitions`、`shadow_events`、`shadow_projection_events` 和不可变触发器。definition/event/projection 与 M4 表完全分离，actor/deployment/run/cycle source scope、idempotency、unique source scope、opaque cursor 与重启恢复均由服务端约束。
+- M5 service 仅用 `projectionByFactKey` 精确读取现有 M4 cycle/artifact projections，再核验 source run、account/Artifact lineage 和 server materialized Strategy/Dataset/Graph/Execution/Risk fingerprints。missing -> unavailable、drift -> stale、source mismatch -> `SHADOW_SOURCE_SCOPE_AMBIGUOUS`；不从 latest 补造事实。
+- `CurrentCryptoReadOnlyShadowAdapter` 没有 Execution Port，且暴露 `executionReachable=false`、`exchangeWriteAllowed=false`。Shadow 不写 M4 account、positions、orders、fills、cycle journal、risk/safety 或 existing artifacts；独立测试在前后比较 M4 cycle/artifact projections。
+- 服务端 policy `1.0.0` 只发 terminal/read-only `insufficient_data`、`observe`、`recommend_validation`，而 Shadow entry 不提供 Start/Stop/Archive/Apply/replace 控件。Champion/Challenger 仅在同 scope 内报告 decision/risk/expected exposure/data quality/health/evidence gaps，明确不声称因果或收益。
+- 自动化：`npm run check`、`npm run test:ts`、`npm run build:web`、`git diff --check` PASS；M5 测试覆盖独立事实、隔离/分页、client injection 拒绝、并发幂等、recovery、terminal 不重复和 missing/stale/ambiguous fail-closed，M4 双实例/close-only 回归同时通过。
+- Agent Chrome：中文 1440×900 和英文 820×760 均读取真实 M4 A/B Shadow record；快速实例切换无串台，Simulation/Live 切换无副作用，刷新和重启 Web/API 后 source/recommendation 持久恢复，窄屏 `scrollWidth=clientWidth=820`。Network 及 Console clear 能力为 `TOOL_UNAVAILABLE`；可读取的 Console warning/error 为 `[]`。M5 为 `COMPLETE`，下一步为 [`LOOP-025`](loop-prompts/loop-025-m6-live-canary-authorization-gate-v1.md) 的非操作性 M6 授权门槛准备。
 
 ### M1 实施状态（2026-08-01）
 

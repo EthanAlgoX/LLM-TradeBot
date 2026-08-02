@@ -98,6 +98,7 @@ import {
 import { DataCenterHttpHandler } from "./data-center-http.js";
 import { DeploymentScopedPaperRuntimeSupervisor, ExecutableStrategyVersionMaterializer, MultiPaperDeploymentService, SqliteMultiPaperDeploymentRepository } from "./multi-paper-runtime.js";
 import { MultiPaperRuntimeHttpHandler } from "./multi-paper-runtime-http.js";
+import { ShadowPromotionService, SqliteShadowPromotionRepository } from "./shadow-promotion.js";
 
 export type ComparativeTradeReviewRuntimeOptions = Omit<
   ProductionComparativeTradeReviewOptions,
@@ -154,6 +155,8 @@ export interface CurrentPipelineOrchestrationRuntime {
   multiPaperDeploymentRepository: SqliteMultiPaperDeploymentRepository;
   multiPaperDeploymentService: MultiPaperDeploymentService;
   multiPaperRuntimeSupervisor: DeploymentScopedPaperRuntimeSupervisor;
+  shadowPromotionRepository: SqliteShadowPromotionRepository;
+  shadowPromotionService: ShadowPromotionService;
   runtimeEvidenceReadModelService?: RuntimeEvidenceReadModelService;
   causalTradeReviewReadModelService?: CausalTradeReviewReadModelService;
   comparativeTradeReviewComposition?: ProductionComparativeTradeReviewComposition;
@@ -581,8 +584,18 @@ export function createCurrentPipelineOrchestrationRuntime(
   // Recovery is deliberately restricted to active deployment aggregates. The
   // supervisor is asynchronous: API/Web start never waits for a market cycle.
   multiPaperRuntimeSupervisor.start();
+  const shadowPromotionRepository = new SqliteShadowPromotionRepository(database);
+  const shadowPromotionService = new ShadowPromotionService({
+    shadows: shadowPromotionRepository,
+    deployments: multiPaperDeploymentRepository,
+    versions: new ExecutableStrategyVersionMaterializer(
+      productionStrategyOrchestration.executableStrategyConfigurationRepository ?? {
+        findByStrategyVersionId: () => undefined,
+      },
+    ),
+  });
   const multiPaperRuntimeHttpHandler = new MultiPaperRuntimeHttpHandler(
-    authenticator, multiPaperDeploymentService, multiPaperDeploymentRepository,
+    authenticator, multiPaperDeploymentService, multiPaperDeploymentRepository, shadowPromotionService,
   );
   const operationalOutboxDispatcher = new SqliteOperationalOutboxDispatcher({
     database,
@@ -688,6 +701,8 @@ export function createCurrentPipelineOrchestrationRuntime(
     multiPaperDeploymentRepository,
     multiPaperDeploymentService,
     multiPaperRuntimeSupervisor,
+    shadowPromotionRepository,
+    shadowPromotionService,
     ...(runtimeEvidenceReadModelService
       ? { runtimeEvidenceReadModelService }
       : {}),

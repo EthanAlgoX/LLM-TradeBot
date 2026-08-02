@@ -1,6 +1,6 @@
 # TradeBot 产品优化规划与进度
 
-> 2026-08-02：LOOP-023 已完成 M4 多模拟运行中心。两个 deployment-scoped Paper 实例经唯一 `Decision -> Portfolio -> Risk -> Execution` 链并行运行，真实 Chrome 验证了独立事实、close-only、刷新和 Web/API 重启恢复；全量测试通过，当前 `tests-ts` 含 380 个 `test()` 用例。M5 Shadow 与晋升建议留待 LOOP-024。
+> 2026-08-02：LOOP-024 已完成 M5 Shadow 与晋升建议。Shadow 只读取明确的 M4 deployment/run/cycle 持久快照，并以独立 append-only 事实输出同 scope 的 Champion/Challenger 描述性比较与终态只读建议；真实 Chrome 验证中英文双尺寸、实例切换、刷新及 Web/API 重启恢复。M6 仍须单独安全评审与用户显式授权，当前不实现 Live 或交易所写入。
 
 > 文档角色：汇总 2026-08-01 之前的产品讨论，作为后续产品优化、页面收敛和阶段验收的执行入口
 > 最后更新：2026-08-01
@@ -637,17 +637,17 @@ README 中的 `320/320 PASS` 当前已过期。恢复稳定测试基线是后续
 
 ### M5：Shadow 与晋升建议
 
-状态：`READY`（LOOP-024；仅 Shadow 与只读晋升建议）
+状态：`COMPLETE`（LOOP-024；仅 Shadow 与只读晋升建议）
 
-- [ ] 定义独立 Trading Strategy Shadow Deployment；
-- [ ] 与目标 Live 数据、账户快照和 Decision Context 保持同源；
-- [ ] 禁止 Execution 写入；
-- [ ] Champion/Challenger 对比；
-- [ ] 版本化 Promotion Policy；
-- [ ] 产生 Promotion Recommendation，而非自动批准；
-- [ ] Shadow Divergence 和 Runtime Health Evidence。
+- [x] 定义独立、actor/deployment/run/cycle-scoped 的 append-only Shadow facts；
+- [x] 从明确 M4 cycle/account snapshot 与 Artifact lineage 读取同源事实；
+- [x] 注册只读 adapter，无 Execution Port，所有写入能力均为 false；
+- [x] Champion/Challenger 同 scope 描述性对比；
+- [x] 服务端版本化 Promotion Policy；
+- [x] 仅产生 terminal、只读 Promotion Recommendation，不自动批准；
+- [x] 显式记录 Shadow Divergence、Runtime Health、数据质量和证据缺口。
 
-验收：Shadow 可以完整产生决策和证据，但任何路径都不能形成真实或 Paper 账户写入；数据、账户和版本漂移时 fail closed。
+验收：Shadow 真实消费 M4 持久事实，任何路径均不写真实或 Paper 账户；数据、账户、Artifact 或版本漂移 explicit unavailable/stale 且 fail closed。LOOP-024 新增严格 contracts、SQLite 独立 `shadow_*` append-only 表、只读 GET/POST history API 与 M4 中心入口；客户端只提交 idempotency key 和 source run/cycle。自动化覆盖独立事实、零 M4 投影写入、actor/cursor 隔离、并发幂等、重启恢复、missing/stale/ambiguous 与 terminal recommendation。Agent Chrome 在中文 1440×900、英文 820×760 验证实际 M4 A/B 实例、快速切换、刷新和 Web/API 重启；Network 与 Console clear 均为 `TOOL_UNAVAILABLE`，可读取的 Console warning/error 为空。
 
 ### M6：受控 Live 与 Canary
 
@@ -710,6 +710,7 @@ M0 恢复稳定基线和路由
 -> M2 数据中心 V1
 -> M3 实验场 V1（COMPLETE）
 -> M4 多模拟运行中心（COMPLETE：LOOP-023）
+-> M5 Shadow 与晋升建议（COMPLETE：LOOP-024）
 ```
 
 完成 M4 后，TradeBot 将形成首个完整、仍保持 Paper Only 的产品闭环：
@@ -723,4 +724,4 @@ M0 恢复稳定基线和路由
 -> 产生下一版候选
 ```
 
-Shadow、Live、Champion 替换和自动化晋升属于后续独立安全阶段，不阻塞当前 Paper 产品价值的形成。
+M6 的 Live、Canary、Champion 替换和任何自动化晋升仍属于独立安全阶段；在安全评审和用户显式授权前，只允许执行非操作性的授权准备工作。

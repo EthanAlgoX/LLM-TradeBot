@@ -48,3 +48,4 @@ export * from "./historical-semantic-evaluation-http.js";
 export * from "./experiment-lab.js";
 export * from "./multi-paper-runtime.js";
 export * from "./multi-paper-runtime-http.js";
+export * from "./shadow-promotion.js";

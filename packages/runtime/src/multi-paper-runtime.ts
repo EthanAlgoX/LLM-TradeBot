@@ -123,6 +123,14 @@ export class SqliteMultiPaperDeploymentRepository {
     const tail = page.at(-1);
     return { data: page.map((row) => JSON.parse(row.payload_json) as Record<string, unknown>), ...(rows.length > safeLimit && tail ? { nextCursor: Buffer.from(`${actorId}|${deploymentId}|${kind}|${tail.created_at},${tail.projection_id}`).toString("base64url") } : {}) };
   }
+  /** Returns one immutable M4 fact by its server-created key.  Shadow uses
+   * this narrow reader instead of reaching into Paper account or execution
+   * stores, so its source scope is explicit and reproducible. */
+  projectionByFactKey(actorId: string, deploymentId: string, kind: ProjectionKind, factKey: string): Record<string, unknown> | undefined {
+    this.get(actorId, deploymentId);
+    const row = this.database.prepare("SELECT payload_json FROM paper_deployment_projection_events WHERE actor_id=? AND deployment_id=? AND kind=? AND fact_key=?").get(actorId, deploymentId, kind, factKey) as { payload_json: string } | undefined;
+    return row ? JSON.parse(row.payload_json) as Record<string, unknown> : undefined;
+  }
   recoverable(): readonly PaperDeployment[] {
     return (this.database.prepare(`SELECT d.definition_json,e.event_json FROM paper_deployment_definitions d JOIN paper_deployment_events e ON e.rowid=(SELECT rowid FROM paper_deployment_events WHERE deployment_id=d.deployment_id ORDER BY rowid DESC LIMIT 1) WHERE json_extract(e.event_json, '$.state.lifecycle') IN ('running','stopping','close_only') ORDER BY d.created_at ASC,d.deployment_id ASC`).all() as {definition_json:string;event_json:string}[]).map((row)=>this.deployment(row));
   }
