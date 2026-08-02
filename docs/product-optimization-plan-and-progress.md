@@ -1,9 +1,9 @@
 # TradeBot 产品优化规划与进度
 
-> 2026-08-02：LOOP-024 已完成 M5 Shadow 与晋升建议。Shadow 只读取明确的 M4 deployment/run/cycle 持久快照，并以独立 append-only 事实输出同 scope 的 Champion/Challenger 描述性比较与终态只读建议；真实 Chrome 验证中英文双尺寸、实例切换、刷新及 Web/API 重启恢复。M6 仍须单独安全评审与用户显式授权，当前不实现 Live 或交易所写入。
+> 2026-08-02：LOOP-026 已完成 R0 Strategy App 产品预览框架。策略助手、Strategy App、Agent 中心、Market Radar、实验场 handoff 与三个 Simulation Slot 均为显式 `SAMPLE` / `PROTOTYPE` 页面内存预览；没有新增后端、Runtime 或交易副作用。M5 真实 Shadow 边界保持不变；在用户评审前不进入 M6。
 
 > 文档角色：汇总 2026-08-01 之前的产品讨论，作为后续产品优化、页面收敛和阶段验收的执行入口
-> 最后更新：2026-08-01
+> 最后更新：2026-08-02
 > 产品基线：[`../PRODUCT.md`](../PRODUCT.md)
 > 当前工程进度：[`product-roadmap-and-progress.md`](product-roadmap-and-progress.md)
 > 架构与安全边界：[`architecture-and-delivery-plan.md`](architecture-and-delivery-plan.md)
@@ -649,6 +649,20 @@ README 中的 `320/320 PASS` 当前已过期。恢复稳定测试基线是后续
 
 验收：Shadow 真实消费 M4 持久事实，任何路径均不写真实或 Paper 账户；数据、账户、Artifact 或版本漂移 explicit unavailable/stale 且 fail closed。LOOP-024 新增严格 contracts、SQLite 独立 `shadow_*` append-only 表、只读 GET/POST history API 与 M4 中心入口；客户端只提交 idempotency key 和 source run/cycle。自动化覆盖独立事实、零 M4 投影写入、actor/cursor 隔离、并发幂等、重启恢复、missing/stale/ambiguous 与 terminal recommendation。Agent Chrome 在中文 1440×900、英文 820×760 验证实际 M4 A/B 实例、快速切换、刷新和 Web/API 重启；Network 与 Console clear 均为 `TOOL_UNAVAILABLE`，可读取的 Console warning/error 为空。
 
+### R0：Strategy App 产品预览框架
+
+状态：`COMPLETE`（LOOP-026；`PROTOTYPE_ONLY / AWAITING_USER_PRODUCT_REVIEW`）
+
+- [x] 新的产品导航：总览、策略助手、我的策略应用、Agent 中心、数据中心、实验场和交易中心；既有 M0～M5 hash 入口保持可达；
+- [x] 策略助手提供三组 Sample 意图和带 Data / Agent / Risk / Assumption / Gap / Evidence boundary 的 Proposal；
+- [x] “创建策略应用”只创建当前页面内存中的 `PROTOTYPE`，刷新后恢复 Sample，绝不物化后端版本；
+- [x] Strategy App 详情提供七个只读 Tab，并将 Risk / Execution 明确显示为系统锁定；
+- [x] Agent 中心将 Data Source / Dataset 与 Input Agent 分开，提供三类只读目录、搜索、筛选与详情；
+- [x] Market Radar、实验场 handoff 和三槽位容量均为显式 `SAMPLE / NOT CONNECTED`，现有真实 Data Center、Experiment、Paper / Shadow 页面保留在其下；
+- [x] 未来 Live Champion 仍为 `NOT AUTHORIZED`，产品预览固定 `runtimeApplied=false`、Paper Only、`exchangeWriteAllowed=false`。
+
+验收：新增纯状态测试覆盖最多三个 active simulation slot、第四个意图拒绝且 `runtimeCall=none`、Sample / Prototype 标签和页面内存创建。真实 Agent Chrome 已完成中文 1440×900 主路径及英文 820×760 七 Tab / 无横向滚动；Data Center、Experiment 与现有 Paper / Shadow 入口可达。Console clear 与 Network 读取不可用，记录为 `TOOL_UNAVAILABLE`；没有用户手工验收替代。
+
 ### M6：受控 Live 与 Canary
 
 状态：`FUTURE / NOT AUTHORIZED`
@@ -711,6 +725,8 @@ M0 恢复稳定基线和路由
 -> M3 实验场 V1（COMPLETE）
 -> M4 多模拟运行中心（COMPLETE：LOOP-023）
 -> M5 Shadow 与晋升建议（COMPLETE：LOOP-024）
+-> R0 Strategy App 产品预览框架（COMPLETE：LOOP-026）
+-> AWAITING_USER_PRODUCT_REVIEW
 ```
 
 完成 M4 后，TradeBot 将形成首个完整、仍保持 Paper Only 的产品闭环：
@@ -724,4 +740,4 @@ M0 恢复稳定基线和路由
 -> 产生下一版候选
 ```
 
-M6 的 Live、Canary、Champion 替换和任何自动化晋升仍属于独立安全阶段；在安全评审和用户显式授权前，只允许执行非操作性的授权准备工作。
+M6 的 Live、Canary、Champion 替换和任何自动化晋升仍属于独立安全阶段；在用户确认 R0 产品预览并另行授权前，不创建详细后端 Loop，也不恢复 M6。

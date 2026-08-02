@@ -1,8 +1,8 @@
 # TradeBot 当前状态与接手说明
 
-> 2026-08-02 接手更新：LOOP-024 已将 M5 标记为 `COMPLETE`。真实 M4 deployment/run/cycle 持久事实现可被独立、只读 Shadow 记录消费，输出相同 scope Champion/Challenger 的描述性比较和不可执行 Promotion Recommendation；Agent Chrome 验证 A/B 切换、双尺寸、刷新与 Web/API 重启恢复。下一任务仅为 LOOP-025 的 M6 授权门槛准备，未授权 Live、Canary、账户或交易所写入。
+> 2026-08-02 接手更新：LOOP-026 已完成 R0 Strategy App 产品预览框架。Advisor、Strategy App、Agent Center、Market Radar、Experiment handoff 和三个 Simulation Slot 都是显式 `SAMPLE` / `PROTOTYPE` 页面内存预览；M0～M5 真实页面与 M5 Shadow 边界未修改。当前状态是 `AWAITING_USER_PRODUCT_REVIEW`，不得自行恢复 LOOP-025 或 M6。
 
-> 快照日期：2026-08-01
+> 快照日期：2026-08-02
 > 适用仓库：`/Users/hyx/Documents/workspace/tradebot`
 > 历史交接：[`archive/project-status-and-handoff-through-2026-07-29.md`](archive/project-status-and-handoff-through-2026-07-29.md)
 > 下一任务：[`next-loop-prompt.md`](next-loop-prompt.md)
@@ -21,7 +21,7 @@
 - 覆盖或回退无关修改
 - 未经明确要求提交 Git
 
-当前最新完成 Loop 是 **M5 Shadow 与晋升建议**。它不复用或修改 M4 runtime，而是用独立 append-only Shadow facts 读取明确 source run/cycle；证据缺失、fingerprint 漂移或 source scope 模糊均 fail closed，不从 latest 或客户端输入猜测事实。
+当前最新完成 Loop 是 **R0 Strategy App 产品预览框架（LOOP-026）**。它不复用或修改 M4/M5 runtime：所有 Strategy App Sample / Prototype 只在当前页面内存中存在，刷新恢复初始 Sample；证据缺失、fingerprint 漂移或 source scope 模糊的 M5 真实边界仍 fail closed，不从 latest 或客户端输入猜测事实。
 
 ## 2. 当前可运行链路
 
@@ -132,6 +132,13 @@ POST /api/orchestration/paper-deployments/:deploymentId/shadows
 - Contract Validation Handoff 状态与稳定 issue code。
 - M5 Shadow / Promotion assessment：真实 source scope、lineage、data quality/health、evidence gaps、描述性 diff、只读 recommendation 和有限历史分页。
 
+R0 页面内存预览（非真实 API）：
+
+- Strategy Advisor 的三组 Sample Intent / Proposal、My Strategy Apps、七 Tab 详情与 Agent Center；
+- Market Radar Sample、Experiment handoff 和 2/3 Simulation Capacity Sample；
+- 所有内容都标记 `SAMPLE`、`PROTOTYPE`、`NOT CONNECTED` 或 `UNAVAILABLE`，不混入真实 Data / Paper / Shadow facts；
+- 创建 Prototype 不写 Storage、Cookie、API、SQLite、Runtime 或交易；第四 Simulation Start intent 只返回页面状态拒绝，`runtimeCall=none`。
+
 必须区分：
 
 - `MOCK`
@@ -156,14 +163,14 @@ Comparative Evidence 当前由 active production composition 的内存索引支�
 
 ## 6. 最新验证
 
-LOOP-024 M5 完成后的最新完整基线：
+LOOP-026 R0 完成后的最新完整基线：
 
 ```text
 npm run check       PASS
 npm run test:ts     PASS
 npm run build:web   PASS
 git diff --check    PASS
-npm run dev:paper   STARTED
+npm run dev:web     STARTED（仅用于 Agent Chrome 产品预览）
 ```
 
 启动地址：
@@ -173,17 +180,17 @@ Web: http://127.0.0.1:5174/
 API: http://127.0.0.1:8787
 ```
 
-启动日志确认 Comparative Trade Review、Runtime Evidence、M5 Shadow API 与 Orchestration/API 已启用，exchange write capability disabled。
+产品预览不启动 Runtime、Worker 或额外后台程序；Chrome 仅访问本地 Vite Web，仍显示 `runtimeApplied=false`、Paper Only、`exchangeWriteAllowed=false`。
 
-浏览器状态：LOOP-024 Agent Chrome 已在中文 1440×900 与英文 820×760 读取真实 M4 A/B 实例的 Shadow 记录，验证快速切换、Simulation/Live 无副作用切换、刷新及 Web/API 重启恢复；Network 和 Console clear 为 `TOOL_UNAVAILABLE`，可读取的 Console warning/error 为零。不得要求用户人工替代。
+浏览器状态：LOOP-026 Agent 直接控制真实 Chrome，在中文 1440×900 走完 Advisor → Proposal → Prototype → My Apps → Experiment handoff → Trade Center；英文 820×760 验证七个详情 Tab、导航与 `scrollWidth=clientWidth=820`。Data Center、Experiment 与现有 Paper / Shadow 入口均可达；Prototype 刷新后恢复 Sample。Console clear 与 Network 读取为 `TOOL_UNAVAILABLE`，不要求用户人工替代。
 
 ## 7. 下一阶段
 
-执行 **M6 授权门槛准备**（LOOP-025）：
+状态为 **AWAITING_USER_PRODUCT_REVIEW**：
 
-1. 只产出 Live/Canary 的安全评审输入、能力缺口和显式授权清单，不实现 Execution Port、账户接入、Canary 或交易所写入。
-2. 以 M4/M5 persisted evidence 说明候选范围、fail-closed 条件、人工审批、Close-only、Safe Stop、reconciliation、rollback 和 incident 的可验证要求。
-3. 保持 M0-M5 runtime、M5 Shadow、账户和交易所写边界不变；若没有用户的明确授权，LOOP-025 只能形成 `NOT_AUTHORIZED` 结论。
+1. 等待用户确认 Strategy Advisor、Strategy App、Agent Center、Data Center、Experiment 与 Trade Center 的页面命名、信息架构和主路径；
+2. 在确认前不创建详细后端 Loop，不实现 LLM 推荐、Blueprint 匹配、Strategy App 物化、Runtime Apply、Live、Canary 或 M6；
+3. 保持 M0～M5 runtime、M5 Shadow、账户和交易所写边界不变。
 
 ### LOOP-021 审计与验证（2026-08-02）
 
@@ -215,6 +222,15 @@ API: http://127.0.0.1:8787
 - 服务端 policy `1.0.0` 只发 terminal/read-only `insufficient_data`、`observe`、`recommend_validation`，而 Shadow entry 不提供 Start/Stop/Archive/Apply/replace 控件。Champion/Challenger 仅在同 scope 内报告 decision/risk/expected exposure/data quality/health/evidence gaps，明确不声称因果或收益。
 - 自动化：`npm run check`、`npm run test:ts`、`npm run build:web`、`git diff --check` PASS；M5 测试覆盖独立事实、隔离/分页、client injection 拒绝、并发幂等、recovery、terminal 不重复和 missing/stale/ambiguous fail-closed，M4 双实例/close-only 回归同时通过。
 - Agent Chrome：中文 1440×900 和英文 820×760 均读取真实 M4 A/B Shadow record；快速实例切换无串台，Simulation/Live 切换无副作用，刷新和重启 Web/API 后 source/recommendation 持久恢复，窄屏 `scrollWidth=clientWidth=820`。Network 及 Console clear 能力为 `TOOL_UNAVAILABLE`；可读取的 Console warning/error 为 `[]`。M5 为 `COMPLETE`，下一步为 [`LOOP-025`](loop-prompts/loop-025-m6-live-canary-authorization-gate-v1.md) 的非操作性 M6 授权门槛准备。
+
+### LOOP-026 审计与验证（2026-08-02）
+
+- 新增隔离的 Web 页面内存模块：`strategy-app-preview-state.ts` 只管理 Sample / Prototype 状态和三槽位产品规则；`strategy-app-preview.ts` 与 CSS 承载可移除的预览视图。没有 API、SQLite、localStorage、sessionStorage、Cookie、LLM、Worker 或 Runtime 调用。
+- 策略助手提供港股低风险趋势与财报、美股财报事件、加密趋势三个 Sample 场景；Proposal 显示数据、Agent、风险、频率、假设、缺口和 Evidence 状态。创建后进入 `PROTOTYPE · PAGE MEMORY` 详情，刷新恢复初始 Sample。
+- Strategy App 详情提供 Overview、Agents、Data、Strategy logic、Risk & runtime、Evidence、Versions 七个只读 Tab；Risk / Execution 标记为 SYSTEM LOCKED，Live 始终 `UNAVAILABLE / NOT AUTHORIZED / Exchange writes OFF`。
+- Agent Chrome 验收：中文 1440×900 完成主路径；英文 820×760 无横向溢出，七 Tab、三类 Agent、搜索/详情和既有 Data Center / Experiment / Paper / Shadow 入口可达。Console clear 与 Network 读取为 `TOOL_UNAVAILABLE`；Runtime 安全保持 `runtimeApplied=false`、Paper Only、`exchangeWriteAllowed=false`。
+- 自动化：`npm run check`、`npm run test:ts`、`npm run build:web`、`git diff --check` 通过；新增测试覆盖三槽位、第四意图拒绝 / 无 Runtime 调用、Sample / Prototype 边界和页面内存创建。
+- LOOP-026 为 `COMPLETE / READY_FOR_USER_REVIEW`。下一步仅为 `AWAITING_USER_PRODUCT_REVIEW`，不得擅自进入 M6。
 
 ### M1 实施状态（2026-08-01）
 

@@ -8,12 +8,36 @@ import "./data-center-api.js";
 import "./experiment-workspace-api.js";
 import "./multi-paper-runtime-center.js";
 import "./runtime-dashboard.css";
+import "./strategy-app-preview.css";
 import type {
   RuntimeDashboardSnapshot,
 } from "./runtime-operation-session.js";
+import {
+  createInitialStrategyAppPreviewState,
+  createPrototypeStrategyApp,
+  selectPreviewApp,
+  selectPreviewProposal,
+  selectPreviewScenario,
+  type StrategyAppPreviewState,
+  type StrategyAppStatus,
+} from "./strategy-app-preview-state.js";
+import {
+  proposalById,
+  renderAgentCenter,
+  renderDataCenterPrelude,
+  renderExperimentHandoff,
+  renderMyStrategyApps,
+  renderStrategyAdvisor,
+  renderStrategyAppDetail,
+  renderStrategyOverview,
+  renderTradeCenterPreview,
+  type AgentCategory,
+  type StrategyDetailTab,
+  type StrategyDetailTarget,
+} from "./strategy-app-preview.js";
 
 type Locale = "zh-CN" | "en";
-type ViewId = "overview" | "data-center" | "orchestration" | "lab" | "experiment" | "activity" | "connections";
+type ViewId = "overview" | "advisor" | "strategy-apps" | "strategy-app-detail" | "agent-center" | "trade-center" | "data-center" | "orchestration" | "lab" | "experiment" | "activity" | "connections";
 type AgentMode = "paper" | "only-close";
 type CapabilityId = "selector" | "data" | "analysis" | "decision" | "risk" | "execution";
 type CapabilityStatus = "passed" | "active" | "idle" | "fallback";
@@ -166,6 +190,14 @@ interface AppState {
   orchestrationNodeId: string;
   orchestrationValidation: ValidationPreview;
   orchestrationDraftCreated: boolean;
+  strategyPreview: StrategyAppPreviewState;
+  strategyAppFilter: "all" | StrategyAppStatus;
+  strategyDetailTarget: StrategyDetailTarget;
+  strategyDetailTab: StrategyDetailTab;
+  agentCenterCategory: AgentCategory;
+  selectedPreviewAgentId: string;
+  agentCenterSearch: string;
+  experimentHandoffAppName?: string;
 }
 
 const appRoot = document.querySelector<HTMLDivElement>("#app");
@@ -186,7 +218,7 @@ function initialLocale(): Locale {
 
 function initialView(): ViewId {
   const hashView = window.location.hash.slice(1);
-  return ["overview", "data-center", "orchestration", "lab", "experiment", "activity", "connections"].includes(hashView)
+  return ["overview", "advisor", "strategy-apps", "strategy-app-detail", "agent-center", "trade-center", "data-center", "orchestration", "lab", "experiment", "activity", "connections"].includes(hashView)
     ? hashView as ViewId
     : "overview";
 }
@@ -209,6 +241,13 @@ const state: AppState = {
   orchestrationNodeId: "data-sync",
   orchestrationValidation: "passed",
   orchestrationDraftCreated: false,
+  strategyPreview: createInitialStrategyAppPreviewState(),
+  strategyAppFilter: "all",
+  strategyDetailTarget: "app",
+  strategyDetailTab: "overview",
+  agentCenterCategory: "input",
+  selectedPreviewAgentId: "market-input",
+  agentCenterSearch: "",
   workspace: {
     stage: 2,
     backtestRunning: false,
@@ -998,19 +1037,20 @@ function activityKind(kind: ActivityKind): string {
 function renderHeader(): string {
   return `
     <header class="command-bar">
-      <button class="brand" type="button" data-view="overview" aria-label="${tr("返回交易 Agent", "Return to Trading Agent")}">
+      <button class="brand" type="button" data-view="overview" aria-label="${tr("返回策略应用总览", "Return to Strategy App overview")}">
         <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
         <span><strong>TRADEBOT</strong><small>${tr("策略操作台", "STRATEGY CONSOLE")}</small></span>
       </button>
 
       <nav class="primary-nav" aria-label="${tr("主要导航", "Primary navigation")}">
         ${[
-          ["overview", tr("交易 Agent", "Trading Agent")],
+          ["overview", tr("总览", "Overview")],
+          ["advisor", tr("策略助手", "Strategy Advisor")],
+          ["strategy-apps", tr("我的策略应用", "My Strategy Apps")],
+          ["agent-center", tr("Agent 中心", "Agent Center")],
           ["data-center", tr("数据中心", "Data Center")],
-          ["orchestration", tr("编排 Agent", "Orchestration Agent")],
-          ["lab", tr("实验场", "Experiment Lab")],
-          ["activity", tr("审计记录", "Audit Log")],
-          ["connections", tr("连接配置", "Connections")],
+          ["experiment", tr("实验场", "Experiment Arena")],
+          ["trade-center", tr("交易中心", "Trade Center")],
         ].map(([id, label]) => `
           <button type="button" data-view="${id}" class="${state.view === id ? "is-active" : ""}" ${state.view === id ? 'aria-current="page"' : ""}>${label}</button>
         `).join("")}
@@ -1206,6 +1246,18 @@ function renderOperatorAction(): string {
 
 function renderOverview(): string {
   return `
+    ${renderStrategyOverview({
+      locale: state.locale,
+      preview: state.strategyPreview,
+      appFilter: state.strategyAppFilter,
+      detailTarget: state.strategyDetailTarget,
+      detailTab: state.strategyDetailTab,
+      agentCategory: state.agentCenterCategory,
+      selectedAgentId: state.selectedPreviewAgentId,
+      agentSearch: state.agentCenterSearch,
+      experimentHandoffAppName: state.experimentHandoffAppName,
+    })}
+    <section class="legacy-surface-divider"><span>EXISTING PAPER / RUNTIME SURFACE</span><p>${tr("下方保留既有运行控制台；其真实状态与产品预览严格分开。", "The existing runtime console remains below; its real state is strictly separate from the product preview.")}</p></section>
     ${renderAgentIdentity()}
     ${renderSimulationCenterHost()}
     <div class="operation-layout">
@@ -1515,8 +1567,22 @@ function renderOrchestration(): string {
   `;
 }
 
+function strategyPreviewContext() {
+  return {
+    locale: state.locale,
+    preview: state.strategyPreview,
+    appFilter: state.strategyAppFilter,
+    detailTarget: state.strategyDetailTarget,
+    detailTab: state.strategyDetailTab,
+    agentCategory: state.agentCenterCategory,
+    selectedAgentId: state.selectedPreviewAgentId,
+    agentSearch: state.agentCenterSearch,
+    experimentHandoffAppName: state.experimentHandoffAppName,
+  };
+}
+
 function renderDataCenter(): string {
-  return `<section class="page-intro"><div><h1>${tr("数据中心", "Data Center")}</h1><p>${tr("仅展示服务端登记的资产、能力和版本化快照。没有真实来源的市场维度会明确标为不可用。", "Only server-registered assets, capabilities, and versioned snapshots are shown. Market dimensions without a real source remain explicitly unavailable.")}</p></div><div class="orchestration-version"><span>${tr("运行时边界", "Runtime boundary")}</span><strong>${tr("只读", "Read only")}</strong><small>runtimeApplied=false</small></div></section><div id="data-center-host"></div>`;
+  return `${renderDataCenterPrelude(state.locale)}<section class="legacy-surface-divider"><span>REGISTERED DATA ASSETS · EXISTING</span><p>${tr("下方保留现有 Data Center：只展示服务端登记的资产、质量、Schema 与 Lineage。", "The existing Data Center remains below, showing only server-registered assets, quality, schema, and lineage.")}</p></section><section class="page-intro"><div><h1>${tr("数据中心", "Data Center")}</h1><p>${tr("仅展示服务端登记的资产、能力和版本化快照。没有真实来源的市场维度会明确标为不可用。", "Only server-registered assets, capabilities, and versioned snapshots are shown. Market dimensions without a real source remain explicitly unavailable.")}</p></div><div class="orchestration-version"><span>${tr("运行时边界", "Runtime boundary")}</span><strong>${tr("只读", "Read only")}</strong><small>runtimeApplied=false</small></div></section><div id="data-center-host"></div>`;
 }
 
 function renderActivityRow(event: ActivityEvent): string {
@@ -1532,6 +1598,14 @@ function renderActivityRow(event: ActivityEvent): string {
 
 function renderLab(): string {
   return `<section class="page-intro"><div><h1>${tr("实验场", "Experiment Arena")}</h1><p>${tr("历史策略版本在服务端锁定并重放；不会审批、部署或改变运行时。", "Historical strategy versions are server-locked and replayed; no approval, deployment, or runtime mutation.")}</p></div></section><div id="experiment-workspace-host"></div>`;
+}
+
+function renderExperiment(): string {
+  return `${renderExperimentHandoff(state.locale, state.experimentHandoffAppName)}<section class="legacy-surface-divider"><span>EXPERIMENT ARENA · EXISTING M3</span><p>${tr("下方保留现有 Backtest、Walk-Forward 与 Candidate 只读实验场。", "The existing Backtest, Walk-Forward, and read-only Candidate Experiment Arena remains below.")}</p></section>${renderLab()}`;
+}
+
+function renderTradeCenter(): string {
+  return `${renderTradeCenterPreview(state.locale)}<section class="legacy-surface-divider"><span>PAPER / SHADOW FACT CENTER · EXISTING M4 / M5</span><p>${tr("下方保留现有多 Paper Runtime 与 Shadow / Promotion 只读页面；它们不属于本轮 Prototype 创建路径。", "The existing multi-Paper Runtime and read-only Shadow / Promotion surfaces remain below; they are outside this Prototype creation path.")}</p></section>${renderSimulationCenterHost()}`;
 }
 
 function renderActivity(): string {
@@ -2054,19 +2128,29 @@ function render(): void {
     tr("从候选市场中选择一个标的，并追踪每个 Agent 决策。", "Select one symbol from the market universe and trace every Agent decision."),
   );
 
-    const view = state.view === "overview"
+  const view = state.view === "overview"
     ? renderOverview()
-    : state.view === "orchestration"
-      ? renderOrchestration()
-    : state.view === "data-center"
-      ? renderDataCenter()
-    : state.view === "lab"
-      ? renderLab()
-    : state.view === "experiment"
-      ? renderLab()
-      : state.view === "activity"
-        ? renderActivity()
-        : renderConnections();
+    : state.view === "advisor"
+      ? renderStrategyAdvisor(strategyPreviewContext())
+      : state.view === "strategy-apps"
+        ? renderMyStrategyApps(strategyPreviewContext())
+        : state.view === "strategy-app-detail"
+          ? renderStrategyAppDetail(strategyPreviewContext())
+          : state.view === "agent-center"
+            ? renderAgentCenter(strategyPreviewContext())
+            : state.view === "trade-center"
+              ? renderTradeCenter()
+              : state.view === "orchestration"
+                ? renderOrchestration()
+                : state.view === "data-center"
+                  ? renderDataCenter()
+                  : state.view === "lab"
+                    ? renderLab()
+                    : state.view === "experiment"
+                      ? renderExperiment()
+                      : state.view === "activity"
+                        ? renderActivity()
+                        : renderConnections();
   app.innerHTML = `
     <!--
     THESIS: One Trading Agent narrows a broad universe to one auditable symbol. It refuses fixed coin tabs and equal-weight dashboard cards.
@@ -2079,7 +2163,11 @@ function render(): void {
       <a class="skip-link" href="#main-content">${tr("跳到主要内容", "Skip to main content")}</a>
       ${renderHeader()}
       <div class="mock-banner environment-banner ${runtimeDashboard.connectionMode === "live" ? "is-live" : runtimeDashboard.connectionMode === "readonly" ? "is-readonly" : ""}" data-environment-banner>${environmentBannerLabel()}</div>
-      <main class="page-frame" id="main-content" tabindex="-1">${view}</main>
+      <nav class="legacy-view-nav" aria-label="${tr("既有工作区", "Existing workspaces")}">
+        <span>${tr("既有工作区", "Existing workspaces")}</span>
+        ${[["orchestration", tr("编排 Agent", "Orchestration")], ["lab", tr("实验场旧入口", "Experiment legacy entry")], ["activity", tr("审计记录", "Audit Log")], ["connections", tr("连接配置", "Connections")]].map(([id, label]) => `<button type="button" data-view="${id}" class="${state.view === id ? "is-active" : ""}">${label}</button>`).join("")}
+      </nav>
+      <main class="page-frame" id="main-content" tabindex="-1" data-product-preview="${["advisor", "strategy-apps", "strategy-app-detail", "agent-center", "data-center", "experiment", "trade-center"].includes(state.view)}">${view}</main>
     </div>
     ${renderCopilot()}
     ${renderPanel()}
@@ -2217,6 +2305,103 @@ function bindEvents(): void {
       state.copilotOpen = false;
       render();
       window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+  });
+
+  document.querySelectorAll<HTMLButtonElement>("[data-preview-scenario]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const scenarioId = button.dataset.previewScenario ?? "hk-low-risk";
+      const initialProposalByScenario: Record<string, string> = {
+        "hk-low-risk": "hk-quality-trend",
+        "us-earnings": "us-earnings-event",
+        "crypto-trend": "crypto-trend-guard",
+      };
+      state.strategyPreview = selectPreviewScenario(
+        state.strategyPreview,
+        scenarioId,
+        initialProposalByScenario[scenarioId] ?? "hk-quality-trend",
+      );
+      render();
+    });
+  });
+
+  document.querySelector<HTMLButtonElement>("[data-preview-adjust]")?.addEventListener("click", () => {
+    document.querySelector<HTMLButtonElement>("[data-preview-scenario]")?.focus();
+  });
+
+  document.querySelectorAll<HTMLButtonElement>("[data-preview-proposal]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.strategyPreview = selectPreviewProposal(state.strategyPreview, button.dataset.previewProposal ?? "hk-quality-trend");
+      state.strategyDetailTarget = "proposal";
+      state.strategyDetailTab = "overview";
+      state.view = "strategy-app-detail";
+      window.history.replaceState(null, "", "#strategy-app-detail");
+      render();
+    });
+  });
+
+  document.querySelectorAll<HTMLButtonElement>("[data-preview-app]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.strategyPreview = selectPreviewApp(state.strategyPreview, button.dataset.previewApp ?? state.strategyPreview.selectedAppId);
+      state.strategyDetailTarget = "app";
+      state.strategyDetailTab = "overview";
+      state.view = "strategy-app-detail";
+      window.history.replaceState(null, "", "#strategy-app-detail");
+      render();
+    });
+  });
+
+  document.querySelectorAll<HTMLButtonElement>("[data-strategy-status]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.strategyAppFilter = (button.dataset.strategyStatus ?? "all") as AppState["strategyAppFilter"];
+      render();
+    });
+  });
+
+  document.querySelectorAll<HTMLButtonElement>("[data-strategy-detail-tab]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.strategyDetailTab = (button.dataset.strategyDetailTab ?? "overview") as StrategyDetailTab;
+      render();
+    });
+  });
+
+  document.querySelectorAll<HTMLButtonElement>("[data-preview-experiment]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const app = state.strategyPreview.apps.find((item) => item.id === button.dataset.previewExperiment);
+      state.experimentHandoffAppName = app?.name;
+      state.view = "experiment";
+      window.history.replaceState(null, "", "#experiment");
+      render();
+    });
+  });
+
+  document.querySelectorAll<HTMLButtonElement>("[data-agent-category]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.agentCenterCategory = (button.dataset.agentCategory ?? "input") as AgentCategory;
+      const firstAgentByCategory: Record<AgentCategory, string> = {
+        input: "market-input",
+        analysis: "quality-analysis",
+        decision: "decision-synthesis",
+      };
+      state.selectedPreviewAgentId = firstAgentByCategory[state.agentCenterCategory];
+      state.agentCenterSearch = "";
+      render();
+    });
+  });
+
+  document.querySelectorAll<HTMLButtonElement>("[data-preview-agent]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.selectedPreviewAgentId = button.dataset.previewAgent ?? "market-input";
+      render();
+    });
+  });
+
+  document.querySelector<HTMLInputElement>("#agent-center-search")?.addEventListener("input", (event) => {
+    const input = event.currentTarget as HTMLInputElement;
+    state.agentCenterSearch = input.value;
+    const query = input.value.trim().toLowerCase();
+    document.querySelectorAll<HTMLElement>(".preview-agent-card").forEach((card) => {
+      card.hidden = Boolean(query) && !card.textContent?.toLowerCase().includes(query);
     });
   });
 
@@ -2507,6 +2692,22 @@ window.addEventListener("hashchange", () => {
   state.view = nextView;
   state.panel = null;
   state.copilotOpen = false;
+  render();
+});
+
+// Delegated once so a Prototype action remains bound across every page-memory
+// render without introducing storage, a Runtime call, or a persistent worker.
+document.addEventListener("click", (event) => {
+  const target = event.target;
+  if (!(target instanceof Element)) return;
+  const button = target.closest<HTMLButtonElement>("[data-preview-create]");
+  if (!button) return;
+  const proposal = proposalById(button.dataset.previewCreate ?? "hk-quality-trend");
+  state.strategyPreview = createPrototypeStrategyApp(state.strategyPreview, proposal);
+  state.strategyDetailTarget = "app";
+  state.strategyDetailTab = "overview";
+  state.view = "strategy-app-detail";
+  window.history.replaceState(null, "", "#strategy-app-detail");
   render();
 });
 

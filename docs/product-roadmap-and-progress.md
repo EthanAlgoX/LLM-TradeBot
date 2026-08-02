@@ -1,9 +1,9 @@
 # TradeBot 产品路线图与当前进度
 
-> 2026-08-02：LOOP-024 已完成 M5 Shadow 与晋升建议：真实 M4 deployment/run/cycle snapshot 被只读 Shadow 消费，独立 append-only facts 输出 Champion/Challenger 描述性比较与 terminal recommendation。Agent Chrome 已验证中英文双尺寸、A/B 切换、刷新与 Web/API 重启恢复；仍不授权 Live、Canary 或交易所写入。下一阶段仅为 M6 的非操作性授权门槛准备（LOOP-025）。
+> 2026-08-02：LOOP-026 已交付 R0 Strategy App 产品预览框架并等待用户产品评审。新增页面均是显式 `SAMPLE` / `PROTOTYPE` 页面内存状态，未接入推荐、Blueprint、Strategy App 物化、Runtime 或交易服务；M5 真实 Shadow 和 Paper Only 边界未改变。
 
 > 文档角色：当前完成度、剩余缺口和交付顺序的权威快照
-> 最后更新：2026-07-31
+> 最后更新：2026-08-02
 > 产品基线：[`../PRODUCT.md`](../PRODUCT.md)
 > 架构基线：[`architecture-and-delivery-plan.md`](architecture-and-delivery-plan.md)
 > 当前交接：[`project-status-and-handoff.md`](project-status-and-handoff.md)
@@ -34,6 +34,7 @@ npm run dev:paper   STARTED
 | DecisionPipeline 与交易安全链 | `REAL` | Selector `topN=1`；当前持仓进入 Position Monitor；唯一动作链为 Decision → Portfolio → Risk → Execution |
 | Crypto Paper Runtime | `REAL` | 服务端注册 Binding、Preflight、Lease、Heartbeat、Fencing、Close-only、Drain、Safe Stop 和持久化运行记录 |
 | M5 Shadow / Promotion Recommendation | `REAL` | 仅消费明确 M4 persisted cycle/artifact snapshot；独立 append-only Shadow facts、cursor history、同 scope 对比和 terminal read-only recommendation；无 Execution Port |
+| R0 Strategy App Product Preview | `PROTOTYPE_ONLY` | Advisor、Strategy App、Agent Center、Market Radar、Experiment handoff 与三槽位信息架构；刷新恢复 Sample，不调用 LLM、API、SQLite、Runtime 或交易 |
 | Exchange 写入 | `UNAVAILABLE` | Paper Only，`exchangeWriteAllowed=false`，没有 Binance 或其他交易所写接口 |
 | Market/Data/Agent Registry | `REAL` | Market Pack、Data Source Capability、Agent Template、Preset 均由服务端注册；客户端不能上传实现 |
 | Pipeline Graph 与 Validator | `REAL` | 检查 Schema、Observation Window、Lineage、权限链、Release Gate 和注册实现 |
@@ -73,6 +74,13 @@ npm run dev:paper   STARTED
 - Pipeline Graph Validator、Historical Graph Executor、Configuration Draft。
 - Graph Backtest / Walk-Forward Evidence、Human Approval、Approved Paper Plan。
 - M5 Shadow 只读 snapshot、同 scope Champion/Challenger comparison、版本化 policy 与 Promotion Recommendation；不批准、不部署、不替换 Runtime。
+
+### R0：Strategy App 产品预览（等待用户评审）
+
+- 自然语言目标先进入 Strategy Advisor 的 Sample Intent 与 Proposal，而不是直连任意 Agent Graph；
+- 用户确认前只在页面内存创建 `PROTOTYPE` Strategy App；刷新后恢复 Sample；
+- Data Center、Agent Center、Experiment 与 Trade Center 的边界在 Web 中可点击审阅，但不改变 M2～M5 真实服务；
+- 未来模型为每个账户 Scope 一个 Live Champion 和每个 Workspace 最多三个 active Paper Challenger；当前 Live 始终 `NOT AUTHORIZED`。
 
 ### M6-M8：受控产品工作区
 
@@ -205,7 +213,16 @@ accepted_for_validation
 - `CurrentCryptoReadOnlyShadowAdapter` 为受限服务端注册 adapter，明确无 Execution Port，全部结果固定 `runtimeApplied=false`、`exchangeWriteAllowed=false`、`executionReachable=false`。M4 账户、position、order、fill、cycle journal、risk/safety 和现有 Artifact 从未由 Shadow 写入。
 - 同 scope Champion/Challenger 对比仅报告 decision、risk、expected exposure、data quality、health 和 evidence gaps；文案明确为描述性而非因果或收益承诺。版本化 server policy 仅输出 terminal/read-only `insufficient_data`、`observe` 或 `recommend_validation`，不能批准、部署、替换、apply 或控制 runtime。
 - 验证：`npm run check`、`npm run test:ts`、`npm run build:web` 与 `git diff --check` 均 PASS。新增 M5 行为测试覆盖独立事实、无 M4 projection 写入、actor/cursor 隔离、幂等、并发去重、重启恢复、missing/stale/ambiguous fail-closed 与 terminal recommendation。Agent Chrome 在中文 1440×900 和英文 820×760 验证真实 A/B M4 facts、快速切换、Simulation/Live 视图、刷新和 Web/API 重启恢复；Network 与 Console clear 为 `TOOL_UNAVAILABLE`，可读取的 Console warning/error 为空。
-- M5 为 `COMPLETE`。下一步为 [`LOOP-025`](loop-prompts/loop-025-m6-live-canary-authorization-gate-v1.md) 的 M6 授权门槛准备；它不授权 Live、Canary、Execution Port、账户、交易所写或 Champion 替换。
+- M5 为 `COMPLETE`。R0 产品预览完成后进入用户评审，不执行 LOOP-025 或任何 M6 工作，直至用户明确确认产品方向。
+
+## 2026-08-02：R0 Strategy App 产品预览框架
+
+- 状态：`PROTOTYPE_ONLY / READY_FOR_USER_REVIEW`。LOOP-026 只新增前端页面内存状态与显示，不新增 API、SQLite、LLM、Graph 生成、Agent 代码生成、Strategy Blueprint 匹配或 Strategy App 后端物化。
+- 产品导航覆盖总览、策略助手、我的策略应用、Agent 中心、数据中心、实验场和交易中心；`#orchestration`、`#lab`、`#activity`、`#connections` 等既有入口保持稳定。
+- Strategy App 详情七个 Tab 均只读；Risk / Execution 是锁定系统组件。Experiment handoff 可见但不发起 Backtest / Walk-Forward / Candidate / Runtime。
+- Simulation Capacity 清晰表达为 `2 / 3 Running` Sample；第四个启动意图在纯产品状态层被拒绝且没有 Runtime 调用。Live 区域固定显示 `LIVE UNAVAILABLE / NOT AUTHORIZED / Exchange writes OFF`。
+- 验证：`npm run check`、`npm run test:ts`、`npm run build:web`、`git diff --check` 通过。Agent Chrome 在中文 1440×900 走完 Advisor → Proposal → Prototype → My Apps → Experiment handoff → Trade Center；英文 820×760 验证七个详情 Tab、可用导航和 `scrollWidth=clientWidth=820`。Console clear 与 Network 为 `TOOL_UNAVAILABLE`。
+- 下一步：`AWAITING_USER_PRODUCT_REVIEW`；不创建详细后端 Loop，也不恢复 M6。
 ## 2026-07-31：Production Semantic Candidate Persistence
 
 - 状态：`REAL`。Rule Reflection 已生成并持久化严格 Semantic Candidate，Review 与 Materialization 使用同一 append-only Store。
