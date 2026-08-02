@@ -1,6 +1,6 @@
 # TradeBot 产品路线图与当前进度
 
-> 2026-08-02：M2 未关闭。CSV Composer、共享 Binding 合同及有界幂等键已修复；真实 Chrome 中 Binding 后历史恢复会切换到非 CSV Draft，待 LOOP-017 关闭 Authority 恢复问题。
+> 2026-08-02：M2 数据中心 V1 已由 LOOP-017 关闭；336/336 自动化与 Agent Chrome 完整闭环通过。当前进入 LOOP-018：M3 实验场 V1。
 
 > 文档角色：当前完成度、剩余缺口和交付顺序的权威快照
 > 最后更新：2026-07-31

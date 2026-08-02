@@ -140,12 +140,12 @@ Comparative Evidence 当前由 active production composition 的内存索引支�
 
 ## 6. 最新验证
 
-M1 历史对话 V1 完成后的最新完整基线：
+M2 数据中心 V1 完成后的最新完整基线：
 
 ```text
 npm run check       PASS
-npm run test:ts     PASS (328/328)
-npm run build:web   PASS (31 modules, 82ms)
+npm run test:ts     PASS (336/336)
+npm run build:web   PASS
 git diff --check    PASS
 npm run dev:paper   STARTED
 ```
@@ -159,19 +159,19 @@ API: http://127.0.0.1:8787
 
 启动日志确认 Comparative Trade Review、Runtime Evidence 与 Orchestration/API 已启用，exchange write capability disabled。
 
-浏览器状态：M1 已通过真实 Chrome 完成 1440×900、820×760、中英文、会话恢复、Storage/Network、Console 与 Runtime 安全验收。M2 实现完成后仍必须使用真实 Chrome 验证数据中心可见工作流；不能只以自动化测试替代。
+浏览器状态：M1 已通过真实 Chrome 完成历史会话、Storage/Network、Console 与 Runtime 安全验收；M2 已通过 Agent Chrome 完成 1440×900、820×760、中英文、CSV Binding、刷新/服务重启、Composer 和会话隔离。M3 实现后仍必须使用 Agent Chrome 验证真实实验工作流，不能以自动化替代。
 
 ## 7. 下一阶段
 
-执行 **数据中心 V1**（M2）：
+执行 **实验场 V1**（M3）：
 
-1. 增加一级“数据中心”入口与服务端登记的 Data Assets 列表/详情。
-2. 首期复用现有 Binance Public 与 CSV Historical 能力。
-3. 展示 Snapshot、Schema、Quality、Lineage、更新时间与健康状态。
-4. 让 Strategy Draft 显式绑定不可变 Dataset version/fingerprint。
-5. 对缺失资产、跨 actor 引用和能力不匹配 fail closed。
-6. 提供基于当前真实能力的 Market Radar，不伪造不可用数据。
-7. 在真实 Chrome 中完成数据绑定、拒绝路径、窄屏和 Runtime 安全验收。
+1. 将静态 Agent Lab 替换为服务端权威、可重放的 Experiment Workspace。
+2. 从历史 Conversation/Strategy Version 选择 2～5 个参与者并锁定传递依赖快照。
+3. 锁定 Dataset、时间、资金、费用、Execution/Risk 与 Model/Prompt 条件。
+4. 复用现有 Graph Backtest/Walk-Forward Evidence，展示真实 equity、Scorecard、Diff 和 lineage。
+5. 由服务端判定 Controlled/Open Class/Incompatible，不使用不可解释单分数声称赢家。
+6. 赢家只形成 Candidate，不提供 Approval、Paper/Live 发布或 Runtime Apply。
+7. 由 Agent Chrome 完成创建、Evidence、重放、负向、双尺寸、Console 与 Runtime safety 验收。
 
 ### M1 实施状态（2026-08-01）
 
@@ -198,7 +198,8 @@ API: http://127.0.0.1:8787
 - LOOP-014 为 `PARTIAL`：提交 `69d785d710f2db2293227137b494a9ba5aa5d999` 已修复 Conversation Replay 缺失 Dataset version/fingerprint 投影，以及同毫秒追加权威 Turn 的稳定排序；332/332 自动化通过。Agent Chrome 已验证 CSV 正向 UI Binding、Authority 与刷新恢复、中文 1440×900、英文 820×760、负向 fail-closed 和产品 Console。继续对话实际返回 `INTERNAL_ORCHESTRATION_ERROR`，因此 M2 不关闭；Network 因 Agent Chrome 不提供读取能力而未验证，不要求用户人工补验。
 - LOOP-015 为 `IN_PROGRESS`：提交 `0ca86b7c2a2c1de70c2891cec6a832d3bbb0119f` 已修复 CSV Historical Agent Template 的允许字段、域错误到 HTTP 的稳定映射、按权威 Draft 精确选择 CSV recipe/Graph，以及服务重启后的 replay mapping；333/333 自动化通过。Agent Chrome 中文 1440×900 页面稳定且 CSV 资产可见，但可见 Binding 返回 `REQUEST_CONTRACT_INVALID`，故 Binding → Composer、英文窄屏与负向闭环未验证；Console 无产品 error，Network 为 `TOOL_UNAVAILABLE`。
 - LOOP-016 为 `PARTIAL`：提交 `c68aad5819accbe99db6a3ab17b2b9c300cb6ea6` 已将 Dataset Binding request 收拢为前后端共享严格 Schema，并把超过 160 字符的旧拼接 idempotency key 改为稳定有界 `binding.<uuid>`；334/334 自动化和正式 handler 幂等/fail-closed 通过。Agent Chrome 中合同错误已消失，但 Binding 后历史恢复会切换到非 CSV Draft 上下文，因此正向闭环、Composer、英文窄屏与 Authority 恢复未验证；Console 无产品 error，Network 为 `TOOL_UNAVAILABLE`。
-- 用户禁止人工校验；下一步执行 [`LOOP-017`](loop-prompts/loop-017-m2-csv-binding-authority-recovery-closeout-v1.md)，区分服务端 latest 排序、Web 会话选择、异步响应覆盖和状态残留，改为 Binding 后同会话定向 read-after-write，并由 Agent Chrome 完成 M2 闭环。全部通过后生成 LOOP-018（M3）。
+- LOOP-017 为 `COMPLETE`：提交 `b78a6f76e99bc5e17fb5e70586cf5907fc619b9a` 已确认服务端 Binding/Turn 排序正确，并修复 Web 全局 history/localStorage 重新选择、陈旧 load 响应覆盖、Turn merge Authority 与 pending/result 跨会话污染。Binding 后现对原 conversation 定向 read-after-write，并校验完整 Draft/Dataset identity；336/336 自动化通过。Agent Chrome 已完成 CSV Binding、刷新、本项目服务重启、Composer、A/B 往返、分页、中文 1440×900、英文 820×760、负向和 Console；Runtime 保持未应用，Network 为 `TOOL_UNAVAILABLE`。M2 已关闭。
+- 用户禁止人工校验；下一步执行 [`LOOP-018`](loop-prompts/loop-018-m3-experiment-lab-v1.md)，将静态 Mock Agent Lab 重构为服务端权威的可重放实验场，比较 2～5 个 Strategy Version，复用真实 Backtest/Walk-Forward Evidence，并保持 Candidate-only/no deploy。
 
 完整 Prompt：[`next-loop-prompt.md`](next-loop-prompt.md)。
 
