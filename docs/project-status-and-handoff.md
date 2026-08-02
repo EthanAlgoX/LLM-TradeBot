@@ -197,7 +197,8 @@ API: http://127.0.0.1:8787
 - 根因是 Current Crypto recipe/Graph 的注册 data-source set 为 Binance Public；显式请求 CSV 会被正确的 Graph exact-set 校验拒绝，不得放宽。LOOP-013 已通过独立 CSV Historical Preset/Graph 和可见创建入口解决该能力缺口，提交 `b7d9fa65a5a9a3220685a5003592a3940c5797ad` 已推送；331/331 自动化通过。Agent Chrome 已确认中文资产、真实 CSV Draft 创建与启用确认动作，但未完成 Binding 成功态、权威引用与刷新恢复、继续对话、英文窄屏及 Console/Network 观察，故 LOOP-013 为 `PARTIAL`、M2 仍为 `IN_PROGRESS`。
 - LOOP-014 为 `PARTIAL`：提交 `69d785d710f2db2293227137b494a9ba5aa5d999` 已修复 Conversation Replay 缺失 Dataset version/fingerprint 投影，以及同毫秒追加权威 Turn 的稳定排序；332/332 自动化通过。Agent Chrome 已验证 CSV 正向 UI Binding、Authority 与刷新恢复、中文 1440×900、英文 820×760、负向 fail-closed 和产品 Console。继续对话实际返回 `INTERNAL_ORCHESTRATION_ERROR`，因此 M2 不关闭；Network 因 Agent Chrome 不提供读取能力而未验证，不要求用户人工补验。
 - LOOP-015 为 `IN_PROGRESS`：提交 `0ca86b7c2a2c1de70c2891cec6a832d3bbb0119f` 已修复 CSV Historical Agent Template 的允许字段、域错误到 HTTP 的稳定映射、按权威 Draft 精确选择 CSV recipe/Graph，以及服务重启后的 replay mapping；333/333 自动化通过。Agent Chrome 中文 1440×900 页面稳定且 CSV 资产可见，但可见 Binding 返回 `REQUEST_CONTRACT_INVALID`，故 Binding → Composer、英文窄屏与负向闭环未验证；Console 无产品 error，Network 为 `TOOL_UNAVAILABLE`。
-- 用户禁止人工校验；下一步执行 [`LOOP-016`](loop-prompts/loop-016-m2-csv-binding-ui-contract-closeout-v1.md)，先以共享 Schema 精确定位并修复 UI Binding 合同，重点检查拼接 idempotency key 的 160 字符上限，再由 Agent Chrome 完成 M2 闭环。全部通过后生成 LOOP-017（M3）。
+- LOOP-016 为 `PARTIAL`：提交 `c68aad5819accbe99db6a3ab17b2b9c300cb6ea6` 已将 Dataset Binding request 收拢为前后端共享严格 Schema，并把超过 160 字符的旧拼接 idempotency key 改为稳定有界 `binding.<uuid>`；334/334 自动化和正式 handler 幂等/fail-closed 通过。Agent Chrome 中合同错误已消失，但 Binding 后历史恢复会切换到非 CSV Draft 上下文，因此正向闭环、Composer、英文窄屏与 Authority 恢复未验证；Console 无产品 error，Network 为 `TOOL_UNAVAILABLE`。
+- 用户禁止人工校验；下一步执行 [`LOOP-017`](loop-prompts/loop-017-m2-csv-binding-authority-recovery-closeout-v1.md)，区分服务端 latest 排序、Web 会话选择、异步响应覆盖和状态残留，改为 Binding 后同会话定向 read-after-write，并由 Agent Chrome 完成 M2 闭环。全部通过后生成 LOOP-018（M3）。
 
 完整 Prompt：[`next-loop-prompt.md`](next-loop-prompt.md)。
 

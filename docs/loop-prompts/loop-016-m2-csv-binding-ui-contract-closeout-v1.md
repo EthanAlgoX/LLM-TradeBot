@@ -3,12 +3,21 @@
 ```text
 Loop ID：LOOP-016
 里程碑：M2 数据中心 V1
-状态：READY
+状态：PARTIAL
 前置 Loop：LOOP-015（IN_PROGRESS，Composer 服务端链路已修复；Chrome Binding 返回 REQUEST_CONTRACT_INVALID）
 执行环境：本地仓库 + 实现后由 Agent 直接控制真实 Google Chrome
 浏览器要求：实现后必需；禁止用户手工验收或 DevTools 交接
 验收模式：CONTRACT_FIX_AND_AGENT_CHROME_VERIFIED
 ```
+
+## 执行结果（2026-08-02）
+
+- 根因确认：旧 `idempotencyKey` 由完整 versionId 与 fingerprint 拼接，超过服务端 160 字符上限。
+- 已改为共享严格 Binding Schema 与短、opaque、同一 pending action 内稳定的 `binding.<uuid>`；正式 handler、幂等与负向 fail-closed 通过。
+- 自动化：`check` PASS、`test:ts` 334/334 PASS、`build:web` PASS、`diff-check` PASS。
+- Agent Chrome 中 `REQUEST_CONTRACT_INVALID` 已消失，但 Binding 后历史恢复会切换到非 CSV Draft；正向 Binding → Composer Authority 闭环未验证。
+- 中文 1440×900 无横向滚动，Console 产品 error 为 0，Network 为 `TOOL_UNAVAILABLE`；M2 保持 `IN_PROGRESS`。
+- 实现提交 `c68aad5819accbe99db6a3ab17b2b9c300cb6ea6` 已推送 `main`；后续执行 [`LOOP-017`](loop-017-m2-csv-binding-authority-recovery-closeout-v1.md)。
 
 ## 目标
 
