@@ -3207,7 +3207,7 @@ kbd,
   }
 }
 
-@media (max-width: 1240px) {
+@media (max-width: 1500px) {
   .command-bar {
     grid-template-columns: minmax(210px, auto) 1fr auto;
   }
