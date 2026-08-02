@@ -1,9 +1,9 @@
 # TradeBot 产品优化规划与进度
 
-> 2026-08-03：LOOP-028 已按用户反馈细化 R1 的两个核心对话面：模拟页恢复子 Agent 多轮运行对话，编排工作台改为“对话即编排结果”，不再用固定右侧 Workflow。预览仍为 `SAMPLE / PROTOTYPE / PAGE MEMORY`，没有 Runtime 或交易副作用。
+> 2026-08-03：LOOP-029 已完成预览后的功能化路线整理。后续固定按“Agent 中心版本基础 → 连接能力完善 → LLM 编排推荐 → 预上线与回测 → 最多三个真实模拟实例”逐步接入，M6 Live 继续暂停。
 
 > 文档角色：汇总 2026-08-01 之前的产品讨论，作为后续产品优化、页面收敛和阶段验收的执行入口
-> 最后更新：2026-08-02
+> 最后更新：2026-08-03
 > 产品基线：[`../PRODUCT.md`](../PRODUCT.md)
 > 当前工程进度：[`product-roadmap-and-progress.md`](product-roadmap-and-progress.md)
 > 架构与安全边界：[`architecture-and-delivery-plan.md`](architecture-and-delivery-plan.md)
@@ -23,9 +23,11 @@
 
 ## 2. 产品定位与已确认方向
 
-TradeBot 的核心定位保持不变：
+TradeBot 的核心定位更新为：
 
-> 用户通过自然语言连接数据、分析、决策与反思 Agent，形成版本化、可验证、可回测、可审计并能受控运行的交易系统。
+> 用户先在 Agent 中心准备可复用、可版本化的输入、分析、决策与反思 Agent；编排工作台再通过自然语言理解需求、推荐动态 Agent Graph，并在用户确认后生成可验证、可回测、可审计、可受控运行的 Strategy Draft。
+
+自然语言不是无约束的自由工作流编辑器。LLM 只能推荐 Agent 中心已有的明确版本，并返回结构化 `nodes + edges`；前端负责展示，服务端负责 Registry 解析、Schema 兼容、DAG、权限和成本校验。用户可以修改推荐并重新生成，也可以选择是否应用，但不能通过对话上传实现、执行代码或绕过固定安全节点。
 
 与参数化固定交易流水线不同，TradeBot 的优势是动态 Agent 编排：
 
@@ -47,17 +49,18 @@ Data Bindings
 Decision -> Portfolio -> Risk -> Execution
 ```
 
-数据输入、分析节点、Prompt、模型、观察窗口、上下文汇总和 Reflection 拓扑都可以通过对话创建新 Draft Version；任何对话变更都不能直接热更新正在运行的 Agent。
+数据输入、分析节点、Prompt、模型、观察窗口、上下文汇总和 Reflection 拓扑都可以形成新 Draft Version；Agent 自身配置在 Agent 中心版本化，Strategy Graph 在编排工作台版本化。任何修改都不能直接热更新正在运行的 Agent。
 
 ## 3. 目标产品闭环
 
 ```text
-数据中心
-  -> 对话式编排 Agent
+连接配置
+  -> Agent 中心：配置 Agent Version
+  -> 编排工作台：对话推荐 Dynamic DAG
   -> Immutable Strategy / Workflow Version
   -> Contract Validation
-  -> 实验场：Backtest / Walk-Forward / Comparison
-  -> 模拟运行：实时 Paper Forward Test
+  -> Preflight / Backtest / Walk-Forward
+  -> 模拟交易：最多三个 Paper Forward Test
   -> Shadow：真实环境旁路决策
   -> Human Approval / Canary
   -> Live Champion
@@ -67,18 +70,16 @@ Decision -> Portfolio -> Risk -> Execution
 
 目标不是让系统自动追逐短期收益最高的策略，而是持续发现“在当前目标、风险约束和证据范围内更好的 Challenger”，经过验证、灰度和人工审批后替换 Live Champion。
 
-## 4. 目标一级信息架构
+## 4. 已确认的四页信息架构
 
 | 一级页面 | 回答的核心问题 | 主要内容 |
 | --- | --- | --- |
-| 交易 Agent | 当前模拟或真实 Agent 运行得怎么样 | 环境切换、收益、持仓、Agent 轨迹、风险、执行、运行控制 |
-| 数据中心 | 系统有哪些数据，当前市场发生了什么 | Market Radar、Data Assets、Sources、Ingestion & Quality |
-| 编排 Agent | 交易系统应该怎样连接和决策 | 历史对话、结构化 Draft、Agent Graph、Prompt/Diff、Validation |
-| 实验场 | 哪个策略、模型、Prompt 或 Graph 更好 | Backtest、Walk-Forward、版本对比、实验 Scorecard |
-| 审计记录 | 为什么产生这次决策和交易 | Run、Cycle、Trace、Artifact Lineage、Trade Review、Reflection |
-| 连接配置 | 外部服务和权限如何接入 | Data/LLM Provider、Paper/只读/未来 Live Account、Secret 与权限 |
+| 模拟交易 | 哪几个策略正在模拟、表现和推理过程怎样 | 最多三个 Paper Strategy、收益曲线、回撤、最近决策、按轮次的子 Agent Artifact 对话、停止与详情 |
+| 编排工作台 | 我的策略需求应使用哪些 Agent、如何连接 | 对话、澄清、动态 DAG 推荐、Agent Version 引用、应用 Strategy Draft、Preflight/Backtest 门槛 |
+| Agent 中心 | 系统有哪些可复用 Agent、它们如何理解输入 | Input/Analysis/Decision/Reflection 四类，数据/上游、Model、用户 Prompt、Schema、测试和不可变版本 |
+| 连接配置 | 数据与模型能力是否可用 | Data Source/Dataset、Model Provider/API、能力探测、健康状态和后端 Secret 引用 |
 
-页面关系遵循“默认简单、按需深入”：首页先展示用户当前最需要判断的结果，Graph、Artifact、Prompt、Lineage 和工具调用作为详情或高级视图。
+实验、审计、Data Asset 深度治理和 Runtime 运维能力不删除，但不占一级导航：Backtest/Walk-Forward 作为编排方案的验证步骤；Trace/Lineage 作为模拟详情；Data Asset 质量作为连接详情。页面关系遵循“默认简单、按需深入”。
 
 ## 5. 核心领域对象
 
@@ -689,6 +690,90 @@ README 中的 `320/320 PASS` 当前已过期。恢复稳定测试基线是后续
 
 验收：Agent Chrome 在 1440×900 完成 Simulation Dialogue、Workbench 动态 Crypto 推荐与 Apply，在 820×760 验证零横向溢出和 US Earnings Dialogue 切换；Console error 0。自动化与构建通过，未新增后端、持久化、LLM 或 Runtime 调用。
 
+### F1：Agent 中心 V1——可版本化配置
+
+状态：`PLANNED / NEXT`（从 LOOP-030 开始）
+
+目标：把当前 Sample Catalog 变成四类 Agent 的真实管理与版本中心，并优先复用已有 Registry、Configuration Draft、Model Adapter 与 Dataset 事实。
+
+- [ ] 定义 `AgentDefinition` 与不可变 `AgentVersion`，覆盖 Input、Analysis、Decision、Reflection 四类；
+- [ ] 每个版本精确绑定 Agent Template、数据或上游 Artifact、Model Connection Ref、Prompt Bundle、输入/输出 Schema、工具权限、预算和 fingerprint；
+- [ ] Input Agent 将确定性 Connector/Normalizer 与可编辑语义解读 Prompt 分开，禁止 LLM 改写原始事实；
+- [ ] 用户可编辑层显示为 System Prompt，但平台安全规则、工具权限、输出 Schema、Risk/Execution 边界保持系统锁定；
+- [ ] Prompt 修改、模型修改、数据源修改或上游合同修改都创建新 Draft Version，不能覆盖 Published/Running Version；
+- [ ] Agent 详情提供概览、数据/上游、模型、Prompt、Schema、测试、版本历史七个区域；
+- [ ] 支持创建、克隆、保存 Draft、校验、发布到 Catalog 和归档；不支持动态上传代码或 Adapter。
+
+建议分三轮完成：第一轮建立真实版本合同、Repository/API 和详情骨架；第二轮接入数据/模型/Prompt 编辑与严格校验；第三轮补测试台、版本 Diff、发布/归档和 Chrome 收尾。每轮有修改都提交、推送，但只有真实持久化、恢复、隔离和 UI 全链均通过时 F1 才能标记 `COMPLETE`。
+
+浏览器要求：实现后必需，由 Agent 直接操作真实 Chrome；文档和纯合同中间轮可标记 `NOT_REQUIRED`，但不能据此关闭 F1。
+
+### F2：连接配置 V1——数据与模型能力
+
+状态：`PLANNED`
+
+- [ ] 数据连接显示 Provider、Market、Capability、Schema、Observation Window、历史覆盖、实时性、质量与 Dataset Snapshot；
+- [ ] 模型连接显示 Provider、Model、Base URL 类型、JSON/Tool 能力、上下文窗口、限流、成本预算和健康状态；
+- [ ] Secret 只在后端安全存储或引用，任何 GET、日志、浏览器 Storage、Artifact 和 Prompt 都不得返回 Secret value；
+- [ ] 提供连接测试、能力探测、禁用和影响范围，已被 Agent Version 引用的连接不能静默删除；
+- [ ] Agent 中心选择的是 Connection/Dataset 的稳定 ID 与版本，不复制凭证或自由 URL。
+
+依赖：复用 M2 Data Asset/Capability 事实和现有 Model Provider 配置；不建立第二套 Dataset 或 Secret 模型。浏览器要求：实现后必需。
+
+### F3：编排工作台 V2——真实 LLM 推荐动态 DAG
+
+状态：`PLANNED`
+
+- [ ] 用户自然语言先产生结构化 Strategy Intent；需求不完整时只返回澄清问题，不强行编排；
+- [ ] LLM 通过注册 Tool/Structured Output 返回说明、`nodes`、`edges`、假设、缺口和推荐理由，不返回 HTML；
+- [ ] 所有节点必须引用 F1 已发布的精确 Agent Version，禁止发明 Agent、Prompt、Model、Data Source 或实现；
+- [ ] 支持一对多、多对一、并行分支和汇聚，例如 K 线 → 短/中/长周期，新闻 → 情绪，全部汇入 Decision；
+- [ ] 服务端校验 DAG 无非法环、Artifact Schema 兼容、数据能力可达、必需输入完整、并发/Token/成本有界；
+- [ ] Portfolio、Risk Gate、Paper Execution 是系统补齐并锁定的动作链，LLM 不能删除、绕过或重排；
+- [ ] 前端把结构化结果渲染为当前对话内动态拓扑；窄屏降级为明确的上游/下游列表；
+- [ ] “应用此方案”创建不可变 Strategy Draft 和完整 Agent/Data/Model/Prompt fingerprints，不启动 Runtime。
+
+依赖：F1 Agent Version Catalog；模型能力来自 F2。浏览器要求：实现后必需。
+
+### F4：预上线检查与历史验证
+
+状态：`PLANNED`
+
+- [ ] Preflight 检查 Agent/Graph/Data/Model/Prompt/Schema/Tool/预算与固定安全链；
+- [ ] 验证失败返回稳定 issue code、具体节点和修复建议，绝不自动降级为可运行；
+- [ ] 通过后复用现有 Backtest、Walk-Forward、Experiment Evidence 和 Replay，不建立第二套回测系统；
+- [ ] 对话中的方案卡展示门禁状态、Evidence lineage、版本 Diff 和 stale；
+- [ ] Prompt、Agent、Dataset、Graph、Execution Model 任一变化都会产生新 fingerprint 并使旧 Evidence stale；
+- [ ] 验证结束仍是 `runtimeApplied=false`，用户另行选择是否加入模拟槽位。
+
+依赖：F3 的真实 Strategy Draft。浏览器要求：实现后必需。
+
+### F5：模拟交易 V2——接回真实 M4 Runtime
+
+状态：`PLANNED`
+
+- [ ] 只有 F4 合格的 Strategy Version 才能申请模拟槽位；
+- [ ] 同一 actor 最多三个 active Paper Deployment，超过上限服务端 fail closed，而非仅前端禁用；
+- [ ] 每个实例绑定独立 Strategy/Data/Model/Prompt/Execution fingerprints、虚拟账户、预算、调度与 Token 使用上限；
+- [ ] 复用 M4 deployment/run/account/lease/fencing/close-only/restart recovery，不创建第二套模拟 Runtime；
+- [ ] 收益曲线、回撤、交易、风险和每轮子 Agent 对话读取真实 cycle/artifact projections；
+- [ ] Artifact 对话必须按显式 lineage 展示轮次、时间、上游、并行分支、汇聚与下游，不用 DOM 顺序推断因果；
+- [ ] 停止一个实例不影响其他实例；刷新和 Web/API 重启后恢复；页面始终没有 Live 或交易所写入口。
+
+依赖：F4 合格版本和现有 M4。浏览器要求：实现后必需。
+
+### F6：功能收敛与运营护栏
+
+状态：`PLANNED`
+
+- [ ] Token、调用次数、延迟和模型错误按 Agent/Run 可见并有硬预算；
+- [ ] Agent Version、Strategy Version、Run、Artifact 和 Evidence 可从四页互相追溯；
+- [ ] 统一 loading/empty/error/stale/permission 状态、中英文、键盘焦点和窄屏；
+- [ ] 清理 Sample 与真实事实混排，真实未接通时明确 unavailable，不补造数据；
+- [ ] 建立页面性能、最大节点数、最大 Artifact 数和长对话分页护栏。
+
+F6 是四页真实功能闭环的关闭阶段，不包含 M6 Live。
+
 ### M6：受控 Live 与 Canary
 
 状态：`FUTURE / NOT AUTHORIZED`
@@ -752,7 +837,13 @@ M0 恢复稳定基线和路由
 -> M4 多模拟运行中心（COMPLETE：LOOP-023）
 -> M5 Shadow 与晋升建议（COMPLETE：LOOP-024）
 -> R0 Strategy App 产品预览框架（COMPLETE：LOOP-026）
--> AWAITING_USER_PRODUCT_REVIEW
+-> R1 四页与对话面预览（COMPLETE：LOOP-027 / LOOP-028）
+-> F1 Agent 中心 V1（NEXT：LOOP-030）
+-> F2 连接配置 V1
+-> F3 编排工作台 V2
+-> F4 预上线检查与历史验证
+-> F5 模拟交易 V2
+-> F6 功能收敛与运营护栏
 ```
 
 完成 M4 后，TradeBot 将形成首个完整、仍保持 Paper Only 的产品闭环：
@@ -766,4 +857,4 @@ M0 恢复稳定基线和路由
 -> 产生下一版候选
 ```
 
-M6 的 Live、Canary、Champion 替换和任何自动化晋升仍属于独立安全阶段；在用户确认 R0 产品预览并另行授权前，不创建详细后端 Loop，也不恢复 M6。
+用户已经确认四页与动态 DAG 方向，可以从 F1 开始逐模块功能化。M6 的 Live、Canary、Champion 替换和任何自动化晋升仍属于独立安全阶段；完成 F1～F6 不能被解释为 Live 授权，也不得恢复 LOOP-025。

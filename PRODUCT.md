@@ -117,10 +117,12 @@ Web 首期只保留四个普通用户页面：
 
 1. **模拟交易**：作为默认首页，最多同时比较三个模拟策略的收益、回撤、最近决策和运行状态；页面底部按模拟策略展示多轮子 Agent 对话，并明确每条输出的轮次、生成时间、上游回复与下游去向；不提供 Live 或交易所写入入口。
 2. **编排工作台**：页面以完整对话为主，不设置固定流程画布。用户用自然语言描述或修改目标后，每次助手回复都从 Agent 中心推荐一张新的动态多 Agent 拓扑；“应用方案”只生成可审阅策略，并进入预上线检查、回测和模拟槽位门禁，不直接启动 Runtime。
-3. **Agent 中心**：分别管理 Input、Analysis、Decision、Reflection 四类 Agent，作为编排工作台唯一可引用的能力目录。
+3. **Agent 中心**：分别管理 Input、Analysis、Decision、Reflection 四类 Agent。每个不可变 Agent Version 可绑定数据或上游 Artifact、Model Connection、用户可编辑 Prompt、输入/输出 Schema、工具权限和预算，作为编排工作台唯一可引用的能力目录。
 4. **连接配置**：合并数据源与模型 API 配置，只显示连接状态和安全边界；Secret 仅保存在后端。
 
 Strategy App 列表折叠进编排工作台，策略比较折叠进模拟交易。Data Center、Experiment、Audit、复杂 Runtime 控制和内部运维工具不再占用一级导航；后端事实、验证与审计能力继续保留，但只在相应详情或开发者入口中渐进展示。
+
+Agent Prompt 必须分层：平台安全规则和权限不可编辑；用户只编辑 Agent 行为层。Input Agent 的 Connector、原始数据清洗、时间对齐与 Schema 校验保持确定性，LLM Prompt 只解释已经标准化的事实。任何 Data、Model、Prompt、Schema 或上游变化均创建新 Agent Version，不能热更新已发布或运行版本。
 
 界面需要支持完整中英文切换。中文模式尽量使用中文；市场代码、标的代码、产品名和通用交易缩写可以保留英文。
 

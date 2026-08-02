@@ -1,8 +1,8 @@
 # TradeBot 当前状态与接手说明
 
-> 2026-08-03 接手更新：LOOP-028 已在 R1 四页预览上完成模拟/编排对话面细化。模拟页恢复多轮子 Agent 语义对话，编排工作台改为对话内返回动态拓扑；所有新内容仍是显式 `SAMPLE / PROTOTYPE / PAGE MEMORY`，M0～M5 后端与 M5 Shadow 边界未修改。当前状态为 `AWAITING_USER_PRODUCT_REVIEW`。
+> 2026-08-03 接手更新：LOOP-029 已完成四页产品的功能化规划。用户已确认动态 DAG 与 Agent 中心可配置数据/模型/Prompt/版本的方向；下一步从 F1 Agent 中心真实版本管理开始。M0～M5 后端、M5 Shadow 与 Paper Only 边界未修改，M6 Live 仍未授权。
 
-> 快照日期：2026-08-02
+> 快照日期：2026-08-03
 > 适用仓库：`/Users/hyx/Documents/workspace/tradebot`
 > 历史交接：[`archive/project-status-and-handoff-through-2026-07-29.md`](archive/project-status-and-handoff-through-2026-07-29.md)
 > 下一任务：[`next-loop-prompt.md`](next-loop-prompt.md)
@@ -21,7 +21,7 @@
 - 覆盖或回退无关修改
 - 未经明确要求提交 Git
 
-当前最新完成 Loop 是 **R1 对话面细化预览（LOOP-028）**。它只在页面内存中恢复 Runtime Artifact 对话的表达形态，并用规则匹配展示动态推荐拓扑；没有复用或修改 M4/M5 runtime。应用方案只创建 Prototype，M5 真实边界继续 fail closed。
+当前最新完成 Loop 是 **F1～F6 功能化规划（LOOP-029）**。它只更新文档，不修改实现或 Runtime。下一实现入口是 **F1 Agent 中心 V1（LOOP-030）**，浏览器在实现后必需；M5 真实边界继续 fail closed。
 
 ## 2. 当前可运行链路
 
@@ -135,11 +135,24 @@ POST /api/orchestration/paper-deployments/:deploymentId/shadows
 R1 页面内存预览（非真实 API）：
 
 - 模拟交易：两个运行 Sample、一个空闲槽位、对比曲线和最近决策；
-- 编排工作台：三组自然语言 Sample、四段 Agent 推荐流程、应用方案与最近方案；
+- 编排工作台：三组自然语言 Sample、对话内动态 Agent DAG、应用方案与 Pending 验证门槛；
 - Agent 中心：Input、Analysis、Decision、Reflection 四类；
 - 连接配置：数据源与模型 API 两个 Tab；
 - 所有内容都标记 `SAMPLE`、`PROTOTYPE`、`NOT CONNECTED` 或 `UNAVAILABLE`，不混入真实 Data / Paper / Shadow facts；
 - 创建 Prototype 不写 Storage、Cookie、API、SQLite、Runtime 或交易；第四 Simulation Start intent 只返回页面状态拒绝，`runtimeCall=none`。
+
+已规划但未实现的功能化顺序：
+
+```text
+F1 Agent Center V1
+-> F2 Connections V1
+-> F3 Workbench V2 / real LLM structured DAG
+-> F4 Preflight + Backtest + Walk-Forward
+-> F5 Simulation V2 / existing M4 integration / max 3
+-> F6 Hardening
+```
+
+F1 的用户可编辑 System Prompt 只是 Agent 行为层；平台安全规则、工具权限、输出 Schema、Portfolio/Risk/Execution 权限不可编辑。任何 Prompt、Model、Data 或上游合同修改都创建新 Agent Version，不热更新已发布或运行版本。
 
 必须区分：
 
@@ -194,13 +207,16 @@ LOOP-028 R1.1 完成后的最新验证：
 - Agent Chrome 1440×900 与 820×760 均为零横向溢出，US Dialogue 切换成功，Console error 0；
 - `npm run check`、`npm run build:web`、受影响测试和 `git diff --check` 通过。
 
+LOOP-029 只整理规划与进度文档：不修改产品代码、SQLite、浏览器状态或本地运行数据，因此浏览器要求为 `NOT_REQUIRED`。文档把旧六页/“自然语言直接编排”表述统一为四页、Agent 中心预配置和 LLM 受约束推荐，并建立 F1～F6 顺序与 LOOP-030 唯一入口。
+
 ## 7. 下一阶段
 
-状态为 **AWAITING_USER_PRODUCT_REVIEW**：
+状态为 **FUNCTIONALIZATION_PLANNED / READY_FOR_F1**：
 
-1. 等待用户确认模拟交易、编排工作台、Agent 中心、连接配置四页结构；
-2. 在确认前不细化单页功能，不实现真实 LLM 推荐、Strategy App 物化、Runtime Apply、Live、Canary 或 M6；
-3. 保持 M0～M5 runtime、M5 Shadow、账户和交易所写边界不变。
+1. 执行 [`LOOP-030`](loop-prompts/loop-030-f1-agent-center-versioned-configuration-v1.md)，建立真实 Agent Definition/Version、Repository/API 和 Agent 中心详情工作台；
+2. LOOP-030 实现后必须由 Agent 直接操作真实 Chrome 验证；禁止用静态 DOM、API 或用户手工代替 UI 证据；
+3. F1 允许引用已有 Registry、Dataset 和 Model facts，但不得动态上传代码、暴露 Secret 或实现 Runtime Apply；
+4. 保持 M0～M5 runtime、M5 Shadow、账户和交易所写边界不变；不执行 LOOP-025 / M6。
 
 ### LOOP-021 审计与验证（2026-08-02）
 

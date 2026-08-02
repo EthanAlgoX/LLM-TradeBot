@@ -1,9 +1,9 @@
 # TradeBot 产品路线图与当前进度
 
-> 2026-08-03：LOOP-028 已完成四页预览的两项对话面细化：模拟页恢复多轮子 Agent 语义对话，编排工作台改为对话内返回动态 Agent 拓扑。页面仍是显式 `SAMPLE / PROTOTYPE`，未接入真实推荐、Strategy App 物化、Runtime 或交易服务；M5 Shadow 与 Paper Only 边界未改变。
+> 2026-08-03：LOOP-029 已将四页预览拆成 F1～F6 功能化路线。下一步从 Agent 中心真实版本管理开始，随后完善连接配置、LLM 动态 DAG、Preflight/Backtest 和最多三个真实 Paper 实例；M6 Live 继续未授权。
 
 > 文档角色：当前完成度、剩余缺口和交付顺序的权威快照
-> 最后更新：2026-08-02
+> 最后更新：2026-08-03
 > 产品基线：[`../PRODUCT.md`](../PRODUCT.md)
 > 架构基线：[`architecture-and-delivery-plan.md`](architecture-and-delivery-plan.md)
 > 当前交接：[`project-status-and-handoff.md`](project-status-and-handoff.md)
@@ -14,6 +14,8 @@
 TradeBot 已从固定 Crypto Paper Pipeline 扩展出真实的 Registry、Capability、Graph Validation、Configuration Draft、Historical Evidence、Strategy Evidence、Approval、受控 Paper Runtime、Conversation-first Copilot、Causal Review 和 Human Lesson Candidate Review 垂直切片。产品一级抽象已经校正为“通用注册输入 + 可配置多 Agent”，具体市场只作为 Market Pack 元数据和执行约束。
 
 当前不是多市场生产系统，也不是通用 Graph Runtime。生产可运行范围仍是服务端注册的 Current Crypto Paper Binding；M4 已能从已物化 Strategy Version 启动多个隔离的 Paper deployment。Draft、Approval、Lesson Candidate 和 Validation Handoff 均不会自动修改正在运行的 Runtime。
+
+用户已经确认四页、对话内动态 DAG、Agent 中心可配置数据/模型/Prompt/版本的方向。当前从 `AWAITING_USER_PRODUCT_REVIEW` 转为 `FUNCTIONALIZATION_PLANNED`；下一项是 F1 Agent 中心，不进入 M6。
 
 当前验证基线：
 
@@ -36,6 +38,11 @@ npm run dev:paper   STARTED
 | M5 Shadow / Promotion Recommendation | `REAL` | 仅消费明确 M4 persisted cycle/artifact snapshot；独立 append-only Shadow facts、cursor history、同 scope 对比和 terminal read-only recommendation；无 Execution Port |
 | R0 Strategy App Product Preview | `PROTOTYPE_ONLY` | Advisor、Strategy App、Agent Center、Market Radar、Experiment handoff 与三槽位信息架构；刷新恢复 Sample，不调用 LLM、API、SQLite、Runtime 或交易 |
 | R1 Four-page Product Preview | `PROTOTYPE_ONLY` | 只保留 Simulation、Workbench、Agent Center、Connections；自然语言推荐与方案库合并，Agent 拆为四类，数据源与模型配置合并 |
+| F1 Agent Center V1 | `PLANNED / NEXT` | 四类 Agent 的真实 Definition/Version、数据或上游、Model Ref、用户 Prompt、Schema、测试与版本历史 |
+| F2 Connections V1 | `PLANNED` | Data/Dataset 与 Model Provider 的真实能力、健康、后端 Secret 引用和影响范围 |
+| F3 Workbench V2 | `PLANNED` | LLM Structured Output 推荐已发布 Agent Version 组成的动态 DAG；Apply 只创建 Strategy Draft |
+| F4 Preflight / Evidence | `PLANNED` | 复用现有 Validator、Backtest、Walk-Forward、Experiment Evidence 与 stale 规则 |
+| F5 Simulation V2 | `PLANNED` | 四页产品层接回现有 M4；服务端强制最多三个 active Paper Deployment，展示真实 Artifact 对话 |
 | Exchange 写入 | `UNAVAILABLE` | Paper Only，`exchangeWriteAllowed=false`，没有 Binance 或其他交易所写接口 |
 | Market/Data/Agent Registry | `REAL` | Market Pack、Data Source Capability、Agent Template、Preset 均由服务端注册；客户端不能上传实现 |
 | Pipeline Graph 与 Validator | `REAL` | 检查 Schema、Observation Window、Lineage、权限链、Release Gate 和注册实现 |
@@ -240,7 +247,18 @@ accepted_for_validation
 - 编排工作台移除固定左右分栏和常驻右侧 Workflow，改为单一聊天线程。每次自然语言请求均在助手回复中带回独立拓扑，港股、美股财报和加密趋势 Sample 的 Agent 数量与连接关系不同。
 - “应用此方案”仍只创建页面内存 Prototype；应用后仅显示预上线检查、回测和模拟槽位三个待执行门槛，不调用真实检查、Evidence、Runtime 或交易接口。
 - 验证：`npm run check`、`npm run build:web`、受影响状态测试和 `git diff --check` 通过。Agent Chrome 在中文 1440×900 验证两页结构、动态生成 Crypto 新拓扑和应用门槛；820×760 无横向溢出、Simulation Dialogue 切换成功，Console error 为 0。
-- 下一步：继续 `AWAITING_USER_PRODUCT_REVIEW`；优先确认这两个对话面的产品方向，再决定真实后端接入顺序。
+- 下一步：用户已确认该方向，LOOP-029 已制定真实功能接入顺序。
+
+## 2026-08-03：F1～F6 功能化路线
+
+- 状态：`PLANNING_COMPLETE / READY_FOR_F1`。LOOP-029 仅修改产品、进度与交接文档，不修改代码、数据库、运行数据或 Runtime。
+- F1 Agent Center：先建立四类 Agent 的不可变版本、Prompt 分层、数据/上游、模型、Schema、测试和发布目录；下一入口为 LOOP-030。
+- F2 Connections：完善数据与模型连接的能力、健康、Secret 引用和影响范围；Agent Version 只引用稳定 ID/版本。
+- F3 Workbench：LLM 只返回结构化说明与 `nodes + edges`，节点必须来自已发布 Agent Version；服务端校验 fan-out/fan-in、DAG、Schema、数据、预算和固定安全链。
+- F4 Validation：复用现有 Preflight、Backtest、Walk-Forward 和 Experiment Evidence，任何 Agent/Prompt/Data/Graph 变化使旧证据 stale。
+- F5 Simulation：接回现有 M4，多实例上限由服务端强制为 3，展示真实 cycle/artifact 对话和独立账户事实。
+- F6 Hardening：成本、Token、性能、长对话、分页、追溯、中英文和状态统一。
+- 所有功能阶段仍固定 Paper Only、`runtimeApplied=false`（直到用户明确启动合格模拟）、`exchangeWriteAllowed=false`；F1～F6 不包含 Live 授权。
 ## 2026-07-31：Production Semantic Candidate Persistence
 
 - 状态：`REAL`。Rule Reflection 已生成并持久化严格 Semantic Candidate，Review 与 Materialization 使用同一 append-only Store。
