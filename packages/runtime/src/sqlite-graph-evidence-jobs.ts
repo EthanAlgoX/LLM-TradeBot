@@ -229,6 +229,11 @@ export class DurableGraphEvidenceJobService {
     return this.repository.submit("walk_forward", rawRequest, this.now().toISOString());
   }
 
+  /** Read-only lookup used by durable consumers such as Experiment Replay. */
+  get(jobId: string): GraphEvidenceJob {
+    return this.repository.get(jobId);
+  }
+
   async run(jobId: string, ownerId: string): Promise<GraphEvidenceJob> {
     const existing = this.repository.get(jobId);
     if (existing.status === "succeeded") return existing;
