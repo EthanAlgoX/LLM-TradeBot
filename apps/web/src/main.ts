@@ -206,6 +206,8 @@ interface AppState {
   experimentHandoffAppName?: string;
   workbenchDraft: string;
   simulationDialogueId: string;
+  realAgents: Array<{ definition: { definitionId: string; category: AgentCategory }; version: { versionId: string; versionIndex: number; fingerprint: string; payload: { name: string; dataRef?: string; upstreamArtifactSchemaRefs: string[]; modelRef?: string } } }>;
+  agentCenterToken: string;
 }
 
 const appRoot = document.querySelector<HTMLDivElement>("#app");
@@ -260,6 +262,8 @@ const state: AppState = {
   connectionPreviewTab: "data",
   workbenchDraft: "",
   simulationDialogueId: "hk-quality-trend",
+  realAgents: [],
+  agentCenterToken: "",
   workspace: {
     stage: 2,
     backtestRunning: false,
@@ -1558,6 +1562,8 @@ function strategyPreviewContext() {
     connectionTab: state.connectionPreviewTab,
     experimentHandoffAppName: state.experimentHandoffAppName,
     workbenchDraft: state.workbenchDraft,
+    realAgents: state.realAgents,
+    agentCenterToken: state.agentCenterToken,
   };
 }
 
@@ -2267,6 +2273,18 @@ function appendConfigurationActivity(title: LocalizedText, summary: LocalizedTex
 }
 
 function bindEvents(): void {
+  const agentRequest = async (path: string, init?: RequestInit) => {
+    const response = await fetch(`http://127.0.0.1:8787${path}`, { ...init, headers: { "content-type": "application/json", authorization: `Bearer ${state.agentCenterToken}`, ...(init?.headers ?? {}) } });
+    const body = await response.json() as { data?: unknown; error?: { code: string } }; if (!response.ok) throw new Error(body.error?.code ?? "AGENT_API_FAILED"); return body.data;
+  };
+  const loadRealAgents = async () => { state.realAgents = await agentRequest(`/api/orchestration/agents?category=${state.agentCenterCategory}`) as AppState["realAgents"]; render(); };
+  document.querySelector<HTMLInputElement>("[data-agent-token]")?.addEventListener("input", (event) => { state.agentCenterToken = (event.currentTarget as HTMLInputElement).value; });
+  document.querySelector<HTMLButtonElement>("[data-create-real-agent]")?.addEventListener("click", async () => {
+    try { const name = document.querySelector<HTMLInputElement>("[data-agent-name]")?.value.trim() ?? "Market Input"; const prompt = document.querySelector<HTMLTextAreaElement>("[data-agent-prompt]")?.value.trim() ?? "Explain normalized facts."; await agentRequest("/api/orchestration/agents", { method: "POST", body: JSON.stringify({ category: "input", payload: { name, templateRef: "agent-template:input:v1", dataRef: "data-source:binance-futures-public:v1", upstreamArtifactSchemaRefs: [], userInstructionPrompt: prompt, inputSchemaRef: "schema:market-observation-input:v1", budget: { maxTokens: 1000, maxCalls: 1, timeoutMs: 5000 } } }) }); await loadRealAgents(); showToast("已创建真实 Input Agent v1", "Real Input Agent v1 created"); } catch (error) { showToast("创建失败", error instanceof Error ? error.message : "Creation failed"); }
+  });
+  document.querySelector<HTMLButtonElement>("[data-create-real-analysis]")?.addEventListener("click", async () => {
+    try { const name = document.querySelector<HTMLInputElement>("[data-agent-name]")?.value.trim() ?? "Analysis Agent"; const prompt = document.querySelector<HTMLTextAreaElement>("[data-agent-prompt]")?.value.trim() ?? "Explain normalized facts."; await agentRequest("/api/orchestration/agents", { method: "POST", body: JSON.stringify({ category: "analysis", payload: { name, templateRef: "agent-template:analysis:v1", upstreamArtifactSchemaRefs: ["artifact-schema:structured-observation:v1"], modelRef: "model-connection:deepseek:default", userInstructionPrompt: prompt, inputSchemaRef: "schema:analysis-input:v1", budget: { maxTokens: 2000, maxCalls: 2, timeoutMs: 10000 } } }) }); await loadRealAgents(); showToast("已创建真实 Analysis Agent", "Real Analysis Agent created"); } catch (error) { showToast("创建失败", error instanceof Error ? error.message : "Creation failed"); }
+  });
   document.querySelector("#toggle-language")?.addEventListener("click", () => {
     state.locale = state.locale === "zh-CN" ? "en" : "zh-CN";
     try { localStorage.setItem(localeStorageKey, state.locale); } catch { /* no-op */ }
@@ -2280,6 +2298,10 @@ function bindEvents(): void {
       state.panel = null;
       state.copilotOpen = false;
       render();
+      if (state.view === "agent-center" && state.agentCenterToken) {
+        fetch(`http://127.0.0.1:8787/api/orchestration/agents?category=${state.agentCenterCategory}`, { headers: { authorization: `Bearer ${state.agentCenterToken}` } })
+          .then((response) => response.json()).then((body: { data?: AppState["realAgents"] }) => { if (body.data) { state.realAgents = body.data; render(); } }).catch(() => undefined);
+      }
       window.scrollTo({ top: 0, behavior: "smooth" });
     });
   });

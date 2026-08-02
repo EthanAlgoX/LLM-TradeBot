@@ -99,6 +99,9 @@ import { DataCenterHttpHandler } from "./data-center-http.js";
 import { DeploymentScopedPaperRuntimeSupervisor, ExecutableStrategyVersionMaterializer, MultiPaperDeploymentService, SqliteMultiPaperDeploymentRepository } from "./multi-paper-runtime.js";
 import { MultiPaperRuntimeHttpHandler } from "./multi-paper-runtime-http.js";
 import { ShadowPromotionService, SqliteShadowPromotionRepository } from "./shadow-promotion.js";
+import { AgentDefinitionService } from "./agent-definition-service.js";
+import { SqliteAgentDefinitionRepository } from "./sqlite-agent-definition-repository.js";
+import { AgentDefinitionHttpHandler } from "./agent-definition-http.js";
 
 export type ComparativeTradeReviewRuntimeOptions = Omit<
   ProductionComparativeTradeReviewOptions,
@@ -162,6 +165,7 @@ export interface CurrentPipelineOrchestrationRuntime {
   comparativeTradeReviewComposition?: ProductionComparativeTradeReviewComposition;
   productionStrategyOrchestration: ProductionStrategyOrchestration;
   ephemeralOperatorToken: string;
+  agentDefinitionService: AgentDefinitionService;
   server: ReturnType<typeof createPipelineOrchestrationHttpServer>;
   close(): Promise<void>;
 }
@@ -300,6 +304,7 @@ export function createCurrentPipelineOrchestrationRuntime(
       actor: operatorActor,
     },
   ]);
+  const agentDefinitionService = new AgentDefinitionService(new SqliteAgentDefinitionRepository(database));
   const evidenceRepository = new SqlitePipelineEvidenceRepository(database);
   if (options.evidenceExecutor && options.historicalRunners) {
     throw new Error(
@@ -651,6 +656,7 @@ export function createCurrentPipelineOrchestrationRuntime(
       productionStrategyOrchestration.configurationDraftHttpHandler,
     dataCenterHttpHandler,
     multiPaperRuntimeHttpHandler,
+    agentDefinitionHttpHandler: new AgentDefinitionHttpHandler(agentDefinitionService, authenticator),
     ...(productionStrategyOrchestration.experimentLabHttpHandler ? { experimentLabHttpHandler: productionStrategyOrchestration.experimentLabHttpHandler } : {}),
     ...(productionStrategyOrchestration.strategyEvidenceHttpHandler
       ? {
@@ -716,6 +722,7 @@ export function createCurrentPipelineOrchestrationRuntime(
     ...(artifactStore ? { artifactStore } : {}),
     ...(artifactLedger ? { artifactLedger } : {}),
     ephemeralOperatorToken: operatorToken,
+    agentDefinitionService,
     server,
     async close(): Promise<void> {
       if (server.listening) {

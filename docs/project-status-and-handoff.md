@@ -1,5 +1,11 @@
 # TradeBot 当前状态与接手说明
 
+## LOOP-030 F1 handoff (2026-08-03)
+
+- REAL：新增 `agent-definition-*` 与 SQLite repository，当前编排 HTTP/runtime 已接入；Chrome 已直接创建并验证 Input v1 和 Analysis v1 的真实 Artifact/Model/fingerprint。
+- PARTIAL：缺 parent `versionId + fingerprint` 的 Web v2、历史/恢复 UX、cursor/幂等和完整验收测试；下轮见 `loop-031-f1-agent-center-versioned-configuration-v1-continuation.md`。
+- 安全：未修改 M4/M5、账户、订单、Shadow、Live 或交易所写入。
+
 > 2026-08-03 接手更新：LOOP-029 已完成四页产品的功能化规划。用户已确认动态 DAG 与 Agent 中心可配置数据/模型/Prompt/版本的方向；下一步从 F1 Agent 中心真实版本管理开始。M0～M5 后端、M5 Shadow 与 Paper Only 边界未修改，M6 Live 仍未授权。
 
 > 快照日期：2026-08-03

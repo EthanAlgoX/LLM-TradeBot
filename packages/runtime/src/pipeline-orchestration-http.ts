@@ -66,6 +66,7 @@ import type {
   ComparativeTradeReviewHttpHandler,
 } from "./comparative-trade-review-http.js";
 import type { MultiPaperRuntimeHttpHandler } from "./multi-paper-runtime-http.js";
+import type { AgentDefinitionHttpHandler } from "./agent-definition-http.js";
 
 const defaultMaxBodyBytes = 1_048_576;
 
@@ -92,6 +93,7 @@ export interface PipelineOrchestrationHttpDependencies {
   dataCenterHttpHandler?: DataCenterHttpHandler;
   experimentLabHttpHandler?: ExperimentLabHttpHandler;
   multiPaperRuntimeHttpHandler?: MultiPaperRuntimeHttpHandler;
+  agentDefinitionHttpHandler?: AgentDefinitionHttpHandler;
   productionWorkspaceCatalog?: object;
   pipelineGraphs?: readonly PipelineGraphVersion[];
   maxBodyBytes?: number;
@@ -334,6 +336,10 @@ export function createPipelineOrchestrationHttpServer(
         }
       }
       const path = url.pathname;
+      if (path.startsWith("/api/orchestration/agents")) {
+        if (!dependencies.agentDefinitionHttpHandler) { sendError(response, 503, "AGENT_DEFINITIONS_UNAVAILABLE", "Agent definitions are not configured."); return; }
+        await forwardWebHandler(request, response, dependencies.agentDefinitionHttpHandler, maxBodyBytes); return;
+      }
       if (path.startsWith("/api/orchestration/paper-deployments")) {
         if (!dependencies.multiPaperRuntimeHttpHandler) {
           sendError(response, 404, "MULTI_PAPER_RUNTIME_UNAVAILABLE", "Multi Paper Runtime is not configured.");
