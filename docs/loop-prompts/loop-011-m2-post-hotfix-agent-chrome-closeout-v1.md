@@ -3,12 +3,21 @@
 ```text
 Loop ID：LOOP-011
 里程碑：M2 数据中心 V1 最终收尾
-状态：READY
+状态：PARTIAL
 前置 Loop：LOOP-010（PARTIAL，P0 卡死修复已完成）
 执行环境：本地仓库 + Agent 直接控制真实 Google Chrome
 浏览器要求：必需；只接受 Agent Chrome 验证，禁止用户手工验收
 验收模式：AGENT_CHROME_VERIFIED
 ```
+
+## 实际执行结果（2026-08-02）
+
+- Agent 已使用真实 Chrome；性能护栏、中文 1440×900、英文 820×760、资产真实性标签均通过。
+- 修复了 1440px 顶栏 25px 横向溢出，提交并推送为 `cfe074724a5837872011b5c7eeab865c4a0fc562`。
+- 负向 fail-closed 与自动化通过：check、329/329 tests、35-module Web build、diff-check。
+- CSV 正向 UI 绑定与刷新恢复未验证：真实产品缺少 `tradebot:orchestration-data-intent` 的 UI 消费者；“送入编排”目前只导航，不能执行或展示 Dataset Binding。
+- Console 未见 TradeBot 页面错误；Chrome 控制能力未提供 Network 读取接口，Network 保持未验证。
+- M2 保持 `IN_PROGRESS`，文档未收敛，下一步执行 LOOP-012 补齐绑定闭环后再做 Agent Chrome 验收。
 
 ## 目标
 

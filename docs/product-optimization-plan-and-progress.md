@@ -586,12 +586,12 @@ README 中的 `320/320 PASS` 当前已过期。恢复稳定测试基线是后续
 - [x] Dataset Snapshot、Schema Preview、Quality 和 Lineage；
 - [x] 服务端不可变 Dataset Binding 合同、版本/fingerprint/capability 校验和 actor fail-closed；
 - [x] Market Radar 首版仅展示当前已证实维度；当前 Regime、Mover、Volume、Funding/OI 均明确 unavailable；
-- [x] “送入编排”仅为受控 Draft 意图入口，未增加 Runtime Apply、Paper Run 或交易所写入；
+- [ ] 补齐“送入编排”在编排工作台的可见 Dataset Binding 消费、确认、不可变 Draft Version 与刷新恢复闭环；现状只完成导航和事件派发；
 - [ ] 完成真实 Chrome 的桌面、窄屏、绑定成功/拒绝和 Console/Network 验收。
 
 验收：一个 Strategy Draft 可以引用服务端登记的数据版本，Validation 能阻止能力不匹配，回测 Evidence 能追溯 Dataset fingerprint。
 
-进度：服务端实现和 329/329 自动化基线已通过。数据中心曾因 MutationObserver 自循环导致 Chrome Renderer 约 89% CPU/3.6GB RSS 和 DOM 超时，现已修复；独立浏览器性能冒烟确认页面恢复响应、请求稳定及 1440/820 无横向溢出。用户已明确禁止人工校验；下一步由 LOOP-011 使用真实 Agent Chrome 完成真实性标签、CSV UI 绑定与刷新恢复及完整 Console/Network 验收，通过后同步收敛过期规划快照，再进入 M3。
+进度：服务端实现和 329/329 自动化基线已通过。MutationObserver 自循环和 1440px 顶栏 25px 溢出已修复；LOOP-011 的真实 Agent Chrome 已通过性能、1440 中文、820 英文与资产真实性，但确认“送入编排”只有导航、没有 `tradebot:orchestration-data-intent` 消费者，无法执行或展示 CSV Binding。下一步由 LOOP-012 补齐 Binding UI、Conversation Draft Authority 与刷新恢复，再用 Agent Chrome 收尾；M2 仍不得关闭。
 
 ### M3：实验场 V1
 
