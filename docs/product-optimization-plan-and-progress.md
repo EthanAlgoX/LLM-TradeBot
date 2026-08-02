@@ -591,7 +591,7 @@ README 中的 `320/320 PASS` 当前已过期。恢复稳定测试基线是后续
 
 验收：一个 Strategy Draft 可以引用服务端登记的数据版本，Validation 能阻止能力不匹配，回测 Evidence 能追溯 Dataset fingerprint。
 
-进度：服务端实现和 329/329 自动化基线已通过。数据中心曾因 MutationObserver 自循环导致 Chrome Renderer 约 89% CPU/3.6GB RSS 和 DOM 超时，现已修复；独立浏览器性能冒烟确认页面恢复响应、请求稳定及 1440/820 无横向溢出。用户已明确禁止人工校验；当前 LOOP-010 V2 仍需由 Agent 直接完成真实性标签、CSV UI 绑定与刷新恢复及完整 Console/Network 验收，通过后同步收敛过期规划快照，再进入 M3。
+进度：服务端实现和 329/329 自动化基线已通过。数据中心曾因 MutationObserver 自循环导致 Chrome Renderer 约 89% CPU/3.6GB RSS 和 DOM 超时，现已修复；独立浏览器性能冒烟确认页面恢复响应、请求稳定及 1440/820 无横向溢出。用户已明确禁止人工校验；下一步由 LOOP-011 使用真实 Agent Chrome 完成真实性标签、CSV UI 绑定与刷新恢复及完整 Console/Network 验收，通过后同步收敛过期规划快照，再进入 M3。
 
 ### M3：实验场 V1
 

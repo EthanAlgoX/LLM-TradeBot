@@ -189,7 +189,8 @@ API: http://127.0.0.1:8787
 - LOOP-009（M2 用户手工 Chrome 验收）仍为 `PARTIAL`：服务可达，真实 Chrome 页面能够打开，但执行窗口再次尝试 Agent 控制并连续超时；所有浏览器项均为未取得证据，而非产品失败。没有敏感值暴露，也没有代码、文档或本地 workspace 数据修改。
 - LOOP-010 首次执行仍为 `IN_PROGRESS`：本地服务和页面可达，check、328/328 tests、34-module Web build 与 diff-check 通过，Git 干净且已同步；但 Agent Chrome 在读取页面 DOM 时超时重置，未取得 UI、响应式或 Console/Network 证据，也未修改代码或文档。
 - 后续 P0 诊断确认超时根因不是后端进程过多，而是数据中心 MutationObserver 监听自身 `innerHTML` 更新形成无限 render/load。修复前独立 Chrome Renderer 约 89% CPU/3.6GB RSS；改为 host identity 有界挂载并取消离页请求后约 0.2% CPU/212MB RSS，Data Assets 请求稳定。check、329/329 tests、35-module Web build、diff-check、1440/820 无横向溢出及 Console error=0 均通过；完整 Agent Chrome 正向绑定/刷新恢复和 Network 仍留在 LOOP-010 V2。
-- 用户最新决定禁止人工校验。下一步继续执行 [`LOOP-010 V2`](loop-prompts/loop-010-m2-agent-chrome-evidence-and-doc-convergence-v2.md)（M2 Agent Chrome 验收与规划文档收敛，不进入 M3）：只接受 Agent 直接控制真实 Chrome 的证据，不得请求用户点击、截图或口头确认。全部通过后关闭 M2、收敛过期快照并生成 LOOP-011（M3）。
+- LOOP-010 以 `PARTIAL` 结束：P0 卡死修复已提交并推送为 `7f2017180cc1b15b660e5a66d0ec80b729c8497b`，但独立性能冒烟不替代完整 Agent Chrome CSV 正向绑定、刷新恢复和 Network 证据，M2 仍为 `IN_PROGRESS`。
+- 用户最新决定禁止人工校验。下一步执行 [`LOOP-011`](loop-prompts/loop-011-m2-post-hotfix-agent-chrome-closeout-v1.md)（M2 修复后 Agent Chrome 最终验收，不进入 M3）：只接受 Agent 直接控制真实 Chrome 的证据，不得请求用户点击、截图或口头确认。全部通过后关闭 M2、收敛过期快照并生成 LOOP-012（M3）。
 
 完整 Prompt：[`next-loop-prompt.md`](next-loop-prompt.md)。
 

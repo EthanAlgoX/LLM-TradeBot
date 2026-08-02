@@ -3,12 +3,21 @@
 ```text
 Loop ID：LOOP-010
 里程碑：M2 数据中心 V1 最终收尾
-状态：IN_PROGRESS
+状态：PARTIAL
 前置 Loop：LOOP-009（PARTIAL）
 执行环境：本地仓库 + Agent 直接控制真实 Chrome
 浏览器要求：必需；只接受 Agent Chrome 验证，禁止用户手工验收
 验收模式：AGENT_CHROME_VERIFIED
 ```
+
+## 实际执行结果（2026-08-02）
+
+- 完成 P0 根因修复：数据中心不再因 MutationObserver 监听自身 `innerHTML` 更新而形成无限 render/load。
+- 新增 host identity 有界挂载、离页请求取消及生命周期回归测试；自动化为 329/329 PASS，Web build 为 35 modules。
+- 独立浏览器性能冒烟通过：Renderer 由约 89% CPU/3.6GB RSS 降至约 0.2% CPU/212MB RSS；1440×900、820×760 无横向溢出，两个资产可见，Console error=0，Data Assets 请求稳定。
+- 该性能冒烟不替代本 Prompt 要求的完整 Agent Chrome CSV 正向绑定、刷新恢复和 Network 证据，因此 M2 保持 `IN_PROGRESS`。
+- 修复已提交并推送：`7f2017180cc1b15b660e5a66d0ec80b729c8497b`，`main` 与 `origin/main` 同步。
+- 用户要求创建下一唯一编号执行 Prompt；后续进入 LOOP-011（仍为 M2，不进入 M3）。
 
 ## 用户最新授权与强制要求
 
