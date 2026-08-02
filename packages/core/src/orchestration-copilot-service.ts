@@ -90,6 +90,10 @@ export interface ConversationReplayRepository {
     actorId: string,
     conversationId: string,
   ): ConversationTurn | undefined;
+  getLatestRecord(
+    actorId: string,
+    conversationId: string,
+  ): ConversationReplayRecord | undefined;
   getLatestDraftReference(
     actorId: string,
     conversationId: string,
@@ -177,6 +181,10 @@ const editableAgentParameters: Readonly<Record<string, readonly string[]>> = {
     "confidenceThreshold",
     "lookbackPeriods",
     "minimumSignalScore",
+  ],
+  "agent-template:semantic-historical:timeframe-analysis:v1": [
+    "confidenceThreshold",
+    "lookbackPeriods",
   ],
   "agent-template:decision:v1": ["minimumDecisionScore"],
 };
@@ -603,6 +611,11 @@ export class OrchestrationCopilotService {
       );
     }
     if (command.draftReference) return command;
+    // The latest replay record is the durable owner of the Configuration →
+    // Pipeline association. Rehydrate it before handling a follow-up so a
+    // restarted process cannot silently fall back to another recipe's graph.
+    const latest = repository.getLatestRecord(actor.actorId, command.conversationId);
+    if (latest) this.restorePipelineDraftMapping(latest.response);
     return { ...command, draftReference: authoritativeReference };
   }
 
@@ -1208,11 +1221,18 @@ export class OrchestrationCopilotService {
           : {}),
         after: requested.value,
       };
-      const recipe = this.dependencies.recipes.find(
-        (candidate) =>
-          candidate.editableAgentTemplateId === agentPayload.agentTemplateId,
-      ) ?? this.dependencies.recipes[0];
-      if (!recipe) throw new Error("COPILOT_RECIPE_NOT_REGISTERED");
+      const recipe = this.recipeForAgentPayload(agentPayload);
+      if (!recipe) {
+        throw new OrchestrationCopilotError(
+          "COPILOT_DRAFT_RECIPE_NOT_REGISTERED",
+          "The Draft does not match a server-registered Copilot recipe.",
+          {
+            agentTemplateId: agentPayload.agentTemplateId,
+            marketPackId: agentPayload.marketPackId,
+            dataSourceIds: agentPayload.dataSourceIds.join(","),
+          },
+        );
+      }
       const preset = this.dependencies.intentDraftService
         .catalog()
         .find((entry) => entry.preset.id === recipe.presetId)?.preset;
@@ -1835,14 +1855,28 @@ export class OrchestrationCopilotService {
   }
 
   private pipelineDraft(configurationDraftId: string) {
-    const draftId =
-      this.pipelineDraftByConfigurationDraft.get(configurationDraftId) ??
-      "pipeline-graph:current-crypto-fixed@1.0.0";
+    const draftId = this.pipelineDraftByConfigurationDraft.get(configurationDraftId);
+    if (!draftId) return undefined;
     try {
       return this.dependencies.pipelineService.getDraft(draftId);
     } catch {
       return undefined;
     }
+  }
+
+  private recipeForAgentPayload(
+    payload: Extract<
+      ReturnType<ConfigurationDraftService["getLatest"]>["payload"],
+      { kind: "agent" }
+    >,
+  ): RegisteredCopilotIntentRecipe | undefined {
+    const matches = this.dependencies.recipes.filter((candidate) =>
+      candidate.editableAgentTemplateId === payload.agentTemplateId &&
+      candidate.marketPackId === payload.marketPackId &&
+      candidate.dataSourceIds.length === payload.dataSourceIds.length &&
+      candidate.dataSourceIds.every((id) => payload.dataSourceIds.includes(id))
+    );
+    return matches.length === 1 ? matches[0] : undefined;
   }
 
   private requirePipelineDraft(command: ConversationCommand): StoredPipelineDraft {

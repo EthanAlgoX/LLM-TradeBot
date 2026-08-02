@@ -1,5 +1,7 @@
 # TradeBot 产品优化规划与进度
 
+> 2026-08-02：M2 CSV Binding Composer 服务端修复已通过 333/333 自动化；真实 Chrome 可见 Binding 仍返回 `REQUEST_CONTRACT_INVALID`，M2 保持 IN_PROGRESS，下一步为 LOOP-016。
+
 > 文档角色：汇总 2026-08-01 之前的产品讨论，作为后续产品优化、页面收敛和阶段验收的执行入口
 > 最后更新：2026-08-01
 > 产品基线：[`../PRODUCT.md`](../PRODUCT.md)

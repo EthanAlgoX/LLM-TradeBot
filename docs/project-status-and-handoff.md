@@ -1,5 +1,7 @@
 # TradeBot 当前状态与接手说明
 
+> 2026-08-02 接手更新：LOOP-015 服务端 Composer 回归已修复并通过 333/333 自动化；Agent Chrome 中文 1440×900 中 CSV Binding 返回 `REQUEST_CONTRACT_INVALID`，不得标记 M2 COMPLETE。下一任务为 LOOP-016。
+
 > 快照日期：2026-08-01
 > 适用仓库：`/Users/hyx/Documents/workspace/tradebot`
 > 历史交接：[`archive/project-status-and-handoff-through-2026-07-29.md`](archive/project-status-and-handoff-through-2026-07-29.md)

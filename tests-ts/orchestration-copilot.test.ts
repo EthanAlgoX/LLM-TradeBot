@@ -141,6 +141,72 @@ test("CSV Dataset Binding is replayed with the server Draft authority", async ()
   }
 });
 
+test("CSV binding survives replay and a restarted Composer update preserves its authoritative recipe", async () => {
+  const database = new DatabaseSync(":memory:");
+  const command = {
+    ...currentCommand,
+    conversationId: "conversation.csv-binding-composer.001",
+    idempotencyKey: "idempotency.csv-binding-composer.create.001",
+    locale: "en" as const,
+    message: "Create a CSV Historical Draft using preset.current-crypto-csv-historical and data-source:csv-historical",
+  };
+  const datasetBindings = [{ assetId: "asset:csv-historical", datasetId: "dataset:csv:test", version: "1.0.0+test", fingerprint: "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", capabilityId: "capability:csv-historical:ohlcv:v1", mode: "pinned_snapshot" as const }];
+  try {
+    const initialRuntime = createCurrentPipelineOrchestrationRuntime({ database, operatorActor: actor });
+    const created = await initialRuntime.orchestrationCopilotService.handle(command, actor);
+    const parent = created.context.selected.draftReference!;
+    const bound = initialRuntime.productionStrategyOrchestration.configurationDraftService.createVersion(
+      parent.draftId,
+      {
+        schemaVersion: "1.0.0",
+        parentFingerprint: parent.fingerprint,
+        humanVersion: "1.0.0 + dataset",
+        payload: { ...initialRuntime.productionStrategyOrchestration.configurationDraftService.get(parent.versionId).payload, dataBindings: datasetBindings },
+      },
+      actor.actorId,
+    );
+    new SqliteConversationReplayRepository(database).appendDraftReference(
+      actor.actorId,
+      command.conversationId,
+      "dataset-binding:ui.csv-binding-composer.001",
+      { draftId: bound.draftId, versionId: bound.versionId, fingerprint: bound.fingerprint },
+      datasetBindings,
+    );
+    await initialRuntime.close();
+
+    const restartedRuntime = createCurrentPipelineOrchestrationRuntime({ database, operatorActor: actor });
+    const updated = await restartedRuntime.orchestrationCopilotService.handle(
+      {
+        ...currentCommand,
+        conversationId: command.conversationId,
+        idempotencyKey: "idempotency.csv-binding-composer.update.001",
+        locale: "en",
+        message: "Modify Analysis Agent confidenceThreshold to 0.72.",
+      },
+      actor,
+    );
+    const updatedVersion = restartedRuntime.productionStrategyOrchestration.configurationDraftService.get(updated.context.selected.draftReference!.versionId);
+    assert.equal(updatedVersion.payload.kind, "agent");
+    if (updatedVersion.payload.kind !== "agent") throw new Error("expected agent Draft");
+    // The fixture binding deliberately uses a synthetic, unregistered Dataset;
+    // that validation failure is expected, while the immutable update itself
+    // must still use the CSV authority and retain the binding.
+    assert.equal(updated.status, "validation_failed");
+    assert.equal(updated.proposal?.presetRef.id, "preset.current-crypto-csv-historical");
+    assert.equal(updated.proposal?.graphRef.id, "pipeline-graph:current-crypto-semantic-csv");
+    assert.deepEqual(updated.context.selected.dataSourceIds, ["data-source:csv-historical"]);
+    assert.deepEqual(updatedVersion.payload.dataBindings, datasetBindings);
+    assert.equal(updatedVersion.payload.parameters.confidenceThreshold, 0.72);
+    assert.equal(updated.runtimeApplied, false);
+    const replayed = restartedRuntime.orchestrationCopilotService.getLatestTurn(actor.actorId, command.conversationId)!;
+    assert.deepEqual(replayed.response.draftReference, updated.context.selected.draftReference);
+    assert.deepEqual(replayed.response.selected.datasetBindings, datasetBindings);
+    await restartedRuntime.close();
+  } finally {
+    database.close();
+  }
+});
+
 test("registered Crypto preset creates persistent Configuration and Pipeline Drafts", async () => {
   const { database, runtime } = fixture();
   try {

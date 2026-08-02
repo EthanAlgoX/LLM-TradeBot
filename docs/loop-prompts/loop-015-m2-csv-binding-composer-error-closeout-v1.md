@@ -3,7 +3,7 @@
 ```text
 Loop ID：LOOP-015
 里程碑：M2 数据中心 V1
-状态：READY
+状态：IN_PROGRESS
 前置 Loop：LOOP-014（PARTIAL，绑定及刷新恢复已通过；继续对话出现 INTERNAL_ORCHESTRATION_ERROR）
 执行环境：本地仓库 + Agent 直接控制真实 Google Chrome
 浏览器要求：实现后必需；禁止用户手工验收或 DevTools 交接
@@ -15,6 +15,13 @@ Loop ID：LOOP-015
 定位并修复 CSV Dataset Binding 成功、刷新恢复后，通过 Composer 修改允许字段时出现的 `INTERNAL_ORCHESTRATION_ERROR`。修复后必须证明：继续对话生成新的不可变 Agent Draft Version、保留 CSV binding、权威 Draft Reference 同步前进且刷新后可恢复，全程不影响 Runtime。
 
 本轮不重复实现已经通过的 Data Asset、CSV-compatible Draft 创建、Binding 或恢复投影。完成正式服务路径的行为级回归后，由 Agent 直接操作真实 Chrome 完成最后验收；通过后关闭 M2 并进入 M3。
+
+## 执行结果（2026-08-02）
+
+- Composer 原始异常是 CSV Historical Agent Template 未登记 `confidenceThreshold` 为允许字段；抛出的域错误随后被 HTTP 层包装成 `INTERNAL_ORCHESTRATION_ERROR`。
+- 修复已将 recipe/preset/Graph 选择改为由权威 Agent Draft 的模板、Market Pack 和 exact data-source set 唯一决定；重启后的 Pipeline mapping 从最新持久化 replay 记录恢复，且不再回退到 Binance Graph。
+- `npm run check`、`npm run test:ts`（333/333）与 `npm run build:web` 已通过。
+- Agent 已直接使用真实 Chrome（中文 1440×900）验证服务与 CSV 资产可见；可见 UI Binding POST 返回稳定 `REQUEST_CONTRACT_INVALID`，故 M2 继续 `IN_PROGRESS`。
 
 ## 已确认基线
 

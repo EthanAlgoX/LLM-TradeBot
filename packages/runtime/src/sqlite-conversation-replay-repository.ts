@@ -210,6 +210,13 @@ export class SqliteConversationReplayRepository
     return this.listTurns(actorId, conversationId, { schemaVersion: "1.0.0", limit: 1 }).items[0];
   }
 
+  getLatestRecord(actorId: string, conversationId: string): ConversationReplayRecord | undefined {
+    const latest = this.getLatestTurn(actorId, conversationId);
+    return latest
+      ? this.get({ actorId, conversationId, idempotencyKey: latest.idempotencyKey })
+      : undefined;
+  }
+
   getLatestDraftReference(actorId: string, conversationId: string): ConversationDraftReference | undefined {
     return this.getLatestTurn(actorId, conversationId)?.response.draftReference;
   }

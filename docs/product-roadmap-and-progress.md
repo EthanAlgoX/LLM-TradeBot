@@ -1,5 +1,7 @@
 # TradeBot 产品路线图与当前进度
 
+> 2026-08-02：M2 未关闭。CSV Composer 的允许字段、权威 recipe 选择和重启 mapping 已修复；真实 Chrome Binding 合同失败待 LOOP-016 关闭。
+
 > 文档角色：当前完成度、剩余缺口和交付顺序的权威快照
 > 最后更新：2026-07-31
 > 产品基线：[`../PRODUCT.md`](../PRODUCT.md)
