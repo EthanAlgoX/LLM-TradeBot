@@ -65,6 +65,7 @@ import type {
 import type {
   ComparativeTradeReviewHttpHandler,
 } from "./comparative-trade-review-http.js";
+import type { MultiPaperRuntimeHttpHandler } from "./multi-paper-runtime-http.js";
 
 const defaultMaxBodyBytes = 1_048_576;
 
@@ -90,6 +91,7 @@ export interface PipelineOrchestrationHttpDependencies {
   historicalSemanticEvaluationHttpHandler?: HistoricalSemanticEvaluationHttpHandler;
   dataCenterHttpHandler?: DataCenterHttpHandler;
   experimentLabHttpHandler?: ExperimentLabHttpHandler;
+  multiPaperRuntimeHttpHandler?: MultiPaperRuntimeHttpHandler;
   productionWorkspaceCatalog?: object;
   pipelineGraphs?: readonly PipelineGraphVersion[];
   maxBodyBytes?: number;
@@ -332,6 +334,14 @@ export function createPipelineOrchestrationHttpServer(
         }
       }
       const path = url.pathname;
+      if (path.startsWith("/api/orchestration/paper-deployments")) {
+        if (!dependencies.multiPaperRuntimeHttpHandler) {
+          sendError(response, 404, "MULTI_PAPER_RUNTIME_UNAVAILABLE", "Multi Paper Runtime is not configured.");
+          return;
+        }
+        await forwardWebHandler(request, response, dependencies.multiPaperRuntimeHttpHandler, maxBodyBytes);
+        return;
+      }
       if (path.startsWith("/api/orchestration/data-center/")) {
         if (!dependencies.dataCenterHttpHandler) {
           sendError(response, 503, "DATA_CENTER_UNAVAILABLE", "Data Center is not configured.");

@@ -96,6 +96,8 @@ import {
   SqliteLessonCandidateValidationBindingRepository,
 } from "./sqlite-lesson-candidate-validation-binding-repository.js";
 import { DataCenterHttpHandler } from "./data-center-http.js";
+import { ExecutableStrategyVersionMaterializer, MultiPaperDeploymentService, SqliteMultiPaperDeploymentRepository } from "./multi-paper-runtime.js";
+import { MultiPaperRuntimeHttpHandler } from "./multi-paper-runtime-http.js";
 
 export type ComparativeTradeReviewRuntimeOptions = Omit<
   ProductionComparativeTradeReviewOptions,
@@ -149,6 +151,8 @@ export interface CurrentPipelineOrchestrationRuntime {
   paperRuntimeSupervisorService: PaperRuntimeSupervisorService;
   paperRuntimeActivationService: PaperRuntimeActivationService;
   currentCryptoPaperLaunchService?: CurrentCryptoPaperLaunchService;
+  multiPaperDeploymentRepository: SqliteMultiPaperDeploymentRepository;
+  multiPaperDeploymentService: MultiPaperDeploymentService;
   runtimeEvidenceReadModelService?: RuntimeEvidenceReadModelService;
   causalTradeReviewReadModelService?: CausalTradeReviewReadModelService;
   comparativeTradeReviewComposition?: ProductionComparativeTradeReviewComposition;
@@ -546,6 +550,18 @@ export function createCurrentPipelineOrchestrationRuntime(
       paperPlans: paperPlanService,
       paperRuntime: paperRuntimeActivationService,
     });
+  const multiPaperDeploymentRepository = new SqliteMultiPaperDeploymentRepository(database);
+  const multiPaperDeploymentService = new MultiPaperDeploymentService(
+    multiPaperDeploymentRepository,
+    new ExecutableStrategyVersionMaterializer(
+      productionStrategyOrchestration.executableStrategyConfigurationRepository ?? {
+        findByStrategyVersionId: () => undefined,
+      },
+    ),
+  );
+  const multiPaperRuntimeHttpHandler = new MultiPaperRuntimeHttpHandler(
+    authenticator, multiPaperDeploymentService, multiPaperDeploymentRepository,
+  );
   const operationalOutboxDispatcher = new SqliteOperationalOutboxDispatcher({
     database,
   });
@@ -599,6 +615,7 @@ export function createCurrentPipelineOrchestrationRuntime(
     configurationDraftHttpHandler:
       productionStrategyOrchestration.configurationDraftHttpHandler,
     dataCenterHttpHandler,
+    multiPaperRuntimeHttpHandler,
     ...(productionStrategyOrchestration.experimentLabHttpHandler ? { experimentLabHttpHandler: productionStrategyOrchestration.experimentLabHttpHandler } : {}),
     ...(productionStrategyOrchestration.strategyEvidenceHttpHandler
       ? {
@@ -646,6 +663,8 @@ export function createCurrentPipelineOrchestrationRuntime(
     paperRuntimeSupervisorService,
     paperRuntimeActivationService,
     currentCryptoPaperLaunchService,
+    multiPaperDeploymentRepository,
+    multiPaperDeploymentService,
     ...(runtimeEvidenceReadModelService
       ? { runtimeEvidenceReadModelService }
       : {}),
