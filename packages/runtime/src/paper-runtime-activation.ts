@@ -81,12 +81,30 @@ export interface RegisteredPaperRuntimeBinding {
   ): Promise<PaperRuntimeBindingPreflightResult>;
   createRuntime(context?: {
     responseLocale: "zh-CN" | "en";
+    /**
+     * The fixed Current Crypto pipeline remains the only execution chain.  A
+     * deployment may, however, supply an immutable Paper scope so the same
+     * binding never shares an account, safety journal, trace, or artefacts
+     * with another deployment.
+     */
+    scope?: {
+      deploymentId: string;
+      runId: string;
+      accountId: string;
+      initialCash: number;
+      closeOnly?: boolean;
+      /** Re-checked immediately before the sole Paper execution adapter writes. */
+      assertFenced?: () => Promise<void>;
+    };
   }): Promise<{
     application: TradingApplication;
     safety: PaperRuntimeSafetyPort;
     portfolioState?: (
       markPrices: Readonly<Record<string, number>>,
     ) => PortfolioState;
+    hasOpenPositions?: () => Promise<boolean>;
+    loadTrace?: (traceId: string) => readonly unknown[];
+    loadArtifacts?: (traceId: string) => Promise<readonly unknown[]>;
     close?: () => void | Promise<void>;
   }>;
 }

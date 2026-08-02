@@ -1,6 +1,6 @@
 # TradeBot 当前状态与接手说明
 
-> 2026-08-02 接手更新：LOOP-022/M4 处于 `IN_PROGRESS`。已提交 Deployment 持久 Projection 分页读模型、模拟/真实无副作用切换、Simulation Overview、创建入口和五个惰性 Detail Tab；全量自动化 359/359 通过，Agent Chrome 双语言/双尺寸与 Console 通过。核心剩余缺口是调度器尚未接入真实 deployment-scoped `Decision -> Portfolio -> Risk -> Execution` cycle，下一任务为 LOOP-023。
+> 2026-08-02 接手更新：LOOP-023 已将 M4 标记为 `COMPLETE`。两个不同 Strategy Version 的 deployment-scoped Paper 实例已通过唯一 `Decision -> Portfolio -> Risk -> Execution` 动作链产生独立事实；Agent Chrome 验证 close-only、刷新、重启恢复、中英文双尺寸与 Paper Only 边界。下一任务为 LOOP-024 的 M5 Shadow 与晋升建议。
 
 > 快照日期：2026-08-01
 > 适用仓库：`/Users/hyx/Documents/workspace/tradebot`
@@ -65,6 +65,7 @@ Draft、Review、Handoff 和 Approval 都不会自动修改 Runtime。
 ### Runtime
 
 - Current Crypto Paper Binding 继续复用现有 `DecisionPipeline`。
+- M4 supervisor 为每个 deployment/run/account 创建隔离 runtime handle，持久化 run/cycle/trade/artifact projection，并使用有界调度、lease/fencing、heartbeat 与退避恢复 active 实例。
 - Selector `topN=1`，当前持仓进入 Position Monitor。
 - Decision → Portfolio → Risk → Execution 不变。
 - Preflight、Lease、Heartbeat、Fencing、Close-only、Drain、Safe Stop。
@@ -140,11 +141,11 @@ Comparative Evidence 当前由 active production composition 的内存索引支�
 
 ## 6. 最新验证
 
-M3 实验场 V1 完成后的最新完整基线：
+LOOP-023 M4 完成后的最新完整基线：
 
 ```text
 npm run check       PASS
-npm run test:ts     PASS (353/353)
+npm run test:ts     PASS (380 declared `test()` cases)
 npm run build:web   PASS
 git diff --check    PASS
 npm run dev:paper   STARTED
@@ -163,15 +164,12 @@ API: http://127.0.0.1:8787
 
 ## 7. 下一阶段
 
-继续执行 **多模拟运行中心**（M4）：
+执行 **M5 Shadow 与晋升建议**（LOOP-024）：
 
-1. 增加“模拟 / 真实”视图选择器；切换只改变视图，不改变后台运行状态。
-2. 支持多个 actor-owned Paper Deployment 与独立虚拟账户并行、持续运行。
-3. 从 Strategy Version 启动受控模拟，保留 Dataset、Graph、配置与 Experiment/Candidate lineage。
-4. 提供多曲线 Overview 和单实例 Detail（表现、Agent 轨迹、交易、配置与数据、晋升评估）。
-5. 实现停止、归档、重启恢复、健康状态和有界非重叠调度。
-6. “真实”环境保持 capability-gated/unavailable；M4 不新增交易所写入、自动晋升或 Live 部署。
-7. 由 Agent Chrome 完成至少两个并行策略、切换、刷新/服务重启、双尺寸、Console 与 Runtime safety 验收。
+1. 为一个 M4 Paper deployment 建立独立、只读的 Shadow decision/evidence context。
+2. 绑定 immutable Strategy/Dataset/Graph/Execution/Risk 与账户快照；任一漂移 fail closed。
+3. 对 Champion/Challenger 输出版本化、可审计的 Promotion Recommendation，不执行自动批准、Runtime Apply、Paper/Live 下单或 Champion 替换。
+4. 保持 M4 已验证的多实例 Paper 调度、close-only、projection 和安全边界不回归。
 
 ### LOOP-021 审计与验证（2026-08-02）
 
@@ -186,6 +184,14 @@ API: http://127.0.0.1:8787
 - `npm run check`、`npm run test:ts`（359/359）、`npm run build:web` 与 `git diff --check` 均通过。
 - Agent Chrome 已完成中文/英文、1440×900/820×760、窄屏无横向滚动和 Console error=0；Network 为 `TOOL_UNAVAILABLE`。Runtime 保持 Paper Only、`runtimeApplied=false`、`exchangeWriteAllowed=false`。
 - M4 未关闭：Deployment scheduler 尚未接入现有唯一 Paper 动作链，不能验证两个实例的真实 cycle、独立交易事实、close-only 和 Web/API 重启恢复。下一步执行 [`LOOP-023`](loop-prompts/loop-023-m4-deployment-scoped-paper-cycle-closeout-v1.md)。
+
+### LOOP-023 审计与验证（2026-08-02）
+
+- 将现有 Current Crypto binding 接入 deployment/run/account scope；每次执行均复用 `Decision -> Portfolio -> Risk -> Execution`，持久化真实 cycle、trade 与 Artifact lineage，未新增模拟撮合器或 exchange write。
+- SQLite aggregate 增加幂等 projection fact key、active deployment recovery、lease/fencing、heartbeat、退避与 terminal state 保护；测试覆盖陈旧 worker 拒绝、重复事实抑制、两实例恢复和 close-only `close_long`。
+- Agent Chrome 在中文 1440×900 从两个可见 Strategy Version 创建、预检和启动 A/B；观察独立 account/equity/heartbeat/curve/artifact，停止 A 后受控平仓且 B 持续。刷新与 Web/API 重启后 B 恢复、A 保持 stopped。英文 820×760 无横向滚动且 keyboard focus 可见。
+- `npm run check`、`npm run test:ts`（全量通过；当前 380 个 `test()` 用例）、`npm run build:web` 与 `git diff --check` 通过。Runtime 始终为 Paper Only、`runtimeApplied=false`、`exchangeWriteAllowed=false`；Network 和 Console clear 为 `TOOL_UNAVAILABLE`，日志仅见 Chrome 扩展异步消息错误。
+- M4 为 `COMPLETE`；下一步执行 [`LOOP-024`](loop-prompts/loop-024-m5-shadow-promotion-recommendations-v1.md)。
 
 ### M1 实施状态（2026-08-01）
 

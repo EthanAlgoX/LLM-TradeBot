@@ -1,6 +1,6 @@
 # TradeBot 产品路线图与当前进度
 
-> 2026-08-02：M4 多模拟运行中心由 LOOP-022 推进至持久 Projection 和多实例 UI 阶段，最新自动化 359/359 PASS；Agent Chrome 双语言/双尺寸与 Console 通过。M4 仍为 `IN_PROGRESS`，下一阶段 LOOP-023 接入真实 deployment-scoped Paper cycle、隔离交易事实、close-only 与重启恢复。
+> 2026-08-02：LOOP-023 已完成 M4 多模拟运行中心：真实 deployment-scoped Paper cycle、两实例隔离、lease/fencing、close-only、刷新和 Web/API 重启恢复均已由 Agent Chrome 验证；全量测试通过，`tests-ts` 当前含 380 个 `test()` 用例。下一阶段为 LOOP-024 的 M5 Shadow 与晋升建议，仍不授权 Live 或交易所写入。
 
 > 文档角色：当前完成度、剩余缺口和交付顺序的权威快照
 > 最后更新：2026-07-31
@@ -13,7 +13,7 @@
 
 TradeBot 已从固定 Crypto Paper Pipeline 扩展出真实的 Registry、Capability、Graph Validation、Configuration Draft、Historical Evidence、Strategy Evidence、Approval、受控 Paper Runtime、Conversation-first Copilot、Causal Review 和 Human Lesson Candidate Review 垂直切片。产品一级抽象已经校正为“通用注册输入 + 可配置多 Agent”，具体市场只作为 Market Pack 元数据和执行约束。
 
-当前不是多市场生产系统，也不是通用 Graph Runtime。生产可运行范围仍是服务端注册的 Current Crypto Paper Binding；Draft、Approval、Lesson Candidate 和 Validation Handoff 均不会自动修改正在运行的 Runtime。
+当前不是多市场生产系统，也不是通用 Graph Runtime。生产可运行范围仍是服务端注册的 Current Crypto Paper Binding；M4 已能从已物化 Strategy Version 启动多个隔离的 Paper deployment。Draft、Approval、Lesson Candidate 和 Validation Handoff 均不会自动修改正在运行的 Runtime。
 
 当前验证基线：
 

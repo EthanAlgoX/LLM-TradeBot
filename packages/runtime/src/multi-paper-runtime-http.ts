@@ -19,7 +19,10 @@ export class MultiPaperRuntimeHttpHandler {
         return response(this.repository.projections(actor.actorId, decodeURIComponent(projection[1]!), kind, Number(url.searchParams.get("limit") ?? 50), url.searchParams.get("cursor") ?? undefined));
       }
       if (match && request.method === "GET" && !match[2]) return response({ data: this.repository.get(actor.actorId, decodeURIComponent(match[1]!)) });
-      if (match && request.method === "POST" && match[2]) return response({ data: this.service.action(actor.actorId, decodeURIComponent(match[1]!), match[2] as "preflight"|"start"|"stop"|"archive", await request.json()) });
+      if (match && request.method === "POST" && match[2]) {
+        const deploymentId = decodeURIComponent(match[1]!); const action = match[2] as "preflight"|"start"|"stop"|"archive"; const body = await request.json();
+        return response({ data: action === "preflight" ? await this.service.preflight(actor.actorId, deploymentId, body) : this.service.action(actor.actorId, deploymentId, action, body) });
+      }
       return error(match || projection ? "METHOD_NOT_ALLOWED" : "ROUTE_NOT_FOUND", match || projection ? 405 : 404);
     } catch (cause) {
       if (cause instanceof URIError) return error("DEPLOYMENT_ID_INVALID");

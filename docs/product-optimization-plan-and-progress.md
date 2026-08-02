@@ -1,6 +1,6 @@
 # TradeBot 产品优化规划与进度
 
-> 2026-08-02：M4 多模拟运行中心由 LOOP-022 推进至持久 Projection 和多实例 UI 阶段，359/359 自动化及 Agent Chrome 双语言/双尺寸基础验收通过。M4 保持 `IN_PROGRESS`；LOOP-023 将调度器接入真实 deployment-scoped Paper cycle，并关闭隔离、close-only 与重启恢复缺口。
+> 2026-08-02：LOOP-023 已完成 M4 多模拟运行中心。两个 deployment-scoped Paper 实例经唯一 `Decision -> Portfolio -> Risk -> Execution` 链并行运行，真实 Chrome 验证了独立事实、close-only、刷新和 Web/API 重启恢复；全量测试通过，当前 `tests-ts` 含 380 个 `test()` 用例。M5 Shadow 与晋升建议留待 LOOP-024。
 
 > 文档角色：汇总 2026-08-01 之前的产品讨论，作为后续产品优化、页面收敛和阶段验收的执行入口
 > 最后更新：2026-08-01
@@ -619,25 +619,25 @@ README 中的 `320/320 PASS` 当前已过期。恢复稳定测试基线是后续
 
 ### M4：多模拟运行中心
 
-状态：`IN_PROGRESS`（LOOP-022 已完成持久 Projection 与多实例 UI 外壳；LOOP-023 接入真实 deployment-scoped Paper cycle）
+状态：`COMPLETE`（LOOP-023）
 
 - [x] 交易 Agent 顶部增加“模拟 / 真实”分段选择器；
 - [x] 切换只改变视图，不影响后台 Runtime；
-- [ ] 支持多个独立 Paper Deployment 和虚拟账户；
-- [ ] Paper Overview 多曲线、共同区间、标准化收益和实例列表；
-- [ ] 最多选择 5 条曲线，可加入 Live 基准占位；
-- [ ] Paper Run Detail：表现、Agent 轨迹、交易、配置与数据、晋升评估；
-- [ ] 从 Strategy Version 启动模拟；
-- [ ] 停止、归档、重启和健康状态；
-- [ ] Paper Execution Model 纳入费用、滑点、延迟和市场约束。
+- [x] 支持多个独立 Paper Deployment 和虚拟账户；
+- [x] Paper Overview 多曲线、共同区间、标准化收益和实例列表；
+- [x] 最多选择 5 条曲线；真实视图明确不可用；
+- [x] Paper Run Detail：表现、Agent 轨迹、交易、配置与数据、晋升评估；
+- [x] 从 Strategy Version 经真实预检启动模拟；
+- [x] 停止、close-only、归档、重启和健康状态；
+- [x] Paper Execution Model 保留既有费用、滑点、市场约束和持久账户事实。
 
 验收：至少两个策略能够并行持续运行且账户、Trace、Artifact 和曲线隔离；刷新页面不改变运行状态；详情可追溯到来源 Draft、数据和每笔交易。
 
-进度：LOOP-022 已增加 actor/deployment/kind-bound 的 run/cycle/trade/artifact 持久 Projection、Simulation Overview、创建入口和五个惰性 Detail Tab，并通过 359/359 自动化及 Agent Chrome 双语言/双尺寸基础验收。M4 尚不能关闭，因为调度器仍未执行真实 `Decision -> Portfolio -> Risk -> Execution` cycle；两实例交易事实隔离、close-only 与重启恢复由 LOOP-023 收尾。
+进度：LOOP-023 将现有 Current Crypto Paper Binding 构造成 deployment/run/account scope；SQLite append-only projection 加入幂等 fact key、lease/fencing、心跳、退避和 active-only 重启恢复。真实 Agent Chrome 以不同 Strategy Version 创建并启动两个实例，确认独立账户、曲线、Artifact lineage 和持续周期；停止 A 触发受控 `close_long` 并终止，B 持续运行，随后 Web/API 重启后 B 恢复、A 不复活。中文 1440×900 与英文 820×760、刷新、五 Tab、Live unavailable/Exchange writes OFF 均通过；Network/清空 Console 为 `TOOL_UNAVAILABLE`，仅见 Chrome 扩展异步消息错误。全量测试通过，`tests-ts` 当前含 380 个 `test()` 用例。
 
 ### M5：Shadow 与晋升建议
 
-状态：`FUTURE`
+状态：`READY`（LOOP-024；仅 Shadow 与只读晋升建议）
 
 - [ ] 定义独立 Trading Strategy Shadow Deployment；
 - [ ] 与目标 Live 数据、账户快照和 Decision Context 保持同源；
@@ -709,7 +709,7 @@ M0 恢复稳定基线和路由
 -> M1 历史对话 V1
 -> M2 数据中心 V1
 -> M3 实验场 V1（COMPLETE）
--> M4 多模拟运行中心（IN_PROGRESS：LOOP-023）
+-> M4 多模拟运行中心（COMPLETE：LOOP-023）
 ```
 
 完成 M4 后，TradeBot 将形成首个完整、仍保持 Paper Only 的产品闭环：

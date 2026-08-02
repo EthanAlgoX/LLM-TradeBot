@@ -96,7 +96,7 @@ import {
   SqliteLessonCandidateValidationBindingRepository,
 } from "./sqlite-lesson-candidate-validation-binding-repository.js";
 import { DataCenterHttpHandler } from "./data-center-http.js";
-import { ExecutableStrategyVersionMaterializer, MultiPaperDeploymentService, SqliteMultiPaperDeploymentRepository } from "./multi-paper-runtime.js";
+import { DeploymentScopedPaperRuntimeSupervisor, ExecutableStrategyVersionMaterializer, MultiPaperDeploymentService, SqliteMultiPaperDeploymentRepository } from "./multi-paper-runtime.js";
 import { MultiPaperRuntimeHttpHandler } from "./multi-paper-runtime-http.js";
 
 export type ComparativeTradeReviewRuntimeOptions = Omit<
@@ -153,6 +153,7 @@ export interface CurrentPipelineOrchestrationRuntime {
   currentCryptoPaperLaunchService?: CurrentCryptoPaperLaunchService;
   multiPaperDeploymentRepository: SqliteMultiPaperDeploymentRepository;
   multiPaperDeploymentService: MultiPaperDeploymentService;
+  multiPaperRuntimeSupervisor: DeploymentScopedPaperRuntimeSupervisor;
   runtimeEvidenceReadModelService?: RuntimeEvidenceReadModelService;
   causalTradeReviewReadModelService?: CausalTradeReviewReadModelService;
   comparativeTradeReviewComposition?: ProductionComparativeTradeReviewComposition;
@@ -551,6 +552,7 @@ export function createCurrentPipelineOrchestrationRuntime(
       paperRuntime: paperRuntimeActivationService,
     });
   const multiPaperDeploymentRepository = new SqliteMultiPaperDeploymentRepository(database);
+  const multiPaperBinding = options.paperRuntimeBindings?.[0];
   const multiPaperDeploymentService = new MultiPaperDeploymentService(
     multiPaperDeploymentRepository,
     new ExecutableStrategyVersionMaterializer(
@@ -558,7 +560,27 @@ export function createCurrentPipelineOrchestrationRuntime(
         findByStrategyVersionId: () => undefined,
       },
     ),
+    async () => {
+      if (!multiPaperBinding || multiPaperBinding.exchangeWriteAllowed !== false || !multiPaperBinding.preflight) {
+        throw new Error("PAPER_BINDING_UNAVAILABLE");
+      }
+      // Binding preflight performs only server-owned database and public market
+      // checks. It does not activate a plan or write an exchange. The existing
+      // binding's plan/activation inputs are not read by this capability probe.
+      const report = await multiPaperBinding.preflight({ plan: {} as never, activation: {} as never, now: new Date() });
+      if (report.checks.some((check) => check.status !== "passed")) throw new Error("PAPER_PREFLIGHT_FAILED");
+    },
   );
+  const multiPaperRuntimeSupervisor = new DeploymentScopedPaperRuntimeSupervisor({
+    repository: multiPaperDeploymentRepository,
+    deployments: multiPaperDeploymentService,
+    binding: multiPaperBinding,
+    maximumConcurrency: 2,
+    ownerId: `multi-paper-runtime:${options.paperRuntimeOwnerId ?? "server"}`,
+  });
+  // Recovery is deliberately restricted to active deployment aggregates. The
+  // supervisor is asynchronous: API/Web start never waits for a market cycle.
+  multiPaperRuntimeSupervisor.start();
   const multiPaperRuntimeHttpHandler = new MultiPaperRuntimeHttpHandler(
     authenticator, multiPaperDeploymentService, multiPaperDeploymentRepository,
   );
@@ -665,6 +687,7 @@ export function createCurrentPipelineOrchestrationRuntime(
     currentCryptoPaperLaunchService,
     multiPaperDeploymentRepository,
     multiPaperDeploymentService,
+    multiPaperRuntimeSupervisor,
     ...(runtimeEvidenceReadModelService
       ? { runtimeEvidenceReadModelService }
       : {}),
@@ -694,6 +717,7 @@ export function createCurrentPipelineOrchestrationRuntime(
       runtimeEvidenceReadModelService?.close();
       causalTradeReviewReadModelService?.close();
       comparativeTradeReviewComposition?.close();
+      await multiPaperRuntimeSupervisor.stop();
       if (ownsDatabase) {
         database.close();
       }

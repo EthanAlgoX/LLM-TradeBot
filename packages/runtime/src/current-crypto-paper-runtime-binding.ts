@@ -468,10 +468,16 @@ export async function createCurrentCryptoPaperRuntimeBinding(
       }
       return { checks };
     },
-    async createRuntime() {
+    async createRuntime(context) {
       const closers: Array<() => void> = [];
       let closed = false;
       try {
+        const scopedAccountId = context?.scope?.accountId ?? accountId;
+        const scopedInitialCash = context?.scope?.initialCash ?? profile.execution.initialCash;
+        // Safety is deliberately deployment-scoped rather than merely
+        // account-scoped so a recycled account id cannot inherit a stale
+        // cooldown. Trace ids carry deployment/run/cycle identity too.
+        const safetyScope = context?.scope?.deploymentId ?? scopedAccountId;
         const paperStore = new SQLitePaperAccountStore(paperDatabasePath);
         closers.push(() => paperStore.close());
         const safetyStore = new SQLiteRuntimeSafetyStore(safetyDatabasePath);
@@ -494,12 +500,12 @@ export async function createCurrentCryptoPaperRuntimeBinding(
         if (artifactLedger) {
           closers.push(() => artifactLedger.close());
         }
-        await paperStore.initialize(accountId, profile.execution.initialCash);
+        await paperStore.initialize(scopedAccountId, scopedInitialCash);
         const executor = await PersistentPaperExecutionAgent.open(
-          accountId,
+          scopedAccountId,
           paperStore,
           {
-            initialCash: profile.execution.initialCash,
+            initialCash: scopedInitialCash,
             feeBps: profile.execution.feeBps,
             slippageBps: profile.execution.slippageBps,
           },
@@ -519,6 +525,16 @@ export async function createCurrentCryptoPaperRuntimeBinding(
             },
           },
         });
+        const fencedExecution = context?.scope?.assertFenced
+          ? {
+              name: executor.name,
+              version: executor.version,
+              run: async (input: Parameters<typeof executor.run>[0]) => {
+                await context.scope!.assertFenced!();
+                return executor.run(input);
+              },
+            }
+          : executor;
         const application = new DecisionPipeline({
           selector: new MarketOpportunitySelectorAgent(market, {
             candidates: symbols,
@@ -532,15 +548,17 @@ export async function createCurrentCryptoPaperRuntimeBinding(
           decision: new RuleDecisionAgent(profile.decision),
           portfolio: new SingleBestPortfolioAgent(),
           risk: new RuleRiskAgent(profile.risk),
-          execution: executor,
+          execution: fencedExecution,
           positionState: executor,
           portfolioState: executor,
           portfolioRisk: new RulePortfolioRiskGuard(profile.accountRisk),
-          positionMonitor: new RulePositionMonitorAgent(),
+          positionMonitor: new RulePositionMonitorAgent(
+            context?.scope?.closeOnly ? { maxHoldingMs: 0 } : {},
+          ),
           reflection,
           tradeHistory: executor,
           ...(reflectionStore
-            ? { reflectionStore, reflectionAccountId: accountId }
+            ? { reflectionStore, reflectionAccountId: scopedAccountId }
             : {}),
           ...(traceSink ? { traceSink } : {}),
           ...(artifactLedger ? { artifactLedger } : {}),
@@ -549,7 +567,7 @@ export async function createCurrentCryptoPaperRuntimeBinding(
           ...(dependencies.now ? { now: dependencies.now } : {}),
         });
         const safety = new PaperSafetyGuard(
-          accountId,
+          safetyScope,
           safetyStore,
           {
             maxConsecutiveFailures,
@@ -565,6 +583,12 @@ export async function createCurrentCryptoPaperRuntimeBinding(
           safety,
           portfolioState: (markPrices) =>
             executor.markToMarket(markPrices),
+          hasOpenPositions: async () =>
+            (await executor.getOpenPositions()).length > 0,
+          ...(traceSink ? { loadTrace: (traceId: string) => traceSink.load(traceId) } : {}),
+          ...(artifactLedger
+            ? { loadArtifacts: (traceId: string) => artifactLedger.query({ traceId, limit: 500 }) }
+            : {}),
           close() {
             if (closed) {
               return;
