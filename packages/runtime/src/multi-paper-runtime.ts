@@ -40,6 +40,11 @@ export class SqliteMultiPaperDeploymentRepository {
         UNIQUE(deployment_id, request_fingerprint));
       CREATE INDEX IF NOT EXISTS paper_deployment_actor_created ON paper_deployment_definitions(actor_id, created_at DESC, deployment_id DESC);
       CREATE INDEX IF NOT EXISTS paper_deployment_events_latest ON paper_deployment_events(deployment_id, created_at DESC);
+      CREATE TABLE IF NOT EXISTS paper_deployment_projection_events (
+        projection_id TEXT PRIMARY KEY, deployment_id TEXT NOT NULL, actor_id TEXT NOT NULL,
+        kind TEXT NOT NULL CHECK(kind IN ('run','cycle','trade','artifact')), payload_json TEXT NOT NULL,
+        created_at TEXT NOT NULL);
+      CREATE INDEX IF NOT EXISTS paper_deployment_projection_cursor ON paper_deployment_projection_events(actor_id, deployment_id, kind, created_at DESC, projection_id DESC);
       CREATE TRIGGER IF NOT EXISTS paper_deployment_definition_immutable BEFORE UPDATE ON paper_deployment_definitions BEGIN SELECT RAISE(ABORT, 'PAPER_DEPLOYMENT_IMMUTABLE'); END;
       CREATE TRIGGER IF NOT EXISTS paper_deployment_definition_delete_forbidden BEFORE DELETE ON paper_deployment_definitions BEGIN SELECT RAISE(ABORT, 'PAPER_DEPLOYMENT_IMMUTABLE'); END;
       CREATE TRIGGER IF NOT EXISTS paper_deployment_event_immutable BEFORE UPDATE ON paper_deployment_events BEGIN SELECT RAISE(ABORT, 'PAPER_DEPLOYMENT_IMMUTABLE'); END;
@@ -71,6 +76,24 @@ export class SqliteMultiPaperDeploymentRepository {
     const current = this.get(actorId, deploymentId); const event = PaperDeploymentEventSchema.parse({ eventId: `pde:${randomUUID()}`, deploymentId, actorId, kind, state: next, ...(requestFingerprint ? {requestFingerprint}:{}), createdAt: nowIso() });
     try { this.database.prepare("INSERT INTO paper_deployment_events(event_id,deployment_id,actor_id,event_kind,request_fingerprint,event_json,created_at) VALUES(?,?,?,?,?,?,?)").run(event.eventId,deploymentId,actorId,kind,requestFingerprint ?? null,JSON.stringify(event),event.createdAt); } catch { if (requestFingerprint) return this.get(actorId,deploymentId); throw new MultiPaperRuntimeError("DEPLOYMENT_EVENT_CONFLICT"); }
     return { definition: current.definition, state: event.state };
+  }
+  /** Immutable operational projections. Payloads are server-produced only. */
+  appendProjection(actorId: string, deploymentId: string, kind: "run"|"cycle"|"trade"|"artifact", payload: Record<string, unknown>): void {
+    this.get(actorId, deploymentId);
+    const createdAt = nowIso();
+    this.database.prepare("INSERT INTO paper_deployment_projection_events(projection_id,deployment_id,actor_id,kind,payload_json,created_at) VALUES(?,?,?,?,?,?)").run(`pdp:${randomUUID()}`, deploymentId, actorId, kind, JSON.stringify(payload), createdAt);
+  }
+  projections(actorId: string, deploymentId: string, kind: "run"|"cycle"|"trade"|"artifact", limit = 50, cursor?: string): { data: readonly Record<string, unknown>[]; nextCursor?: string } {
+    this.get(actorId, deploymentId);
+    const safeLimit = Math.min(Math.max(limit, 1), 100);
+    const cursorParts = cursor ? Buffer.from(cursor, "base64url").toString("utf8").split("|") : undefined;
+    if (cursorParts && (cursorParts.length !== 4 || cursorParts[0] !== actorId || cursorParts[1] !== deploymentId || cursorParts[2] !== kind)) throw new MultiPaperRuntimeError("CURSOR_INVALID");
+    const rows = (cursorParts
+      ? this.database.prepare("SELECT projection_id,payload_json,created_at FROM paper_deployment_projection_events WHERE actor_id=? AND deployment_id=? AND kind=? AND (created_at < ? OR (created_at=? AND projection_id < ?)) ORDER BY created_at DESC,projection_id DESC LIMIT ?").all(actorId,deploymentId,kind,cursorParts[3]!.split(",")[0],cursorParts[3]!.split(",")[0],cursorParts[3]!.split(",")[1],safeLimit + 1)
+      : this.database.prepare("SELECT projection_id,payload_json,created_at FROM paper_deployment_projection_events WHERE actor_id=? AND deployment_id=? AND kind=? ORDER BY created_at DESC,projection_id DESC LIMIT ?").all(actorId,deploymentId,kind,safeLimit + 1)) as {projection_id:string;payload_json:string;created_at:string}[];
+    const page = rows.slice(0, safeLimit);
+    const tail = page.at(-1);
+    return { data: page.map((row) => JSON.parse(row.payload_json) as Record<string, unknown>), ...(rows.length > safeLimit && tail ? { nextCursor: Buffer.from(`${actorId}|${deploymentId}|${kind}|${tail.created_at},${tail.projection_id}`).toString("base64url") } : {}) };
   }
 }
 

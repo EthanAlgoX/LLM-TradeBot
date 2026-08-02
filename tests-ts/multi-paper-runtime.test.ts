@@ -47,3 +47,14 @@ test("M4 overview is persistent-fact shaped and bounded", () => {
   const overview = downsampleOverview(points, 100, 25);
   assert.ok(overview.length <= 26); assert.equal(overview.at(-1)?.equity, 1099); assert.equal(overview[0]?.normalizedReturnPct, 0);
 });
+
+test("M4 projections are immutable, actor/kind-bound and cursor paginated", () => {
+  const { service, repository } = fixture(); const deployment = service.create("actor:one", request("projection")); const id = deployment.definition.deploymentId;
+  repository.appendProjection("actor:one", id, "cycle", { cycleId: "cycle:1", equity: 10001 });
+  repository.appendProjection("actor:one", id, "cycle", { cycleId: "cycle:2", equity: 10002 });
+  const first = repository.projections("actor:one", id, "cycle", 1);
+  assert.equal(first.data.length, 1); assert.ok(first.nextCursor);
+  assert.equal(repository.projections("actor:one", id, "cycle", 1, first.nextCursor).data.length, 1);
+  assert.throws(() => repository.projections("actor:one", id, "trade", 1, first.nextCursor), /CURSOR_INVALID/);
+  assert.throws(() => repository.projections("actor:two", id, "cycle"), /DEPLOYMENT_NOT_FOUND/);
+});

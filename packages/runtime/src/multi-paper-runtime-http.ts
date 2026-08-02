@@ -10,12 +10,17 @@ export class MultiPaperRuntimeHttpHandler {
     let actor; try { actor = this.authenticate.authenticate(request.headers.get("authorization") ?? undefined); } catch { return error("UNAUTHENTICATED", 401); }
     const url = new URL(request.url); const path = url.pathname;
     const match = path.match(/^\/api\/orchestration\/paper-deployments\/([^/]+)(?:\/(preflight|start|stop|archive))?$/);
+    const projection = path.match(/^\/api\/orchestration\/paper-deployments\/([^/]+)\/(runs|cycles|trades|artifacts)$/);
     try {
       if (request.method === "GET" && path === "/api/orchestration/paper-deployments") return response({ data: this.repository.list(actor.actorId, Number(url.searchParams.get("limit") ?? 50)) });
       if (request.method === "POST" && path === "/api/orchestration/paper-deployments") return response({ data: this.service.create(actor.actorId, await request.json()) }, 201);
+      if (projection && request.method === "GET") {
+        const kind = projection[2]!.slice(0, -1) as "run"|"cycle"|"trade"|"artifact";
+        return response(this.repository.projections(actor.actorId, decodeURIComponent(projection[1]!), kind, Number(url.searchParams.get("limit") ?? 50), url.searchParams.get("cursor") ?? undefined));
+      }
       if (match && request.method === "GET" && !match[2]) return response({ data: this.repository.get(actor.actorId, decodeURIComponent(match[1]!)) });
       if (match && request.method === "POST" && match[2]) return response({ data: this.service.action(actor.actorId, decodeURIComponent(match[1]!), match[2] as "preflight"|"start"|"stop"|"archive", await request.json()) });
-      return error(match ? "METHOD_NOT_ALLOWED" : "ROUTE_NOT_FOUND", match ? 405 : 404);
+      return error(match || projection ? "METHOD_NOT_ALLOWED" : "ROUTE_NOT_FOUND", match || projection ? 405 : 404);
     } catch (cause) {
       if (cause instanceof URIError) return error("DEPLOYMENT_ID_INVALID");
       if (cause instanceof MultiPaperRuntimeError) return error(cause.code, cause.code === "DEPLOYMENT_NOT_FOUND" ? 404 : 409);

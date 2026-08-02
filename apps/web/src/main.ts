@@ -6,6 +6,7 @@ import "./comparative-trade-review-api.js";
 import "./strategy-workspace-api.js";
 import "./data-center-api.js";
 import "./experiment-workspace-api.js";
+import "./multi-paper-runtime-center.js";
 import "./runtime-dashboard.css";
 import type {
   RuntimeDashboardSnapshot,
@@ -1053,6 +1054,10 @@ function renderAgentIdentity(): string {
   `;
 }
 
+function renderSimulationCenterHost(): string {
+  return `<section class="simulation-center-shell" aria-label="${tr("多模拟运行中心", "Multi-simulation runtime center")}"><div id="multi-paper-runtime-center-host"></div></section>`;
+}
+
 function renderCandidateRow(candidate: Candidate): string {
   const label = candidate.state === "selected"
     ? tr("本轮选中", "Selected")
@@ -1202,6 +1207,7 @@ function renderOperatorAction(): string {
 function renderOverview(): string {
   return `
     ${renderAgentIdentity()}
+    ${renderSimulationCenterHost()}
     <div class="operation-layout">
       <div class="operation-main">
         ${renderSelectorAperture()}
@@ -2082,6 +2088,7 @@ function render(): void {
   window.dispatchEvent(
     new CustomEvent("tradebot:runtime-evidence-remount"),
   );
+  window.dispatchEvent(new CustomEvent("tradebot:multi-paper-remount"));
   bindEvents();
   syncOverlayState();
 }
