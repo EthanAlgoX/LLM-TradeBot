@@ -94,7 +94,13 @@ export interface ConversationReplayRepository {
     actorId: string,
     conversationId: string,
   ): ConversationDraftReference | undefined;
-  appendDraftReference(actorId: string, conversationId: string, idempotencyKey: string, draftReference: ConversationDraftReference): void;
+  appendDraftReference(
+    actorId: string,
+    conversationId: string,
+    idempotencyKey: string,
+    draftReference: ConversationDraftReference,
+    datasetBindings?: ConversationAssistantResponse["context"]["selected"]["datasetBindings"],
+  ): void;
 }
 
 export interface OrchestrationCopilotServiceDependencies {
@@ -1593,10 +1599,11 @@ export class OrchestrationCopilotService {
     gates: ConversationAssistantResponse["evidenceGates"];
     selected: ConversationAssistantResponse["context"]["selected"];
   }): ConversationAssistantResponse {
+    const selected = this.withDatasetBindingProjection(input.selected);
     const contextIdentity = {
       conversationId: input.command.conversationId,
       actorId: input.actor.actorId,
-      selected: input.selected,
+      selected,
       tools: this.tools.list(),
     };
     const context = {
@@ -1620,7 +1627,7 @@ export class OrchestrationCopilotService {
           .map((entry) => entry.preset.id),
         toolIds: [...this.tools.list()],
       },
-      selected: input.selected,
+      selected,
     };
     const identity = {
       command: input.command,
@@ -1649,6 +1656,21 @@ export class OrchestrationCopilotService {
       evidenceGates: input.gates,
       runtimeApplied: false,
     });
+  }
+
+  private withDatasetBindingProjection(
+    selected: ConversationAssistantResponse["context"]["selected"],
+  ): ConversationAssistantResponse["context"]["selected"] {
+    if (!selected.draftReference) return selected;
+    const version = this.dependencies.configurationDraftService.get(
+      selected.draftReference.versionId,
+    );
+    const datasetBindings = "dataBindings" in version.payload
+      ? version.payload.dataBindings
+      : undefined;
+    return datasetBindings?.length
+      ? { ...selected, datasetBindings: [...datasetBindings] }
+      : selected;
   }
 
   private capabilitySummaries(

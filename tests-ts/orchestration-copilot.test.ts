@@ -116,6 +116,31 @@ test("an explicit CSV Historical preset wins over overlapping Current Crypto ali
   }
 });
 
+test("CSV Dataset Binding is replayed with the server Draft authority", async () => {
+  const { database, runtime } = fixture();
+  const command = {
+    ...currentCommand,
+    conversationId: "conversation.csv-binding-projection.001",
+    idempotencyKey: "idempotency.csv-binding-projection.create.001",
+    locale: "en" as const,
+    message: "Create a CSV Historical Draft using preset.current-crypto-csv-historical and data-source:csv-historical",
+  };
+  try {
+    const created = await runtime.orchestrationCopilotService.handle(command, actor);
+    const parent = created.context.selected.draftReference!;
+    const repository = new SqliteConversationReplayRepository(database);
+    const datasetBindings = [{ assetId: "asset:csv-historical", datasetId: "dataset:csv:test", version: "1.0.0+test", fingerprint: "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", capabilityId: "capability:csv-historical:ohlcv:v1", mode: "pinned_snapshot" as const }];
+    repository.appendDraftReference(actor.actorId, command.conversationId, "dataset-binding:ui.csv-binding-projection.001", parent, datasetBindings);
+    const replayed = runtime.orchestrationCopilotService.listTurns(actor.actorId, command.conversationId, { schemaVersion: "1.0.0", limit: 20 }).items[0]!;
+    assert.deepEqual(replayed.response.selected.draftReference, parent);
+    assert.deepEqual(replayed.response.selected.datasetBindings, datasetBindings);
+    assert.equal(replayed.runtimeApplied, false);
+  } finally {
+    await runtime.close();
+    database.close();
+  }
+});
+
 test("registered Crypto preset creates persistent Configuration and Pipeline Drafts", async () => {
   const { database, runtime } = fixture();
   try {

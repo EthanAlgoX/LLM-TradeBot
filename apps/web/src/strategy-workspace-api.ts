@@ -27,6 +27,15 @@ interface DraftReference {
   fingerprint: string;
 }
 
+interface DatasetBinding {
+  assetId: string;
+  datasetId: string;
+  version: string;
+  fingerprint: string;
+  capabilityId: string;
+  mode: "latest_snapshot" | "pinned_snapshot" | "replay";
+}
+
 interface WindowDefinition {
   kind: string;
   unit: string;
@@ -62,6 +71,7 @@ interface ConversationResponse {
       presetId?: string;
       agentTemplateId?: string;
       draftReference?: DraftReference;
+      datasetBindings?: DatasetBinding[];
     };
   };
   proposal?: {
@@ -516,13 +526,17 @@ function renderSelection(): string {
 
 function renderBinding(): string {
   const intent = state.bindingIntent;
-  if (!intent) return "";
   const text = locale() === "zh-CN" ? {
-    title: "待绑定数据资产", confirm: "确认绑定 Dataset", create: "创建 CSV 兼容 Draft", cancel: "取消", target: "目标 Draft", unavailable: "需要包含 CSV Historical 的 Market 或 Agent Draft", safety: "仅创建不可变 Configuration Draft Version；不会 Apply Runtime、启动 Paper Run 或写入交易所。", success: "绑定成功",
+    title: "待绑定数据资产", restoredTitle: "已恢复 Dataset 绑定", confirm: "确认绑定 Dataset", create: "创建 CSV 兼容 Draft", cancel: "取消", target: "目标 Draft", unavailable: "需要包含 CSV Historical 的 Market 或 Agent Draft", safety: "仅创建不可变 Configuration Draft Version；不会 Apply Runtime、启动 Paper Run 或写入交易所。", success: "绑定成功", restored: "已从服务端恢复绑定",
   } : {
-    title: "Pending data asset binding", confirm: "Confirm Dataset binding", create: "Create CSV-compatible Draft", cancel: "Cancel", target: "Target Draft", unavailable: "A Market or Agent Draft containing CSV Historical is required", safety: "Creates an immutable Configuration Draft Version only. It cannot apply Runtime, start a Paper Run, or write to an exchange.", success: "Binding succeeded",
+    title: "Pending data asset binding", restoredTitle: "Restored Dataset binding", confirm: "Confirm Dataset binding", create: "Create CSV-compatible Draft", cancel: "Cancel", target: "Target Draft", unavailable: "A Market or Agent Draft containing CSV Historical is required", safety: "Creates an immutable Configuration Draft Version only. It cannot apply Runtime, start a Paper Run, or write to an exchange.", success: "Binding succeeded", restored: "Binding restored from server",
   };
   const selected = latestResponse()?.context.selected;
+  const restored = selected?.datasetBindings?.find((binding) => binding.assetId === "asset:csv-historical");
+  if (!intent && restored) {
+    return `<section class="copilot-binding" aria-live="polite"><header><span>DATASET BINDING</span><h2>${text.restoredTitle}</h2></header><dl><div><dt>Asset</dt><dd>${escapeHtml(restored.assetId)}</dd></div><div><dt>Dataset</dt><dd>${escapeHtml(restored.version)} · <code>${escapeHtml(compact(restored.fingerprint))}</code></dd></div><div><dt>Mode</dt><dd>${escapeHtml(restored.mode)}</dd></div><div><dt>${text.target}</dt><dd>${escapeHtml(state.currentDraft?.versionId ?? text.unavailable)}</dd></div></dl><p class="copilot-validation-pass">${text.restored}: ${escapeHtml(state.currentDraft?.versionId ?? "-")} · <code>${escapeHtml(compact(restored.fingerprint))}</code> · runtimeApplied=false</p></section>`;
+  }
+  if (!intent) return "";
   const allowed = state.mode === "live" && !state.busy && !state.bindingBusy && !!state.currentDraft && ["data-source:csv-historical"].some((id) => selected?.dataSourceIds.includes(id));
   return `<section class="copilot-binding" aria-live="polite"><header><span>DATASET BINDING</span><h2>${text.title}</h2></header><dl><div><dt>Asset</dt><dd>${escapeHtml(intent.displayName)}</dd></div><div><dt>Dataset</dt><dd>${escapeHtml(intent.version)} · <code>${escapeHtml(compact(intent.fingerprint))}</code></dd></div><div><dt>Mode</dt><dd>${escapeHtml(intent.mode)}</dd></div><div><dt>${text.target}</dt><dd>${escapeHtml(state.currentDraft?.versionId ?? text.unavailable)}</dd></div></dl><p>${text.safety}</p>${state.bindingResult ? `<p class="copilot-validation-pass">${text.success}: ${escapeHtml(state.bindingResult.versionId)} · <code>${escapeHtml(compact(state.bindingResult.fingerprint))}</code> · ${state.bindingResult.valid ? "VALID" : "VALIDATION_FAILED"} · runtimeApplied=false</p>` : ""}<div>${allowed ? "" : `<button type="button" data-create-csv-compatible-draft ${state.busy || state.bindingBusy || state.mode !== "live" ? "disabled" : ""}>${state.busy ? "…" : text.create}</button>`}<button type="button" data-confirm-dataset-binding ${allowed ? "" : "disabled"}>${state.bindingBusy ? "…" : text.confirm}</button><button type="button" data-cancel-dataset-binding ${state.bindingBusy ? "disabled" : ""}>${text.cancel}</button></div>${allowed ? "" : `<small>${text.unavailable}</small>`}</section>`;
 }

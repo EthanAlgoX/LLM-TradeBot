@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { OrchestrationIntentObservationWindowSchema } from "./orchestration-intent.js";
+import { DatasetBindingDraftSchema } from "./configuration-drafts.js";
 
 const ConversationStableIdSchema = z
   .string()
@@ -52,6 +53,9 @@ const ConversationSummarySelectionSchema = z
     presetId: ConversationStableIdSchema.optional(),
     agentTemplateId: ConversationStableIdSchema.optional(),
     draftReference: ConversationDraftReferenceSchema.optional(),
+    // This is a server-projected subset of the immutable Configuration Draft,
+    // so a recovered conversation can show exactly which Dataset is bound.
+    datasetBindings: z.array(DatasetBindingDraftSchema).max(32).optional(),
   })
   .strict();
 
@@ -199,6 +203,7 @@ export const ConversationContextSchema = z
         presetId: ConversationStableIdSchema.optional(),
         agentTemplateId: ConversationStableIdSchema.optional(),
         draftReference: ConversationDraftReferenceSchema.optional(),
+        datasetBindings: z.array(DatasetBindingDraftSchema).max(32).optional(),
       })
       .strict(),
   })

@@ -10,6 +10,7 @@ import {
 } from "../../contracts/src/index.js";
 import type {
   ConversationDraftReference,
+  ConversationAssistantResponse,
   ConversationListRequest,
   ConversationSummary,
   ConversationSummaryPage,
@@ -213,16 +214,25 @@ export class SqliteConversationReplayRepository
     return this.getLatestTurn(actorId, conversationId)?.response.draftReference;
   }
 
-  appendDraftReference(actorId: string, conversationId: string, idempotencyKey: string, draftReference: ConversationDraftReference): void {
+  appendDraftReference(
+    actorId: string,
+    conversationId: string,
+    idempotencyKey: string,
+    draftReference: ConversationDraftReference,
+    datasetBindings?: ConversationAssistantResponse["context"]["selected"]["datasetBindings"],
+  ): void {
     if (this.get({ actorId, conversationId, idempotencyKey })) return;
     const latest = this.getLatestTurn(actorId, conversationId);
     if (!latest) throw new Error("CONVERSATION_NOT_FOUND");
     const record = this.get({ actorId, conversationId, idempotencyKey: latest.idempotencyKey });
     if (!record) throw new Error("CONVERSATION_NOT_FOUND");
-    const createdAt = new Date().toISOString();
+    // Pagination orders immutable turns by timestamp then idempotency key. Keep
+    // this append-only authority update strictly after its parent even when both
+    // actions occur within one clock millisecond.
+    const createdAt = new Date(Math.max(Date.now(), Date.parse(latest.createdAt) + 1)).toISOString();
     this.save({ actorId, conversationId, idempotencyKey }, {
       command: { ...record.command, idempotencyKey, message: "Dataset binding confirmed.", draftReference },
-      response: { ...record.response, createdAt, assistantMessage: "Dataset binding confirmed. Runtime remains unchanged.", context: { ...record.response.context, selected: { ...record.response.context.selected, draftReference } } },
+      response: { ...record.response, createdAt, assistantMessage: "Dataset binding confirmed. Runtime remains unchanged.", context: { ...record.response.context, selected: { ...record.response.context.selected, draftReference, ...(datasetBindings?.length ? { datasetBindings: [...datasetBindings] } : {}) } } },
     });
   }
 

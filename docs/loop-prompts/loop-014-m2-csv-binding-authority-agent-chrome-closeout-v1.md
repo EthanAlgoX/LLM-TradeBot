@@ -3,12 +3,19 @@
 ```text
 Loop ID：LOOP-014
 里程碑：M2 数据中心 V1
-状态：READY
+状态：PARTIAL
 前置 Loop：LOOP-013（PARTIAL，CSV-compatible Draft 与可见创建入口已完成，绑定成功态及恢复尚未验证）
 执行环境：本地仓库 + Agent 直接控制真实 Google Chrome
 浏览器要求：必需；禁止任何用户手工验收或 DevTools 交接
 验收模式：DIAGNOSE_FIX_AND_AGENT_CHROME_VERIFIED
 ```
+
+## 执行结果（2026-08-02）
+
+- Binding 成功态、不可变 Draft Version、服务端会话权威引用与刷新恢复已由 Agent Chrome 复现。
+- 本轮修复了恢复读模型未投影 Dataset version/fingerprint 的缺口；回放现展示服务端确认的绑定，且同毫秒追加的权威回放严格排在父 Turn 之后。
+- Chrome 继续对话仍返回 `INTERNAL_ORCHESTRATION_ERROR`，因此 LOOP-014 为 `PARTIAL`，M2 保持 `IN_PROGRESS`；不得进入 M3。
+- 自动化：`check` PASS、`test:ts` 332/332 PASS、`build:web` PASS、`diff-check` PASS。
 
 ## 目标
 

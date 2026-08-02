@@ -68,7 +68,7 @@ export class DataCenterHttpHandler {
       if (existing?.response.context.selected.draftReference) return json({ data: { version: this.configurations.get(existing.response.context.selected.draftReference.versionId), validation: this.configurations.validate(existing.response.context.selected.draftReference.versionId), runtimeApplied: false } });
       const version = this.configurations.createVersion(current.draftId, { schemaVersion: "1.0.0", parentFingerprint: current.fingerprint, humanVersion: `${current.humanVersion} + dataset`, payload: { ...current.payload, dataBindings } }, actor.actorId);
       const validation = this.configurations.validate(version.versionId);
-      this.replayRepository.appendDraftReference(actor.actorId, input.conversationId, `dataset-binding:${input.idempotencyKey}`, { draftId: version.draftId, versionId: version.versionId, fingerprint: version.fingerprint });
+      this.replayRepository.appendDraftReference(actor.actorId, input.conversationId, `dataset-binding:${input.idempotencyKey}`, { draftId: version.draftId, versionId: version.versionId, fingerprint: version.fingerprint }, dataBindings);
       return json({ data: { version, validation, runtimeApplied: false } }, 201);
     } catch (error) {
       if (error instanceof z.ZodError) return json({ error: { code: "REQUEST_CONTRACT_INVALID" } }, 400);
