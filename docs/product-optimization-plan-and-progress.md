@@ -588,12 +588,13 @@ README 中的 `320/320 PASS` 当前已过期。恢复稳定测试基线是后续
 - [x] Market Radar 首版仅展示当前已证实维度；当前 Regime、Mover、Volume、Funding/OI 均明确 unavailable；
 - [x] 补齐“送入编排”在编排工作台的可见 Dataset intent 消费与待绑定确认卡片；
 - [x] 提供可由 UI 确定性创建的 CSV-compatible Agent Draft（真实注册 CSV Graph、exact-set 校验与可见入口）；
-- [ ] 完成 CSV Binding 成功、不可变 Draft Version、权威引用、刷新恢复与继续对话的正向 Chrome 验收；
-- [ ] 完成真实 Chrome 的桌面、窄屏、绑定成功/拒绝和 Console/Network 验收。
+- [x] 完成 CSV Binding 成功、不可变 Draft Version、权威引用与刷新恢复的正向 Chrome 验收；
+- [ ] 修复绑定后继续对话的 `INTERNAL_ORCHESTRATION_ERROR`，并验证新版本保留 Dataset binding；
+- [x] 完成真实 Chrome 的桌面、窄屏、绑定成功/拒绝和产品 Console 验收；Network 因 Agent Chrome 工具不提供读取能力，保持 `TOOL_UNAVAILABLE`，禁止人工替代。
 
 验收：一个 Strategy Draft 可以引用服务端登记的数据版本，Validation 能阻止能力不匹配，回测 Evidence 能追溯 Dataset fingerprint。
 
-进度：LOOP-013 已注册独立 CSV Historical Preset/Graph，并让待绑定卡片通过受认证 Copilot 入口创建 CSV-compatible Agent Draft；331/331 自动化通过。真实 Chrome 已确认资产、中文创建入口、真实 CSV Draft 与启用的确认绑定动作，但尚未观察到 Binding 完整成功态，也未完成权威引用、刷新/会话恢复、继续对话、英文窄屏和 Console/Network 证据。下一步执行 LOOP-014，先诊断并最小修复剩余断点，再由 Agent Chrome 收尾；M2 保持 `IN_PROGRESS`。
+进度：LOOP-014 已修复 Conversation Replay 未投影 Dataset version/fingerprint 及同毫秒权威 Turn 排序问题；332/332 自动化通过。Agent Chrome 已完成 CSV 正向 Binding、权威引用与刷新恢复、中文 1440×900、英文 820×760、负向 fail-closed 和产品 Console 验收。绑定后继续 Composer 修改仍出现 `INTERNAL_ORCHESTRATION_ERROR`，是当前唯一产品阻塞；Network 为宿主工具不可读而非产品失败。下一步执行 LOOP-015 定位并修复继续对话链路；M2 保持 `IN_PROGRESS`。
 
 ### M3：实验场 V1
 
