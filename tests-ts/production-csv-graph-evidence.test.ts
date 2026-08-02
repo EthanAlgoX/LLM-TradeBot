@@ -109,6 +109,34 @@ async function fixture() {
   return { csvPath, profilePath, registration };
 }
 
+test("CSV versioned definitions remain stable across process start times", async () => {
+  const configured = await fixture();
+  const restarted = await createCsvProductionGraphEvidenceRegistration({
+    csvPath: configured.csvPath,
+    profilePath: configured.profilePath,
+    symbols: ["BTCUSDT"],
+    walkForward: {
+      trainingCycles: 4,
+      validationCycles: 2,
+      stepCycles: 2,
+    },
+    now: () => new Date("2026-08-02T12:00:00.000Z"),
+  });
+
+  assert.equal(
+    restarted.dataset.fingerprint,
+    configured.registration.dataset.fingerprint,
+  );
+  assert.equal(
+    restarted.profile.fingerprint,
+    configured.registration.profile.fingerprint,
+  );
+  assert.equal(
+    restarted.walkForwardPlan.fingerprint,
+    configured.registration.walkForwardPlan.fingerprint,
+  );
+});
+
 test("production CSV semantic Graph completes Draft through approved-ready without applying Runtime", async () => {
   const configured = await fixture();
   const database = new DatabaseSync(":memory:");
@@ -152,7 +180,10 @@ test("production CSV semantic Graph completes Draft through approved-ready witho
           observationWindows: [
             { kind: "bar_interval", unit: "minute", value: 5 },
           ],
-          parameters: {},
+          parameters: {
+            confidenceThreshold: 0.6,
+            lookbackPeriods: 48,
+          },
         },
       },
       actor.actorId,
@@ -168,7 +199,7 @@ test("production CSV semantic Graph completes Draft through approved-ready witho
           agentConfigurationDraftIds: [agentDraft.draftId],
           promptPolicyDraftIds: [],
           weights: {},
-          thresholds: { minimumConfidence: 0.5 },
+          thresholds: {},
         },
       },
       actor.actorId,
@@ -186,7 +217,11 @@ test("production CSV semantic Graph completes Draft through approved-ready witho
     assert.equal(executable.runtimeApplied, false);
     assert.equal(
       executable.derivedProfile.parameters.minimumConfidence,
-      0.5,
+      0.6,
+    );
+    assert.equal(
+      executable.derivedProfile.parameters.lookbackPeriods,
+      48,
     );
 
     const evidence = production.strategyEvidenceApprovalService!;

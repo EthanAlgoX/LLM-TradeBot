@@ -411,6 +411,23 @@ function objectiveValue(metrics: GraphBacktestMetrics, objective: GraphWalkForwa
   throw new GraphEvidenceError("WALK_FORWARD_OBJECTIVE_INCOMPATIBLE", { objective, mode: metrics.mode });
 }
 
+function walkForwardDerivedId(
+  kind: "training" | "validation" | "fold",
+  requestIdempotencyKey: string,
+  foldIndex: number,
+  profileId?: string,
+): string {
+  const suffix = graphEvidenceFingerprint({
+    kind,
+    requestIdempotencyKey,
+    foldIndex,
+    profileId,
+  }).slice(7, 39);
+  return kind === "fold"
+    ? `graph-walk-forward:fold:${foldIndex}:${suffix}`
+    : `wf.${kind}.${foldIndex}.${suffix}`;
+}
+
 export class GraphWalkForwardRunner {
   constructor(
     private readonly datasets: RegisteredGraphHistoricalDatasetRegistry,
@@ -450,7 +467,12 @@ export class GraphWalkForwardRunner {
           profileId,
           startAt: training[0]!,
           endAt: training.at(-1)!,
-          idempotencyKey: `${request.idempotencyKey}:fold:${foldIndex}:training:${profileId}`,
+          idempotencyKey: walkForwardDerivedId(
+            "training",
+            request.idempotencyKey,
+            foldIndex,
+            profileId,
+          ),
         });
         candidates.push({
           profileRef: definitionRef(profile),
@@ -471,10 +493,19 @@ export class GraphWalkForwardRunner {
         profileId: selected.profileRef.id,
         startAt: validation[0]!,
         endAt: validation.at(-1)!,
-        idempotencyKey: `${request.idempotencyKey}:fold:${foldIndex}:validation:${selected.profileRef.id}`,
+        idempotencyKey: walkForwardDerivedId(
+          "validation",
+          request.idempotencyKey,
+          foldIndex,
+          selected.profileRef.id,
+        ),
       });
       const foldWithoutFingerprint = {
-        foldId: `graph-walk-forward:${request.idempotencyKey}:fold:${foldIndex}`,
+        foldId: walkForwardDerivedId(
+          "fold",
+          request.idempotencyKey,
+          foldIndex,
+        ),
         trainingStartAt: training[0]!,
         trainingEndAt: training.at(-1)!,
         validationStartAt: validation[0]!,

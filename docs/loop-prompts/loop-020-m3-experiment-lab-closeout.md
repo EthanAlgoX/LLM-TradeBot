@@ -3,13 +3,15 @@
 ```text
 Loop ID：LOOP-020
 里程碑：M3 实验场 V1
-状态：READY
+状态：COMPLETE
 前置 Loop：LOOP-019（IN_PROGRESS）
 基线提交：56f018e8c593017a9369ee20e9155b1bb744c129
 执行环境：本地仓库 + 修复后由 Agent 直接控制真实 Google Chrome
 浏览器要求：必需；只允许 Agent 操作真实 Chrome，禁止用户手工验收或 DevTools 交接
 验收模式：M3_BEHAVIOR_TESTS_AND_AGENT_CHROME_CLOSEOUT
 ```
+
+关闭结果：353/353 自动化通过；Agent Chrome 已完成受控/Open Class 创建、真实 Backtest、109-fold Walk-Forward、Replay、唯一 Candidate、中英文双尺寸及 Web/API 重启恢复。Network 为 `TOOL_UNAVAILABLE`，TradeBot Console error 为 0，Runtime 始终未应用。
 
 ## 本轮目标
 

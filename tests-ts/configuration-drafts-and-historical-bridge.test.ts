@@ -357,7 +357,10 @@ function topologicalSteps(graph: PipelineGraphVersion) {
   }));
 }
 
-function bridgeFixture(fixture: typeof nativeThreeWindowFixture) {
+function bridgeFixture(
+  fixture: typeof nativeThreeWindowFixture,
+  now: () => Date = fixedNow,
+) {
   const graph = fixture.graph;
   const context = fixture.context;
   const agentConfigs = [...context.agentConfigs];
@@ -417,7 +420,7 @@ function bridgeFixture(fixture: typeof nativeThreeWindowFixture) {
     executorRegistry: nodeExecutorRegistry,
     artifactSchemaRegistry,
     bindings: [],
-    now: fixedNow,
+    now,
   });
   const bridge = new PipelineGraphHistoricalBridge({
     registry,
@@ -428,7 +431,7 @@ function bridgeFixture(fixture: typeof nativeThreeWindowFixture) {
       implementationKey: binding.implementationKey,
       executorId: `executor.${binding.agentConfigId}`,
     })),
-    now: fixedNow,
+    now,
   });
   return { bridge, compiled, graph, historicalPlanRegistry };
 }
@@ -449,6 +452,26 @@ test("compiler bridge registers the current multi-window graph without applying 
   assert.ok(plan.nodes.some((node) => node.role === "risk"));
   assert.ok(plan.nodes.some((node) => node.role === "execution"));
   assert.equal(historicalPlanRegistry.require(plan.planId).fingerprint, plan.fingerprint);
+});
+
+test("compiler bridge keeps the plan fingerprint stable across compilation time", () => {
+  let invocation = 0;
+  const now = () =>
+    new Date(
+      invocation++ === 0
+        ? "2026-07-26T08:00:00.000Z"
+        : "2026-08-02T08:00:00.000Z",
+    );
+  const { bridge, compiled, graph } = bridgeFixture(
+    nativeThreeWindowFixture,
+    now,
+  );
+
+  const first = bridge.bridge(graph, compiled);
+  const second = bridge.bridge(graph, compiled);
+
+  assert.equal(second.createdAt, graph.createdAt.toISOString());
+  assert.equal(second.fingerprint, first.fingerprint);
 });
 
 test("compiler bridge represents daily-only and event-only historical plans", () => {

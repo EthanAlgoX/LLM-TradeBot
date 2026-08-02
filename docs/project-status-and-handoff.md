@@ -1,6 +1,6 @@
 # TradeBot 当前状态与接手说明
 
-> 2026-08-02 接手更新：LOOP-017 已关闭 M2。CSV Binding 的服务端排序/写入正确；Web 全局历史重新选择和陈旧 load 响应会覆盖同会话 CSV Authority，现已改为定向 read-after-write、newest Turn Authority 与 epoch 隔离。Agent Chrome 已通过 Binding、刷新、服务重启、Composer、A/B 往返及双尺寸验收；336/336 自动化通过。下一任务为 LOOP-018（M3 实验场 V1）。
+> 2026-08-02 接手更新：LOOP-020 已关闭 M3。Experiment contracts、SQLite 权威聚合、comparability、真实 Graph Evidence、durable Replay、唯一 Candidate 和 UI 全链已完成；Agent Chrome 通过双尺寸、负向、刷新与 Web/API 重启恢复，353/353 自动化通过。下一任务为 LOOP-021（M4 多模拟运行中心）。
 
 > 快照日期：2026-08-01
 > 适用仓库：`/Users/hyx/Documents/workspace/tradebot`
@@ -140,11 +140,11 @@ Comparative Evidence 当前由 active production composition 的内存索引支�
 
 ## 6. 最新验证
 
-M2 数据中心 V1 完成后的最新完整基线：
+M3 实验场 V1 完成后的最新完整基线：
 
 ```text
 npm run check       PASS
-npm run test:ts     PASS (336/336)
+npm run test:ts     PASS (353/353)
 npm run build:web   PASS
 git diff --check    PASS
 npm run dev:paper   STARTED
@@ -159,19 +159,19 @@ API: http://127.0.0.1:8787
 
 启动日志确认 Comparative Trade Review、Runtime Evidence 与 Orchestration/API 已启用，exchange write capability disabled。
 
-浏览器状态：M1 已通过真实 Chrome 完成历史会话、Storage/Network、Console 与 Runtime 安全验收；M2 已通过 Agent Chrome 完成 1440×900、820×760、中英文、CSV Binding、刷新/服务重启、Composer 和会话隔离。M3 实现后仍必须使用 Agent Chrome 验证真实实验工作流，不能以自动化替代。
+浏览器状态：M1、M2 已完成各自真实 Chrome 验收；M3 已由 Agent Chrome 完成中文 1440×900、英文 820×760、受控/Open Class、Backtest、Walk-Forward、Replay、Candidate、刷新与服务重启恢复。Network 在 M2/M3 均为 `TOOL_UNAVAILABLE`；不得要求用户人工替代。
 
 ## 7. 下一阶段
 
-执行 **实验场 V1**（M3）：
+执行 **多模拟运行中心**（M4）：
 
-1. 将静态 Agent Lab 替换为服务端权威、可重放的 Experiment Workspace。
-2. 从历史 Conversation/Strategy Version 选择 2～5 个参与者并锁定传递依赖快照。
-3. 锁定 Dataset、时间、资金、费用、Execution/Risk 与 Model/Prompt 条件。
-4. 复用现有 Graph Backtest/Walk-Forward Evidence，展示真实 equity、Scorecard、Diff 和 lineage。
-5. 由服务端判定 Controlled/Open Class/Incompatible，不使用不可解释单分数声称赢家。
-6. 赢家只形成 Candidate，不提供 Approval、Paper/Live 发布或 Runtime Apply。
-7. 由 Agent Chrome 完成创建、Evidence、重放、负向、双尺寸、Console 与 Runtime safety 验收。
+1. 增加“模拟 / 真实”视图选择器；切换只改变视图，不改变后台运行状态。
+2. 支持多个 actor-owned Paper Deployment 与独立虚拟账户并行、持续运行。
+3. 从 Strategy Version 启动受控模拟，保留 Dataset、Graph、配置与 Experiment/Candidate lineage。
+4. 提供多曲线 Overview 和单实例 Detail（表现、Agent 轨迹、交易、配置与数据、晋升评估）。
+5. 实现停止、归档、重启恢复、健康状态和有界非重叠调度。
+6. “真实”环境保持 capability-gated/unavailable；M4 不新增交易所写入、自动晋升或 Live 部署。
+7. 由 Agent Chrome 完成至少两个并行策略、切换、刷新/服务重启、双尺寸、Console 与 Runtime safety 验收。
 
 ### M1 实施状态（2026-08-01）
 
@@ -199,7 +199,7 @@ API: http://127.0.0.1:8787
 - LOOP-015 为 `IN_PROGRESS`：提交 `0ca86b7c2a2c1de70c2891cec6a832d3bbb0119f` 已修复 CSV Historical Agent Template 的允许字段、域错误到 HTTP 的稳定映射、按权威 Draft 精确选择 CSV recipe/Graph，以及服务重启后的 replay mapping；333/333 自动化通过。Agent Chrome 中文 1440×900 页面稳定且 CSV 资产可见，但可见 Binding 返回 `REQUEST_CONTRACT_INVALID`，故 Binding → Composer、英文窄屏与负向闭环未验证；Console 无产品 error，Network 为 `TOOL_UNAVAILABLE`。
 - LOOP-016 为 `PARTIAL`：提交 `c68aad5819accbe99db6a3ab17b2b9c300cb6ea6` 已将 Dataset Binding request 收拢为前后端共享严格 Schema，并把超过 160 字符的旧拼接 idempotency key 改为稳定有界 `binding.<uuid>`；334/334 自动化和正式 handler 幂等/fail-closed 通过。Agent Chrome 中合同错误已消失，但 Binding 后历史恢复会切换到非 CSV Draft 上下文，因此正向闭环、Composer、英文窄屏与 Authority 恢复未验证；Console 无产品 error，Network 为 `TOOL_UNAVAILABLE`。
 - LOOP-017 为 `COMPLETE`：提交 `b78a6f76e99bc5e17fb5e70586cf5907fc619b9a` 已确认服务端 Binding/Turn 排序正确，并修复 Web 全局 history/localStorage 重新选择、陈旧 load 响应覆盖、Turn merge Authority 与 pending/result 跨会话污染。Binding 后现对原 conversation 定向 read-after-write，并校验完整 Draft/Dataset identity；336/336 自动化通过。Agent Chrome 已完成 CSV Binding、刷新、本项目服务重启、Composer、A/B 往返、分页、中文 1440×900、英文 820×760、负向和 Console；Runtime 保持未应用，Network 为 `TOOL_UNAVAILABLE`。M2 已关闭。
-- LOOP-019 为 `IN_PROGRESS`：已修复 Experiment 自触发渲染循环，加入 host lifecycle/cancellation/epoch，收紧 Evidence/Scorecard/Replay/Candidate 合同并采用版本化 cursor；`check`、336/336 tests、Web build 和 diff-check 通过。Agent Chrome 已直接读取真实实验页及安全状态，但创建动作未出现结果视图，新增 Experiment 自动化仍缺失；不标记 M3 完成。下一步执行 [`LOOP-020`](loop-prompts/loop-020-m3-experiment-lab-closeout.md) 继续 M3，禁止进入 M4 或要求人工验收。
+- LOOP-018、LOOP-019、LOOP-020 均为 `COMPLETE`：LOOP-020 将 Experiment contracts、Repository/API、不可变 snapshot、comparability、Evidence、constraints、Replay、Candidate 和 Web 状态补齐，新增 deterministic plan/CSV registration、完整 eligibility、Walk-Forward 有界派生键和 equity DOM 护栏。353/353 自动化通过。Agent Chrome 完成真实差异策略的 Backtest、109-fold Walk-Forward、唯一 Candidate、Replay、Open Class、少于两名负向、中英文双尺寸与 Web/API 重启恢复；Runtime 始终未应用，Network 为 `TOOL_UNAVAILABLE`。下一步执行 [`LOOP-021`](loop-prompts/loop-021-m4-multi-paper-runtime-center-v1.md)。
 
 完整 Prompt：[`next-loop-prompt.md`](next-loop-prompt.md)。
 

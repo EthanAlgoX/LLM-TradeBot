@@ -1,6 +1,6 @@
 # TradeBot 产品优化规划与进度
 
-> 2026-08-02：M2 已由 LOOP-017 关闭；336/336 自动化及 Agent Chrome 双尺寸、Binding、恢复、Composer、会话隔离与 Runtime safety 通过。LOOP-019 已修复 M3 Experiment 的挂载循环、严格投影、Replay/Candidate 和 cursor，但新增自动化与真实 Chrome 全链尚未闭环；M3 保持 IN_PROGRESS，由 LOOP-020 续办，未进入 M4。
+> 2026-08-02：M3 实验场 V1 已由 LOOP-020 关闭。353/353 自动化与 Agent Chrome 的受控/Open Class、真实 Backtest、109-fold Walk-Forward、Replay、唯一 Candidate、中英文双尺寸和 Web/API 重启恢复均通过；Runtime 始终未应用。下一阶段进入 LOOP-021 / M4 多模拟运行中心。
 
 > 文档角色：汇总 2026-08-01 之前的产品讨论，作为后续产品优化、页面收敛和阶段验收的执行入口
 > 最后更新：2026-08-01
@@ -602,18 +602,20 @@ README 中的 `320/320 PASS` 当前已过期。恢复稳定测试基线是后续
 
 ### M3：实验场 V1
 
-状态：`READY`
+状态：`COMPLETE`
 
-- [ ] 恢复并重构 Agent Lab 为实验场；
-- [ ] 从历史会话或 Strategy Version 创建实验；
-- [ ] 选择 2～5 个参与版本；
-- [ ] 锁定 Dataset、时间、资金、费用、Risk 和 Model/Prompt 变量；
-- [ ] 展示净值、回撤和核心 Scorecard；
-- [ ] 配置 Diff；
-- [ ] Backtest -> Walk-Forward -> Candidate；
-- [ ] 不提供直接 Runtime Apply。
+- [x] 恢复并重构 Agent Lab 为服务端权威实验场；
+- [x] 从 actor-owned Strategy Version 创建实验；
+- [x] 选择 2～5 个参与版本并严格拒绝 invalid/unsupported/stale；
+- [x] 锁定 Dataset、时间、Execution、Risk 和 Model/Prompt 可得变量；
+- [x] 展示有界净值、回撤和真实 Scorecard；
+- [x] 展示服务端配置 Diff、changed/locked dimensions 和 Evidence lineage；
+- [x] 完成 Backtest -> Walk-Forward -> Replay -> Candidate；
+- [x] 不提供 Approval、Deploy、Paper Run 或 Runtime Apply。
 
 验收：同一 Experiment 可重放并得到相同 fingerprint；比较条件不一致时明确标记 Open Class 或拒绝因果结论。
+
+进度：LOOP-020 新增严格 Experiment contracts、actor-bound cursor、append-only definition/event、不可变 snapshot、可比性判定、真实约束、durable artifact Replay 与唯一第一名 Candidate。修复历史计划和 CSV 注册定义随进程时间漂移、Walk-Forward 派生幂等键超长、目录 eligibility 预检不完整，以及 1118 点净值文本导致的 DOM 膨胀。Agent Chrome 通过中文 1440×900、英文 820×760、Open Class/少于两名负向、两个差异策略的真实 Evidence、Candidate、刷新和服务重启恢复；Network 为 `TOOL_UNAVAILABLE`，仅观察到扩展自身消息通道错误。自动化为 353/353 PASS。
 
 ### M4：多模拟运行中心
 
@@ -704,8 +706,8 @@ README 中的 `320/320 PASS` 当前已过期。恢复稳定测试基线是后续
 M0 恢复稳定基线和路由
 -> M1 历史对话 V1
 -> M2 数据中心 V1
--> M3 实验场 V1（IN_PROGRESS：等待 Agent Chrome 全链验收）
--> M4 多模拟运行中心（尚未进入）
+-> M3 实验场 V1（COMPLETE）
+-> M4 多模拟运行中心（READY：LOOP-021）
 ```
 
 完成 M4 后，TradeBot 将形成首个完整、仍保持 Paper Only 的产品闭环：

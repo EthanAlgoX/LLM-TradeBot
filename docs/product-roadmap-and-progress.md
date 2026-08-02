@@ -1,6 +1,6 @@
 # TradeBot 产品路线图与当前进度
 
-> 2026-08-02：M2 数据中心 V1 已由 LOOP-017 关闭；336/336 自动化与 Agent Chrome 完整闭环通过。LOOP-019 修复了 M3 实验场的渲染生命周期、严格 Evidence/Replay/Candidate 合同与游标，但自动化仍为 336/336，真实 Chrome 创建链未完成；M3 保持 IN_PROGRESS，续办为 LOOP-020，未进入 M4。
+> 2026-08-02：M3 实验场 V1 已由 LOOP-020 关闭。严格 Experiment 聚合、真实 Graph Evidence、durable Replay、Candidate-only、公平比较和 Agent Chrome 全链均完成；最新自动化 353/353 PASS。下一阶段为 LOOP-021 / M4 多模拟运行中心。
 
 > 文档角色：当前完成度、剩余缺口和交付顺序的权威快照
 > 最后更新：2026-07-31
@@ -194,6 +194,7 @@ accepted_for_validation
 - 后续真实 Chrome 验收已确认：session、conversation list、turn list 均为 200 且无 401；受控 Copilot 成功创建 Draft Version 3；Console 无 warning/error；`runtimeApplied=false`、Paper Only 与 Exchange writes OFF 保持成立。
 - LOOP-003 保持未完成的历史交接记录。LOOP-004 中用户明确授权 Agent 直接操作真实 Chrome DevTools：localStorage、sessionStorage 与 Cookie 均为空；可见 Composer 触发的 `POST /api/orchestration/copilot/messages` 为 `200`，生成仅 Draft 的 Version 5；清空 Console 并刷新后无 TradeBot 页面 error/warning。没有读取 value、请求载荷或响应。
 - M2 数据中心 V1 为 `COMPLETE`：LOOP-017 确认服务端 Binding 写入和 `createdAt DESC, idempotencyKey DESC` latest 排序正确；缺陷是 Web 全局 history/localStorage 重新选择与无 identity guard 的旧 load response 覆盖。Binding 后现定向回读原 conversation，并校验完整 Draft/version/fingerprint 与 Dataset binding；列表不再改变 active selection，A/B/pending state 由 epoch 隔离。Agent Chrome 已完成中文 1440×900 与英文 820×760 的 Binding、刷新、服务重启、Composer、A/B 往返和无 Draft disabled 负向；`runtimeApplied=false`、Paper Only、Exchange writes OFF。336/336 自动化通过，Network 仍为 `TOOL_UNAVAILABLE`。
+- M3 实验场 V1 为 `COMPLETE`：Experiment definition/event 为 actor-scoped、append-only、可重启恢复；Dataset/range/Execution/Risk/Model/Prompt 和 participant refs 被不可变锁定，Controlled/Open Class/Incompatible 由服务端判定。Backtest 与 Walk-Forward 复用 Durable Graph Evidence，Replay 重新读取并验证 job request/artifact/manifest/result，Candidate 只选择满足约束的唯一第一名且保持 `runtimeApplied=false`。LOOP-020 同时修复 deterministic plan/CSV definition fingerprint、完整 materialization eligibility、Walk-Forward 派生键上限和有界 equity DOM。Agent Chrome 已通过中文 1440×900、英文 820×760、负向、109-fold Evidence、Replay、Candidate 和 Web/API 重启恢复；353/353 自动化通过，Network 为 `TOOL_UNAVAILABLE`。
 ## 2026-07-31：Production Semantic Candidate Persistence
 
 - 状态：`REAL`。Rule Reflection 已生成并持久化严格 Semantic Candidate，Review 与 Materialization 使用同一 append-only Store。

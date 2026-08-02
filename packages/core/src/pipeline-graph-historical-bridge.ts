@@ -392,7 +392,13 @@ export class PipelineGraphHistoricalBridge {
       planId: `pipeline-graph:${graph.pipelineGraphId}:historical-plan:${graph.humanReadableVersion}`,
       version: graph.humanReadableVersion,
       lifecycleStatus: "registered" as const,
-      createdAt: this.now().toISOString(),
+      // A historical plan is a deterministic projection of an immutable graph.
+      // Using compilation wall-clock time here made the same graph produce a
+      // different fingerprint on every read and poisoned the plan registry.
+      createdAt:
+        graph.createdAt instanceof Date
+          ? graph.createdAt.toISOString()
+          : new Date(String(graph.createdAt)).toISOString(),
       presetRef: {
         id: graph.pipelineGraphId,
         version: graph.humanReadableVersion,

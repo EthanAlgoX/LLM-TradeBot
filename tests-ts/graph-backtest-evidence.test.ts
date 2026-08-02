@@ -499,7 +499,7 @@ test("Walk-Forward selects only from training evidence and validates in fresh no
     walkForwardPlanId: setup.walkPlan.id,
     startAt: setup.dataset.asOfSequence[0],
     endAt: setup.dataset.asOfSequence.at(-1),
-    idempotencyKey: "walk-forward-0001",
+    idempotencyKey: "w".repeat(160),
   });
   assert.equal(run.folds.length, 2);
   assert.ok(run.folds.every((fold) => fold.selectedProfileRef.id === "profile.fast"));
@@ -507,6 +507,7 @@ test("Walk-Forward selects only from training evidence and validates in fresh no
   assert.equal(new Set(setup.audit.sessionIds).size, setup.audit.sessionIds.length);
   assert.equal(setup.audit.sessionIds.length, 6);
   assert.equal(run.promotionEligible, true);
+  assert.ok(run.folds.every((fold) => fold.foldId.length <= 200));
 });
 
 test("Evidence verification detects result, Dataset, Plan and Profile scope drift", async () => {

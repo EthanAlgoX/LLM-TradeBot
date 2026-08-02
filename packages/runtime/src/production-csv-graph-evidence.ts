@@ -989,7 +989,9 @@ export async function createCsvProductionGraphEvidenceRegistration(
   }
 
   const now = config.now ?? (() => new Date());
-  const createdAt = now().toISOString();
+  // These are versioned definitions derived from immutable CSV/profile input.
+  // Their identity must not drift merely because the local process restarted.
+  const createdAt = asOfSequence[0]!;
   const profileComponent = stableComponent(profile.profileId);
   const dataset = createGraphHistoricalDatasetDefinition({
     schemaVersion: "1.0.0",

@@ -3,12 +3,14 @@
 ```text
 Loop ID：LOOP-018
 里程碑：M3 实验场 V1
-状态：READY
+状态：COMPLETE（由 LOOP-020 完成全链验收）
 前置 Loop：LOOP-017（COMPLETE，M2 数据中心 V1 已关闭）
 执行环境：本地仓库 + 实现后由 Agent 直接控制真实 Google Chrome
 浏览器要求：实现后必需；禁止用户手工验收或 DevTools 交接
 验收模式：EXPERIMENT_LAB_AND_AGENT_CHROME_VERIFIED
 ```
+
+关闭结果：LOOP-020 已完成严格合同、SQLite 权威聚合、真实 Graph Evidence、Replay、Candidate、双尺寸 Agent Chrome 与重启恢复验收；M3 已关闭。
 
 ## 目标
 

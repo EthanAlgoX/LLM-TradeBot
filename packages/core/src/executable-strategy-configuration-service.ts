@@ -13,7 +13,7 @@ import {
   createGraphStrategyProfileCandidateSet,
   createGraphStrategyProfileDefinition,
   graphEvidenceFingerprint,
-  type RegisteredGraphStrategyProfileRegistry,
+  RegisteredGraphStrategyProfileRegistry,
 } from "./graph-backtest-evidence.js";
 
 export interface ExecutableStrategyConfigurationRepository {
@@ -76,6 +76,9 @@ ExecutableStrategyParameterPolicy = {
     },
     analysis: {
       weight: rule("analysisWeight", 0, 1),
+      confidenceThreshold: rule("minimumConfidence", 0, 1),
+      lookbackPeriods: rule("lookbackPeriods", 1, 10_000),
+      minimumSignalScore: rule("minimumSignalScore", 0, 1),
     },
     bull_case: {
       weight: rule("bullWeight", 0, 1),
@@ -222,6 +225,64 @@ export class ExecutableStrategyConfigurationService {
     this.policy =
       options.policy ?? DEFAULT_EXECUTABLE_STRATEGY_PARAMETER_POLICY;
     this.now = options.now ?? (() => new Date());
+  }
+
+  /** Read-only full materialization preview for eligibility catalogs. */
+  inspectSource(strategyVersionId: string): {
+    eligible: boolean;
+    sourceFingerprint?: `sha256:${string}`;
+    issueCodes: string[];
+  } {
+    try {
+      const baseProfile = this.profiles.require(this.baseProfileId);
+      const previewProfiles = new RegisteredGraphStrategyProfileRegistry([
+        baseProfile,
+      ]);
+      const preview = new ExecutableStrategyConfigurationService(
+        this.configuration,
+        {
+          save: (configuration) => configuration,
+          findByStrategyVersionId: () => undefined,
+          get: () => {
+            throw new ExecutableStrategyConfigurationError(
+              "EXECUTABLE_STRATEGY_NOT_FOUND",
+            );
+          },
+        },
+        this.templates,
+        previewProfiles,
+        this.baseProfileId,
+        { policy: this.policy, now: this.now },
+      ).materialize(strategyVersionId, "actor:catalog-preview");
+      const existing =
+        this.repository.findByStrategyVersionId(strategyVersionId);
+      if (
+        existing &&
+        existing.sourceFingerprint !== preview.sourceFingerprint
+      ) {
+        throw new ExecutableStrategyConfigurationError(
+          "EXECUTABLE_STRATEGY_SOURCE_CHANGED",
+          { strategyVersionId },
+        );
+      }
+      return {
+        eligible: true,
+        sourceFingerprint:
+          preview.sourceFingerprint as `sha256:${string}`,
+        issueCodes: [],
+      };
+    } catch (error) {
+      const code =
+        typeof error === "object" &&
+        error !== null &&
+        "code" in error &&
+        typeof error.code === "string"
+          ? error.code
+          : error instanceof Error && /^[A-Z0-9_:.-]+$/u.test(error.message)
+            ? error.message
+            : "EXECUTABLE_STRATEGY_UNSUPPORTED";
+      return { eligible: false, issueCodes: [code] };
+    }
   }
 
   materialize(
@@ -671,4 +732,3 @@ export class ExecutableStrategyConfigurationService {
     };
   }
 }
-

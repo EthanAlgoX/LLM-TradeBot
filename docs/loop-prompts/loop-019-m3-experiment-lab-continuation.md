@@ -3,12 +3,14 @@
 ```text
 Loop ID：LOOP-019
 里程碑：M3 实验场 V1
-状态：READY
+状态：COMPLETE（由 LOOP-020 完成全链验收）
 前置 Loop：LOOP-018（IN_PROGRESS）
 执行环境：本地仓库 + 修复后由 Agent 直接控制真实 Google Chrome
 浏览器要求：必需；只允许 Agent 操作真实 Chrome，禁止用户手工验收或 DevTools 交接
 验收模式：M3_IMPLEMENTATION_AUDIT_FIX_AND_AGENT_CHROME_VERIFIED
 ```
+
+关闭结果：本轮发现的生命周期、严格投影与 cursor 风险已在 LOOP-020 的行为测试和真实 Chrome 全链中闭环；M3 已关闭。
 
 ## 本轮目标
 
