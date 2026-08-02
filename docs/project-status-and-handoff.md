@@ -1,6 +1,6 @@
 # TradeBot 当前状态与接手说明
 
-> 2026-08-02 接手更新：LOOP-021/M4 处于 `IN_PROGRESS`。已提交 Deployment 基础合同、append-only SQLite 聚合、actor isolation、状态机、fingerprint 阻断、10 实例服务端上限、并发调度原语和 HTTP 动作边界；全量自动化 358/358 通过。真实 Chrome 已确认当前交易页仍是单一 Paper Runtime 控制卡，缺少多实例 UI 与真实 deployment-scoped cycle，故下一任务为 LOOP-022 继续 M4。
+> 2026-08-02 接手更新：LOOP-022/M4 处于 `IN_PROGRESS`。已提交 Deployment 持久 Projection 分页读模型、模拟/真实无副作用切换、Simulation Overview、创建入口和五个惰性 Detail Tab；全量自动化 359/359 通过，Agent Chrome 双语言/双尺寸与 Console 通过。核心剩余缺口是调度器尚未接入真实 deployment-scoped `Decision -> Portfolio -> Risk -> Execution` cycle，下一任务为 LOOP-023。
 
 > 快照日期：2026-08-01
 > 适用仓库：`/Users/hyx/Documents/workspace/tradebot`
@@ -178,7 +178,14 @@ API: http://127.0.0.1:8787
 - `npm run check`、`npm run test:ts`（358/358）、`npm run build:web` 与 `git diff --check` 均通过。
 - `npm run dev:paper` 发现 5174/8787 已由本项目当前服务占用，遵循 Loop 要求未中断；该服务明确显示 `Paper Only` 与 `Exchange writes OFF`。
 - Agent 直接控制真实 Google Chrome 检查中文交易页：页面连接成功，Console error 为 0；但页面只提供单一 `Paper Runtime control`，未提供“模拟 / 真实”分段、Deployment 创建、Overview、多曲线或五 Tab Detail，故不能进行两实例和双尺寸的产品验收。
-- 现有 `LOOP-022` 是唯一 continuation Prompt；不得创建 Live、自动 Candidate 部署或交易所写路径。
+- LOOP-021 当时转入 `LOOP-022` continuation；该历史结论现已由 LOOP-022 的执行结果和 LOOP-023 接续取代。M4 仍不得创建 Live、自动 Candidate 部署或交易所写路径。
+
+### LOOP-022 审计与验证（2026-08-02）
+
+- 新增 actor/deployment/kind-bound cursor 的 run/cycle/trade/artifact 持久 Projection，并完成模拟/真实无副作用切换、Simulation Overview、创建入口和五个 Detail Tab 的惰性请求界面。
+- `npm run check`、`npm run test:ts`（359/359）、`npm run build:web` 与 `git diff --check` 均通过。
+- Agent Chrome 已完成中文/英文、1440×900/820×760、窄屏无横向滚动和 Console error=0；Network 为 `TOOL_UNAVAILABLE`。Runtime 保持 Paper Only、`runtimeApplied=false`、`exchangeWriteAllowed=false`。
+- M4 未关闭：Deployment scheduler 尚未接入现有唯一 Paper 动作链，不能验证两个实例的真实 cycle、独立交易事实、close-only 和 Web/API 重启恢复。下一步执行 [`LOOP-023`](loop-prompts/loop-023-m4-deployment-scoped-paper-cycle-closeout-v1.md)。
 
 ### M1 实施状态（2026-08-01）
 

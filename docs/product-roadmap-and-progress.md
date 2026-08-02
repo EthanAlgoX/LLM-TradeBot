@@ -1,6 +1,6 @@
 # TradeBot 产品路线图与当前进度
 
-> 2026-08-02：M3 实验场 V1 已由 LOOP-020 关闭。严格 Experiment 聚合、真实 Graph Evidence、durable Replay、Candidate-only、公平比较和 Agent Chrome 全链均完成；最新自动化 353/353 PASS。下一阶段为 LOOP-021 / M4 多模拟运行中心。
+> 2026-08-02：M4 多模拟运行中心由 LOOP-022 推进至持久 Projection 和多实例 UI 阶段，最新自动化 359/359 PASS；Agent Chrome 双语言/双尺寸与 Console 通过。M4 仍为 `IN_PROGRESS`，下一阶段 LOOP-023 接入真实 deployment-scoped Paper cycle、隔离交易事实、close-only 与重启恢复。
 
 > 文档角色：当前完成度、剩余缺口和交付顺序的权威快照
 > 最后更新：2026-07-31

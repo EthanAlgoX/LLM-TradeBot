@@ -3,8 +3,10 @@
 ```text
 Loop ID：LOOP-022
 前置 Loop：LOOP-021（IN_PROGRESS）
-状态：READY
+状态：PARTIAL（已执行，M4 保持 IN_PROGRESS）
 ```
+
+执行结果：已完成 Deployment 的 run/cycle/trade/artifact 持久 Projection、模拟/真实无副作用切换、Simulation Overview、创建入口与五个惰性 Detail Tab；359/359 自动化和 Agent Chrome 双语言/双尺寸基础验收通过。调度器尚未接入真实 Paper 动作链，两实例交易事实隔离、close-only 与重启恢复转入唯一 [`LOOP-023`](loop-023-m4-deployment-scoped-paper-cycle-closeout-v1.md)。
 
 继续完成 M4，且不得将其标记为 COMPLETE，直到以下缺口全部关闭：
 

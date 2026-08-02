@@ -1,6 +1,6 @@
 # TradeBot 产品优化规划与进度
 
-> 2026-08-02：M3 实验场 V1 已由 LOOP-020 关闭。353/353 自动化与 Agent Chrome 的受控/Open Class、真实 Backtest、109-fold Walk-Forward、Replay、唯一 Candidate、中英文双尺寸和 Web/API 重启恢复均通过；Runtime 始终未应用。下一阶段进入 LOOP-021 / M4 多模拟运行中心。
+> 2026-08-02：M4 多模拟运行中心由 LOOP-022 推进至持久 Projection 和多实例 UI 阶段，359/359 自动化及 Agent Chrome 双语言/双尺寸基础验收通过。M4 保持 `IN_PROGRESS`；LOOP-023 将调度器接入真实 deployment-scoped Paper cycle，并关闭隔离、close-only 与重启恢复缺口。
 
 > 文档角色：汇总 2026-08-01 之前的产品讨论，作为后续产品优化、页面收敛和阶段验收的执行入口
 > 最后更新：2026-08-01
@@ -619,10 +619,10 @@ README 中的 `320/320 PASS` 当前已过期。恢复稳定测试基线是后续
 
 ### M4：多模拟运行中心
 
-状态：`PLANNED`
+状态：`IN_PROGRESS`（LOOP-022 已完成持久 Projection 与多实例 UI 外壳；LOOP-023 接入真实 deployment-scoped Paper cycle）
 
-- [ ] 交易 Agent 顶部增加“模拟 / 真实”分段选择器；
-- [ ] 切换只改变视图，不影响后台 Runtime；
+- [x] 交易 Agent 顶部增加“模拟 / 真实”分段选择器；
+- [x] 切换只改变视图，不影响后台 Runtime；
 - [ ] 支持多个独立 Paper Deployment 和虚拟账户；
 - [ ] Paper Overview 多曲线、共同区间、标准化收益和实例列表；
 - [ ] 最多选择 5 条曲线，可加入 Live 基准占位；
@@ -632,6 +632,8 @@ README 中的 `320/320 PASS` 当前已过期。恢复稳定测试基线是后续
 - [ ] Paper Execution Model 纳入费用、滑点、延迟和市场约束。
 
 验收：至少两个策略能够并行持续运行且账户、Trace、Artifact 和曲线隔离；刷新页面不改变运行状态；详情可追溯到来源 Draft、数据和每笔交易。
+
+进度：LOOP-022 已增加 actor/deployment/kind-bound 的 run/cycle/trade/artifact 持久 Projection、Simulation Overview、创建入口和五个惰性 Detail Tab，并通过 359/359 自动化及 Agent Chrome 双语言/双尺寸基础验收。M4 尚不能关闭，因为调度器仍未执行真实 `Decision -> Portfolio -> Risk -> Execution` cycle；两实例交易事实隔离、close-only 与重启恢复由 LOOP-023 收尾。
 
 ### M5：Shadow 与晋升建议
 
@@ -707,7 +709,7 @@ M0 恢复稳定基线和路由
 -> M1 历史对话 V1
 -> M2 数据中心 V1
 -> M3 实验场 V1（COMPLETE）
--> M4 多模拟运行中心（READY：LOOP-021）
+-> M4 多模拟运行中心（IN_PROGRESS：LOOP-023）
 ```
 
 完成 M4 后，TradeBot 将形成首个完整、仍保持 Paper Only 的产品闭环：
