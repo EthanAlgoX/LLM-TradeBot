@@ -1,5 +1,7 @@
 # TradeBot 产品路线图与当前进度
 
+> 2026-08-03：F2 `COMPLETE`。Connections 为 actor-scoped immutable SQLite Definition/Version；受控 Bearer session 只用于 loopback API，页面不会显示、持久化或接受 Secret/Token。Chrome 已验证全部注册连接的 health/capability/impact/secret-reference/fingerprint、刷新与 Web/API 重启恢复、中文 1440×900、英文 820×760、无横向溢出与可见焦点；保持 `runtimeApplied=false`、`exchangeWriteAllowed=false`。
+
 > 2026-08-03：F1 `COMPLETE`。REAL：Agent Version immutable SQLite、append-only Draft→Validated→Published→Archived lifecycle、服务端 Diff、Published Catalog、Clone lineage、registered-fixture deterministic Test Evidence、actor 隔离与重启恢复；始终 `runtimeApplied=false`、`exchangeWriteAllowed=false`。不接入 Runtime、Backtest、Live 或交易所写入。
 
 > 2026-08-03：LOOP-029 已将四页预览拆成 F1～F6 功能化路线。下一步从 Agent 中心真实版本管理开始，随后完善连接配置、LLM 动态 DAG、Preflight/Backtest 和最多三个真实 Paper 实例；M6 Live 继续未授权。
@@ -41,7 +43,7 @@ npm run dev:paper   STARTED
 | R0 Strategy App Product Preview | `PROTOTYPE_ONLY` | Advisor、Strategy App、Agent Center、Market Radar、Experiment handoff 与三槽位信息架构；刷新恢复 Sample，不调用 LLM、API、SQLite、Runtime 或交易 |
 | R1 Four-page Product Preview | `PROTOTYPE_ONLY` | 只保留 Simulation、Workbench、Agent Center、Connections；自然语言推荐与方案库合并，Agent 拆为四类，数据源与模型配置合并 |
 | F1 Agent Center V1 | `COMPLETE` | 真实 immutable Version、服务端 Diff、Validate/Publish/Archive、Published Catalog、Clone lineage 和 `DETERMINISTIC_TEST_ADAPTER` Test Evidence；四类 Agent 同一版本流，不写 Runtime/交易事实 |
-| F2 Connections V1 | `IN_PROGRESS` | actor-scoped immutable Connection Definition/Version、SQLite 重启恢复、Bearer API 与仅展示健康/能力/影响/Secret reference 状态的 Web；不读取或显示 Secret，仍待 Chrome 完整验收。 |
+| F2 Connections V1 | `COMPLETE` | actor-scoped immutable Connection Definition/Version、SQLite 重启恢复、Bearer API 与仅展示健康/能力/影响/Secret reference 状态的 Web；Chrome 完整验收已通过，不读取或显示 Secret。 |
 | F3 Workbench V2 | `PLANNED` | LLM Structured Output 推荐已发布 Agent Version 组成的动态 DAG；Apply 只创建 Strategy Draft |
 | F4 Preflight / Evidence | `PLANNED` | 复用现有 Validator、Backtest、Walk-Forward、Experiment Evidence 与 stale 规则 |
 | F5 Simulation V2 | `PLANNED` | 四页产品层接回现有 M4；服务端强制最多三个 active Paper Deployment，展示真实 Artifact 对话 |

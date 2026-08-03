@@ -1,15 +1,15 @@
 # Next Loop Prompt Index
 
 ```text
-当前状态：F2 IN_PROGRESS
-最近完成：LOOP-033 — F2 服务端连接定义、SQLite、Bearer API 与安全 Web 基础
-下一任务：LOOP-034 — F2 Connections Chrome Closeout V1
-浏览器要求：LOOP-034 必需，由 Agent 直接操作真实 Chrome
+当前状态：F2 COMPLETE
+最近完成：LOOP-034 — F2 Connections Chrome Closeout V1
+下一任务：F3 Workbench V2 — 已发布 Agent Version 的受控动态 DAG
+浏览器要求：F3 实现完成后必需，由 Agent 直接操作真实 Chrome
 ```
 
-执行：[`loop-034-f2-connections-chrome-closeout-v1.md`](loop-prompts/loop-034-f2-connections-chrome-closeout-v1.md)
+依据：[`product-roadmap-and-progress.md`](product-roadmap-and-progress.md) 的 F3 Workbench V2 范围。
 
-LOOP-033 已完成 F2 基础实现；下一轮只关闭受控 actor 的 Chrome 与 Web/API restart 验收，不并行实现 F3～F5。
+LOOP-034 已关闭 F2：受控 actor 的连接登记、不可变 fingerprint、刷新和 Web/API restart 验收均已完成。下一轮只实现 F3 Workbench V2，不并行进入 F4～F5。
 
 在此之前不得：
 

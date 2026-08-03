@@ -1,16 +1,23 @@
 # TradeBot 当前状态与接手说明
 
+## LOOP-034 F2 Connections 收尾完成（2026-08-03）
+
+- F2 `COMPLETE`：修复 Connections 首屏未采用已有 loopback Bearer actor 会话、刷新后没有自动水合的问题；会话只用于受控 API 请求，绝不显示、持久化或作为连接配置接受。
+- Agent Chrome：受控 actor 已登记 Binance Futures Public、CSV Historical、Daily Research 和 DeepSeek adapter；各项均显示 immutable v1/fingerprint、health、capability、impact 与 secret-reference state。刷新与 Web/API 重启后，SQLite 连接和 fingerprint 均恢复。
+- Chrome 验证：中文 1440×900、英文 820×760 无横向溢出；键盘焦点有可见 outline；Console 在最终干净 tab 无 warning/error。所有页面和响应保持 Paper Only、`runtimeApplied=false`、`exchangeWriteAllowed=false`。
+- 自动化：`check`、`test:ts`（自然 TAP 完结）、`build:web`、`diff --check` 通过。下一入口：F3 Workbench V2（仅创建 Strategy Draft，禁止 Runtime Apply）。
+
 ## LOOP-032 F1 收尾完成（2026-08-03）
 
 - F1 `COMPLETE`：新增 append-only lifecycle、服务端 Diff、Published Catalog、Clone lineage、Archive 历史可读和 registered-fixture `DETERMINISTIC_TEST_ADAPTER` Evidence。
 - Agent Chrome 已验证中文 1440×900、英文 820×760 无横向溢出；Input v1→v2、Diff、Validate→Publish、Archive→Clone、fixture Evidence、Decision/Reflection 创建与刷新恢复。始终 Paper Only、`runtimeApplied=false`、`exchangeWriteAllowed=false`。
 - 自动化：`check`、`test:ts`（自然 TAP 完结）、`build:web`、`diff --check` 通过。下一入口：[`LOOP-033`](loop-prompts/loop-033-f2-connections-v1.md)。
 
-## LOOP-033 F2 进行中（2026-08-03）
+## LOOP-033 F2 基础实现（2026-08-03）
 
 - 新增 actor-scoped `ConnectionDefinition` / immutable `ConnectionVersion` SQLite 事实、Bearer `GET/POST /api/orchestration/connections` 和登记能力的严格 allowlist。PUT/PATCH/DELETE、未知字段、未知连接及 URL 等注入均 fail closed。
 - Web Connections 已替换旧浏览器草案与 API Key/Secret 表单；它只显示服务端健康、capability、immutable fingerprint、impact 和 `secretReferenceStatus`，不读取、发送、保存或渲染 Secret。
-- 连接不触及 Agent/Strategy/Runtime/Account/Order/Fill/Shadow；所有响应固定 `runtimeApplied=false`、`exchangeWriteAllowed=false`、`paperOnly=true`。尚待 Chrome 全链、build 与 git 验收。
+- 连接不触及 Agent/Strategy/Runtime/Account/Order/Fill/Shadow；所有响应固定 `runtimeApplied=false`、`exchangeWriteAllowed=false`、`paperOnly=true`。Chrome、build 与 git 验收由 LOOP-034 关闭。
 
 ## LOOP-031 F1 continuation (2026-08-03)
 

@@ -40,6 +40,10 @@ import {
   type StrategyDetailTab,
   type StrategyDetailTarget,
 } from "./strategy-app-preview.js";
+import {
+  resolveOrchestrationSessionConfiguration,
+  type OrchestrationViteEnvironment,
+} from "./orchestration-session.js";
 
 type Locale = "zh-CN" | "en";
 type ViewId = "overview" | "advisor" | "strategy-apps" | "strategy-app-detail" | "agent-center" | "trade-center" | "data-center" | "orchestration" | "lab" | "experiment" | "activity" | "connections";
@@ -216,6 +220,26 @@ interface AppState {
 const appRoot = document.querySelector<HTMLDivElement>("#app");
 if (!appRoot) throw new Error("app root is missing");
 const app = appRoot;
+const sessionConfiguration = resolveOrchestrationSessionConfiguration({
+  globalApiBase: (
+    globalThis as typeof globalThis & {
+      __TRADEBOT_ORCHESTRATION_API__?: string;
+    }
+  ).__TRADEBOT_ORCHESTRATION_API__,
+  globalToken: (
+    globalThis as typeof globalThis & {
+      __TRADEBOT_ORCHESTRATION_TOKEN__?: string;
+    }
+  ).__TRADEBOT_ORCHESTRATION_TOKEN__,
+  viteEnvironment: {
+    DEV: import.meta.env.DEV,
+    VITE_TRADEBOT_ORCHESTRATION_API:
+      import.meta.env.VITE_TRADEBOT_ORCHESTRATION_API,
+    VITE_TRADEBOT_ORCHESTRATION_TOKEN: import.meta.env.DEV
+      ? import.meta.env.VITE_TRADEBOT_ORCHESTRATION_TOKEN
+      : undefined,
+  } satisfies OrchestrationViteEnvironment,
+});
 const localeStorageKey = "tradebot.locale";
 let overlayReturnFocusSelector: string | null = null;
 
@@ -266,7 +290,9 @@ const state: AppState = {
   workbenchDraft: "",
   simulationDialogueId: "hk-quality-trend",
   realAgents: [],
-  agentCenterToken: "",
+  // The loopback-only development session injects its Bearer actor here; it is
+  // never rendered, persisted, or accepted as a connection configuration value.
+  agentCenterToken: sessionConfiguration.token ?? "",
   agentVersions: [],
   realConnections: [],
   workspace: {
@@ -2264,7 +2290,7 @@ function appendConfigurationActivity(title: LocalizedText, summary: LocalizedTex
 
 function bindEvents(): void {
   const agentRequest = async (path: string, init?: RequestInit) => {
-    const response = await fetch(`http://127.0.0.1:8787${path}`, { ...init, headers: { "content-type": "application/json", authorization: `Bearer ${state.agentCenterToken}`, ...(init?.headers ?? {}) } });
+    const response = await fetch(`${sessionConfiguration.apiBase}${path}`, { ...init, headers: { "content-type": "application/json", authorization: `Bearer ${state.agentCenterToken}`, ...(init?.headers ?? {}) } });
     const body = await response.json() as { data?: unknown; error?: { code: string } }; if (!response.ok) throw new Error(body.error?.code ?? "AGENT_API_FAILED"); return body.data;
   };
   const loadRealAgents = async () => { state.realAgents = await agentRequest(`/api/orchestration/agents?category=${state.agentCenterCategory}`) as AppState["realAgents"]; render(); };
@@ -2298,7 +2324,7 @@ function bindEvents(): void {
       state.copilotOpen = false;
       render();
       if (state.view === "agent-center" && state.agentCenterToken) {
-        fetch(`http://127.0.0.1:8787/api/orchestration/agents?category=${state.agentCenterCategory}`, { headers: { authorization: `Bearer ${state.agentCenterToken}` } })
+        fetch(`${sessionConfiguration.apiBase}/api/orchestration/agents?category=${state.agentCenterCategory}`, { headers: { authorization: `Bearer ${state.agentCenterToken}` } })
           .then((response) => response.json()).then((body: { data?: AppState["realAgents"] }) => { if (body.data) { state.realAgents = body.data; render(); } }).catch(() => undefined);
       }
       if (state.view === "connections" && state.agentCenterToken) void loadRealConnections().catch(() => undefined);
@@ -2758,3 +2784,20 @@ document.addEventListener("click", (event) => {
 });
 
 render();
+
+// A direct #connections navigation must hydrate the actor-scoped read model on
+// first paint as well as after an in-app navigation. The session credential is
+// the existing loopback-only development injection and is never rendered or
+// persisted by this page.
+if (state.view === "connections" && state.agentCenterToken) {
+  void fetch(`${sessionConfiguration.apiBase}/api/orchestration/connections`, {
+    headers: { authorization: `Bearer ${state.agentCenterToken}` },
+  })
+    .then((response) => response.json())
+    .then((body: { data?: AppState["realConnections"] }) => {
+      if (!body.data) return;
+      state.realConnections = body.data;
+      render();
+    })
+    .catch(() => undefined);
+}
