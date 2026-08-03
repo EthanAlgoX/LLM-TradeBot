@@ -16,6 +16,11 @@ export const StrategyIntentSchema = z.object({
 export const StrategyRecommendationSchema = z.object({
   recommendationId: Id, fingerprint: Fingerprint, intentId: Id, conversationId: Id, createdAt: z.string().datetime(),
   status: z.literal("VALIDATED_RECOMMENDATION"), adapter: z.literal("DETERMINISTIC_STRUCTURED_ADAPTER"),
+  provenance: z.object({
+    provider: z.literal("registered"), modelConnectionRef: z.string().min(3).max(180),
+    adapterMode: z.literal("DETERMINISTIC_STRUCTURED_ADAPTER"), catalogSnapshotFingerprint: Fingerprint,
+    generatedAt: z.string().datetime(), fallbackUsed: z.literal(false),
+  }).strict(),
   catalogSnapshotFingerprint: Fingerprint, explanation: z.string().max(2_000), reasons: z.array(z.string().max(300)).max(12),
   assumptions: z.array(z.string().max(240)).max(8), gaps: z.array(z.string().max(240)).max(8),
   nodes: z.array(z.object({ nodeId: Id, label: z.string().max(120), category: z.string().max(40), systemOwned: z.boolean(), agentVersionId: Id.optional(), agentFingerprint: Fingerprint.optional(), dataRef: z.string().max(180).optional(), modelRef: z.string().max(180).optional() }).strict()).min(6).max(20),

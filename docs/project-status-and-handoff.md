@@ -1,5 +1,11 @@
 # TradeBot 当前状态与接手说明
 
+## LOOP-038 F3 final continuation（2026-08-03）
+
+- F3 仍为 `IN_PROGRESS`。Recommendation 现持久化 provider/model-connection/adapter/catalog snapshot/generated-at/fallback provenance；新增 actor/scope-bound conversations/turns cursor APIs，并以自动化覆盖 actor 隔离、非法 cursor、unsafe input、Apply 严格合同和 SQLite restart authority recovery。
+- Agent Chrome 在中文 1440×900 经正常 Agent Center lifecycle 创建、Validate、Publish 了 Analysis、Decision、Reflection test Agents（Input 已发布）。启动前 Catalog 不足被正确拒绝，无 Draft/Runtime 副作用。
+- 未完成：重启本地 Web/API 后本地 Bearer actor 发生变化，actor-scoped history 正确为空，不能证明同 actor restart recovery；此前的 legacy Recommendation 还缺 provenance，Web 已明确显示 `PROVENANCE_UNAVAILABLE` 而非抛错。中文 Recommendation/Apply/修改和英文 820×760 响应式、焦点及无溢出仍未验收。唯一下一入口为 [`LOOP-039`](loop-prompts/loop-039-f3-workbench-restart-identity-continuation-v1.md)。
+
 ## LOOP-037 F3 authority continuation（2026-08-03）
 
 - F3 仍为 `IN_PROGRESS`。Apply 先经既有 Pipeline Graph Validator 校验并写入 immutable Pipeline Draft，再创建既有 Configuration Draft strategy authority；Workbench 仅投影这两个 authority ID。Turn 和 Apply replay key 的 payload 变化会 fail closed。

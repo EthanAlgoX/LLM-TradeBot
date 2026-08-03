@@ -1,6 +1,6 @@
 # TradeBot 产品路线图与当前进度
 
-> 2026-08-03：F3 `IN_PROGRESS`。LOOP-037 已让 Apply 复用既有 Pipeline/Configuration Draft authority，并在 Chrome 验证中文澄清、推荐和 Apply；但精确 provenance、cursor/actor/restart 负向测试及中文修改/重启、英文窄屏验收仍缺，不能标记 COMPLETE。继续执行 LOOP-038；保持 `runtimeApplied=false`、`exchangeWriteAllowed=false`。
+> 2026-08-03：F3 `IN_PROGRESS`。LOOP-038 已完成精确 provenance、cursor/actor/restart 负向测试；但真实 Chrome Web/API 重启换发本地 Bearer actor，历史正确隔离而不能以同 actor 恢复，中文修改/Apply 和英文窄屏验收也未完成。继续执行 LOOP-039；保持 `runtimeApplied=false`、`exchangeWriteAllowed=false`。
 
 > 2026-08-03：F1 `COMPLETE`。REAL：Agent Version immutable SQLite、append-only Draft→Validated→Published→Archived lifecycle、服务端 Diff、Published Catalog、Clone lineage、registered-fixture deterministic Test Evidence、actor 隔离与重启恢复；始终 `runtimeApplied=false`、`exchangeWriteAllowed=false`。不接入 Runtime、Backtest、Live 或交易所写入。
 

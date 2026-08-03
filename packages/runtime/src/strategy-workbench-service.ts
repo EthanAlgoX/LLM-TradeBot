@@ -13,6 +13,17 @@ const hash = (value: unknown) => `sha256:${createHash("sha256").update(JSON.stri
 const now = () => new Date().toISOString();
 const unsafe = /(?:<\/?[a-z]|https?:\/\/|\b(?:select|insert|delete|update)\b|\b(?:javascript|sql|secret|token|password|prompt|tool|runtime|trade|order)\b|[\\/](?:Users|etc|tmp)\b)/iu;
 const needs = (message: string, words: readonly string[]) => words.some((word) => message.toLowerCase().includes(word));
+const PageRequestSchema = z.object({ cursor: z.string().min(8).max(2_000).optional(), limit: z.coerce.number().int().min(1).max(50).default(20) }).strict();
+const ApplyRequestSchema = z.object({ recommendationId: z.string().min(3).max(240).regex(/^[a-z0-9][a-z0-9._:@-]*$/u), fingerprint: z.string().regex(/^sha256:[a-f0-9]{64}$/u), idempotencyKey: z.string().min(3).max(240).regex(/^[a-z0-9][a-z0-9._:@-]*$/u) }).strict();
+type PageCursor = { actorId: string; kind: "conversations" | "turns"; scope: string; createdAt: string; id: string };
+const encodeCursor = (value: PageCursor) => Buffer.from(JSON.stringify(value), "utf8").toString("base64url");
+const decodeCursor = (value: string, actorId: string, kind: PageCursor["kind"], scope: string): PageCursor => {
+  try {
+    const cursor = JSON.parse(Buffer.from(value, "base64url").toString("utf8")) as PageCursor;
+    if (cursor.actorId !== actorId || cursor.kind !== kind || cursor.scope !== scope || typeof cursor.createdAt !== "string" || typeof cursor.id !== "string") throw new Error("invalid");
+    return cursor;
+  } catch { throw new StrategyWorkbenchError("CURSOR_INVALID"); }
+};
 
 export class StrategyWorkbenchError extends Error { constructor(readonly code: string) { super(code); } }
 
@@ -64,8 +75,11 @@ CREATE TRIGGER IF NOT EXISTS strategy_workbench_drafts_no_update BEFORE UPDATE O
     const business = (nodeId: string, label: string, entry: NonNullable<ReturnType<AgentDefinitionService["catalog"]>[number]>) => ({ nodeId, label, category: entry.definition.category, systemOwned: false, agentVersionId: entry.version.versionId, agentFingerprint: entry.version.fingerprint, ...(entry.version.payload.dataRef ? { dataRef: entry.version.payload.dataRef } : {}), ...(entry.version.payload.modelRef ? { modelRef: entry.version.payload.modelRef } : {}) });
     const nodes = [business("node.kline", "K-line input", inputAgent), business("node.news", "Financial news input", inputAgent), business("node.short", "Short horizon analysis", analysis), business("node.medium", "Medium horizon analysis", analysis), business("node.long", "Long horizon analysis", analysis), business("node.sentiment", "News sentiment", analysis), business("node.decision", "Decision", decision), { nodeId: "system.portfolio", label: "Portfolio", category: "portfolio", systemOwned: true }, { nodeId: "system.risk", label: "Risk Gate", category: "risk", systemOwned: true }, { nodeId: "system.paper", label: "Paper Execution · NOT_APPLIED", category: "paper_execution", systemOwned: true }, business("node.reflection", "Reflection", reflection)];
     const edges = [["node.kline","node.short"],["node.kline","node.medium"],["node.kline","node.long"],["node.news","node.sentiment"],["node.short","node.decision"],["node.medium","node.decision"],["node.long","node.decision"],["node.sentiment","node.decision"],["node.decision","system.portfolio"],["system.portfolio","system.risk"],["system.risk","system.paper"],["node.decision","node.reflection"]].map(([sourceNodeId,targetNodeId]) => ({ sourceNodeId, targetNodeId, artifactSchemaRef: "artifact-schema:analysis-assessment:v1" }));
-    const candidate = { recommendationId: `strategy-recommendation:${randomUUID()}`, intentId: intent.intentId, conversationId: command.conversationId, createdAt: now(), status: "VALIDATED_RECOMMENDATION" as const, adapter: "DETERMINISTIC_STRUCTURED_ADAPTER" as const, catalogSnapshotFingerprint: snapshot, explanation: "Server-validated recommendation using only the current Published Agent Catalog.", reasons: ["Parallel multi-horizon and news inputs converge before Decision.", "Portfolio, Risk Gate, and Paper Execution are system locked."], assumptions: [], gaps: [], nodes, edges, runtimeApplied: false as const, paperOnly: true as const, exchangeWriteAllowed: false as const };
+    const createdAt = now();
+    const candidate = { recommendationId: `strategy-recommendation:${randomUUID()}`, intentId: intent.intentId, conversationId: command.conversationId, createdAt, status: "VALIDATED_RECOMMENDATION" as const, adapter: "DETERMINISTIC_STRUCTURED_ADAPTER" as const, provenance: { provider: "registered" as const, modelConnectionRef: analysis.version.payload.modelRef ?? "registered:deterministic-structured-adapter:v1", adapterMode: "DETERMINISTIC_STRUCTURED_ADAPTER" as const, catalogSnapshotFingerprint: snapshot, generatedAt: createdAt, fallbackUsed: false as const }, catalogSnapshotFingerprint: snapshot, explanation: "Server-validated recommendation using only the current Published Agent Catalog.", reasons: ["Parallel multi-horizon and news inputs converge before Decision.", "Portfolio, Risk Gate, and Paper Execution are system locked."], assumptions: [], gaps: [], nodes, edges, runtimeApplied: false as const, paperOnly: true as const, exchangeWriteAllowed: false as const };
     const recommendation = StrategyRecommendationSchema.parse({ ...candidate, fingerprint: hash(candidate) });
+    const validatedGraph = this.validateGraph?.(this.compileRecommendation(recommendation));
+    if (!validatedGraph?.valid) throw new StrategyWorkbenchError("RECOMMENDATION_GRAPH_INVALID");
     this.db.prepare("INSERT INTO strategy_workbench_recommendations VALUES (?, ?, ?, ?, ?, ?, ?)").run(recommendation.recommendationId, actorId, command.conversationId, intent.intentId, hash(command), JSON.stringify(recommendation), recommendation.createdAt);
     const result = { kind: "recommendation" as const, intent, recommendation };
     this.appendConversationReplay(actorId, command, result);
@@ -74,8 +88,7 @@ CREATE TRIGGER IF NOT EXISTS strategy_workbench_drafts_no_update BEFORE UPDATE O
   }
 
   apply(actorId: string, input: unknown) {
-    const request = (awaitable: unknown) => awaitable as { recommendationId?: string; fingerprint?: string; idempotencyKey?: string };
-    const body = request(input); if (!body || typeof body.recommendationId !== "string" || typeof body.fingerprint !== "string" || typeof body.idempotencyKey !== "string" || Object.keys(body).length !== 3) throw new StrategyWorkbenchError("REQUEST_CONTRACT_INVALID");
+    const body = ApplyRequestSchema.parse(input);
     const requestFingerprint = hash(body);
     const applyReplay = this.db.prepare("SELECT request_fingerprint, draft_json FROM strategy_workbench_apply_replays WHERE actor_id=? AND idempotency_key=?").get(actorId, body.idempotencyKey) as { request_fingerprint: string; draft_json: string } | undefined;
     if (applyReplay) { if (applyReplay.request_fingerprint !== requestFingerprint) throw new StrategyWorkbenchError("IDEMPOTENCY_CONFLICT"); return StrategyDraftSchema.parse(JSON.parse(applyReplay.draft_json)); }
@@ -150,6 +163,15 @@ CREATE TRIGGER IF NOT EXISTS strategy_workbench_drafts_no_update BEFORE UPDATE O
     return { ...CURRENT_CRYPTO_PIPELINE_GRAPH, pipelineGraphId: `pipeline-graph:workbench:${recommendation.recommendationId}`, name: "Workbench compiled recommendation", humanReadableVersion: "1.0.0", fingerprint: hash(recommendation), createdAt: new Date(recommendation.createdAt), nodes, edges, entryNodeIds: ["system.selector"], terminalNodeIds: [paper.nodeId, reflection.nodeId] };
   }
 
+  listConversations(actorId: string, input: unknown) {
+    const request = PageRequestSchema.parse(input);
+    const cursor = request.cursor ? decodeCursor(request.cursor, actorId, "conversations", "all") : undefined;
+    const rows = this.db.prepare(`SELECT conversation_id, MAX(created_at) AS created_at, COUNT(*) AS turn_count FROM strategy_workbench_intents WHERE actor_id=? GROUP BY conversation_id HAVING (? IS NULL OR MAX(created_at) < ? OR (MAX(created_at) = ? AND conversation_id < ?)) ORDER BY created_at DESC, conversation_id DESC LIMIT ?`).all(actorId, cursor?.createdAt ?? null, cursor?.createdAt ?? null, cursor?.createdAt ?? null, cursor?.id ?? null, request.limit + 1) as Array<{ conversation_id: string; created_at: string; turn_count: number }>;
+    const items = rows.slice(0, request.limit).map((row) => ({ conversationId: row.conversation_id, createdAt: row.created_at, turnCount: row.turn_count }));
+    const last = items.at(-1);
+    return { items, nextCursor: rows.length > request.limit && last ? encodeCursor({ actorId, kind: "conversations", scope: "all", createdAt: last.createdAt, id: last.conversationId }) : undefined, runtimeApplied: false as const, paperOnly: true as const, exchangeWriteAllowed: false as const };
+  }
+
   history(actorId: string, conversationId: string) {
     const intents = this.db.prepare("SELECT intent_json, created_at FROM strategy_workbench_intents WHERE actor_id=? AND conversation_id=? ORDER BY created_at ASC, turn_id ASC").all(actorId, conversationId) as Array<{ intent_json: string; created_at: string }>;
     const recommendations = this.db.prepare("SELECT recommendation_json FROM strategy_workbench_recommendations WHERE actor_id=? AND conversation_id=?").all(actorId, conversationId) as Array<{ recommendation_json: string }>;
@@ -159,6 +181,17 @@ CREATE TRIGGER IF NOT EXISTS strategy_workbench_drafts_no_update BEFORE UPDATE O
       return [recommendation.intentId, { recommendation, ...(draftRow ? { draft: StrategyDraftSchema.parse(JSON.parse(draftRow.draft_json)) } : {}) }];
     }));
     return intents.map((row) => ({ intent: StrategyIntentSchema.parse(JSON.parse(row.intent_json)), ...(byIntent.get(StrategyIntentSchema.parse(JSON.parse(row.intent_json)).intentId) ?? {}) }));
+  }
+
+  listTurns(actorId: string, conversationId: string, input: unknown) {
+    const request = PageRequestSchema.parse(input);
+    const cursor = request.cursor ? decodeCursor(request.cursor, actorId, "turns", conversationId) : undefined;
+    const rows = this.db.prepare(`SELECT intent_json, created_at, intent_id FROM strategy_workbench_intents WHERE actor_id=? AND conversation_id=? AND (? IS NULL OR created_at > ? OR (created_at = ? AND intent_id > ?)) ORDER BY created_at ASC, intent_id ASC LIMIT ?`).all(actorId, conversationId, cursor?.createdAt ?? null, cursor?.createdAt ?? null, cursor?.createdAt ?? null, cursor?.id ?? null, request.limit + 1) as Array<{ intent_json: string; created_at: string; intent_id: string }>;
+    const all = this.history(actorId, conversationId);
+    const byIntent = new Map(all.map((item) => [item.intent.intentId, item]));
+    const items = rows.slice(0, request.limit).map((row) => byIntent.get(row.intent_id)!);
+    const last = rows[Math.min(rows.length, request.limit) - 1];
+    return { items, nextCursor: rows.length > request.limit && last ? encodeCursor({ actorId, kind: "turns", scope: conversationId, createdAt: last.created_at, id: last.intent_id }) : undefined, runtimeApplied: false as const, paperOnly: true as const, exchangeWriteAllowed: false as const };
   }
 
   private appendConversationReplay(actorId: string, command: z.infer<typeof StrategyWorkbenchCommandSchema>, result: { kind: "clarification"; intent: z.infer<typeof StrategyIntentSchema>; clarificationQuestions: string[]; runtimeApplied: false; paperOnly: true; exchangeWriteAllowed: false } | { kind: "recommendation"; intent: z.infer<typeof StrategyIntentSchema>; recommendation: z.infer<typeof StrategyRecommendationSchema> }) {
