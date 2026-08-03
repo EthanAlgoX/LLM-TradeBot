@@ -175,10 +175,22 @@ CREATE TRIGGER IF NOT EXISTS strategy_workbench_drafts_no_update BEFORE UPDATE O
   history(actorId: string, conversationId: string) {
     const intents = this.db.prepare("SELECT intent_json, created_at FROM strategy_workbench_intents WHERE actor_id=? AND conversation_id=? ORDER BY created_at ASC, turn_id ASC").all(actorId, conversationId) as Array<{ intent_json: string; created_at: string }>;
     const recommendations = this.db.prepare("SELECT recommendation_json FROM strategy_workbench_recommendations WHERE actor_id=? AND conversation_id=?").all(actorId, conversationId) as Array<{ recommendation_json: string }>;
-    const byIntent = new Map(recommendations.map((row) => {
-      const recommendation = StrategyRecommendationSchema.parse(JSON.parse(row.recommendation_json));
+    const byIntent = new Map(recommendations.flatMap((row) => {
+      const raw = JSON.parse(row.recommendation_json) as unknown;
+      const parsed = StrategyRecommendationSchema.safeParse(raw);
+      // Recommendations written before provenance became mandatory remain
+      // append-only historical facts. They must not prevent the rest of this
+      // actor's conversation from hydrating after a restart. The Web surface
+      // marks such a record PROVENANCE_UNAVAILABLE and does not offer Apply.
+      if (!parsed.success) {
+        const legacy = raw as { intentId?: unknown };
+        return typeof legacy.intentId === "string"
+          ? [[legacy.intentId, { recommendation: raw as z.infer<typeof StrategyRecommendationSchema> }] as const]
+          : [];
+      }
+      const recommendation = parsed.data;
       const draftRow = this.db.prepare("SELECT draft_json FROM strategy_workbench_drafts WHERE actor_id=? AND recommendation_id=?").get(actorId, recommendation.recommendationId) as { draft_json: string } | undefined;
-      return [recommendation.intentId, { recommendation, ...(draftRow ? { draft: StrategyDraftSchema.parse(JSON.parse(draftRow.draft_json)) } : {}) }];
+      return [[recommendation.intentId, { recommendation, ...(draftRow ? { draft: StrategyDraftSchema.parse(JSON.parse(draftRow.draft_json)) } : {}) }] as const];
     }));
     return intents.map((row) => ({ intent: StrategyIntentSchema.parse(JSON.parse(row.intent_json)), ...(byIntent.get(StrategyIntentSchema.parse(JSON.parse(row.intent_json)).intentId) ?? {}) }));
   }

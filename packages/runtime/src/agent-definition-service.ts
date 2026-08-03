@@ -72,7 +72,21 @@ export class AgentDefinitionService {
     if ((target === "validated" && current !== "draft") || (target === "published" && current !== "validated") || (target === "archived" && !["validated", "published"].includes(current))) throw new AgentDefinitionError("LIFECYCLE_TRANSITION_INVALID");
     this.repository.saveGovernance(actorId, version.versionId, version.fingerprint, target, this.clock().toISOString()); return { version, lifecycle: this.lifecycle(version) };
   }
-  catalog(actorId: string, category?: AgentCategory) { return this.repository.listDefinitions(actorId, category).flatMap((definition) => { const version = this.repository.latest(definition.definitionId)!; return this.lifecycle(version).status === "published" ? [{ definition, version, lifecycle: this.lifecycle(version) }] : []; }); }
+  catalog(actorId: string, category?: AgentCategory) {
+    return this.repository.listDefinitions(actorId, category).flatMap((definition) => {
+      // A later Draft/Validated version must not make the immutable previously
+      // Published version disappear from the only catalog Workbench may use.
+      // Select the newest Published version for this definition, rather than
+      // treating the mutable lifecycle of the newest version as the catalog.
+      const version = this.repository
+        .listVersions(definition.definitionId)
+        .toReversed()
+        .find((candidate) => this.lifecycle(candidate).status === "published");
+      return version
+        ? [{ definition, version, lifecycle: this.lifecycle(version) }]
+        : [];
+    });
+  }
   clone(actorId: string, definitionId: string, request: { versionId: string; fingerprint: string; idempotencyKey: string }) {
     const source = this.owned(actorId, definitionId); const version = this.repository.getVersion(request.versionId); if (!version || version.definitionId !== source.definitionId || version.fingerprint !== request.fingerprint) throw new AgentDefinitionError("VERSION_AUTHORITY_CONFLICT");
     const replay = this.repository.getReplay(actorId, `clone:${definitionId}`, request.idempotencyKey); const requestFingerprint = digest(request); if (replay) { if (replay.requestFingerprint !== requestFingerprint || !replay.response.definition) throw new AgentDefinitionError("IDEMPOTENCY_CONFLICT"); return replay.response; }

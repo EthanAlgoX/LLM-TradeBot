@@ -1,6 +1,6 @@
 # TradeBot 产品路线图与当前进度
 
-> 2026-08-03：F3 `IN_PROGRESS`。LOOP-041 在 Chrome 完成中文澄清、Catalog recommendation、Draft Apply 与修改，但 reload 和 `dev:paper` restart 后仍只呈现既有 Input Agent 与空 Workbench，尽管 local Paper SQLite 保留 `local:operator` facts。v2 HttpOnly Cookie 名迁移的回归测试通过，Chrome 恢复未闭合；下一步为 LOOP-042。保持 `runtimeApplied=false`、Paper Only、`exchangeWriteAllowed=false`。
+> 2026-08-03：F3 `IN_PROGRESS`。LOOP-042 已在 Chrome 验证 `dev:paper` restart 后同一 `local:operator` 恢复 Workbench、Draft 和四类 Published Catalog；旧 provenance-free Recommendation 不可 Apply。仍需干净的全量 TAP 汇总及新鲜 Console/Network 证据；下一步为 LOOP-043。保持 `runtimeApplied=false`、Paper Only、`exchangeWriteAllowed=false`。
 
 > 2026-08-03：F3 `IN_PROGRESS`。LOOP-038 已完成精确 provenance、cursor/actor/restart 负向测试；但真实 Chrome Web/API 重启换发本地 Bearer actor，历史正确隔离而不能以同 actor 恢复，中文修改/Apply 和英文窄屏验收也未完成。继续执行 LOOP-039；保持 `runtimeApplied=false`、`exchangeWriteAllowed=false`。
 

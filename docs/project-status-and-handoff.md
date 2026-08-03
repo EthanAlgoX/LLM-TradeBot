@@ -1,5 +1,10 @@
 # TradeBot 当前状态与接手说明
 
+## LOOP-042 F3 browser recovery diagnosis（2026-08-03）
+
+- F3 仍为 `IN_PROGRESS`：同一 Chrome 在 `dev:paper` restart 后已恢复 `local:operator` 的 Workbench、Configuration Draft 与四类 Published Catalog；旧 provenance-free Recommendation 显示 `PROVENANCE_UNAVAILABLE` 且不可 Apply。
+- 仍需干净的全量 TAP 汇总与新鲜 Console/Network 证据；下一入口为 [`LOOP-043`](loop-prompts/loop-043-f3-workbench-recovery-verification-continuation-v1.md)。
+
 ## LOOP-041 F3 restart recovery continuation（2026-08-03）
 
 - F3 仍为 `IN_PROGRESS`。真实 Chrome 经正常 Agent Center lifecycle 发布了 Analysis、Decision、Reflection（Input 已发布），并完成中文澄清、Published Catalog `VALIDATED_RECOMMENDATION`、Apply 到 `NOT_VALIDATED` Configuration Draft 与中文修改；全程保持 `runtimeApplied=false`、Paper Only、`exchangeWriteAllowed=false`。

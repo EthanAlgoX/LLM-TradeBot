@@ -1,6 +1,6 @@
 # TradeBot 产品优化规划与进度
 
-> 2026-08-03：LOOP-041 F3 仍为 `IN_PROGRESS`。真实 Chrome 完成 Published Catalog 中文 recommendation、immutable Configuration Draft Apply 与修改，但 reload/Web/API restart 后仍不能渲染同一 `local:operator` 的 catalog 与 Workbench facts。已做现有 HttpOnly cookie 名 v2 迁移及 stale-cookie automated regression，尚未关闭 Chrome 恢复。下一步为 LOOP-042；保持 `runtimeApplied=false`、Paper Only、`exchangeWriteAllowed=false`。
+> 2026-08-03：LOOP-042 F3 仍为 `IN_PROGRESS`。真实 Chrome 已在 Web/API restart 后恢复同一 `local:operator` 的 Workbench、Configuration Draft 与四类 Published Catalog；旧 provenance-free Recommendation 只读且不可 Apply。仍需干净 TAP 汇总及新鲜 Console/Network 证据；下一步为 LOOP-043。保持 `runtimeApplied=false`、Paper Only、`exchangeWriteAllowed=false`。
 
 > 2026-08-03：LOOP-032 已完成 F1 Agent Center V1：SQLite append-only 生命周期、服务端 Diff、Catalog、Clone lineage、Archive 和受限 deterministic 测试台均以 Bearer actor/精确版本 authority 持久化；不触发 Runtime 或交易写入。
 
