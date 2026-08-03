@@ -2,7 +2,7 @@
 
 > 2026-08-03：LOOP-032 已完成 F1 Agent Center V1：SQLite append-only 生命周期、服务端 Diff、Catalog、Clone lineage、Archive 和受限 deterministic 测试台均以 Bearer actor/精确版本 authority 持久化；不触发 Runtime 或交易写入。
 
-> 2026-08-03：LOOP-036 F3 为 `IN_PROGRESS`：已将 Workbench turn 写入既有 append-only Conversation Replay、在 Apply 后追加 server-authoritative Draft reference，并提供服务端 history hydration；真实 Chrome 已确认信息不足仅返回澄清。当前仅通过 Agent Center 正常生命周期 materialize/publish 了 Input Agent；Apply 尚未复用现有 Configuration/Pipeline Draft authority，Recommendation 尚未完整复用 Graph Validator，负向/重启及完整 Chrome 链未完成。下一步为 LOOP-037；保持 `runtimeApplied=false`、Paper Only、`exchangeWriteAllowed=false`。
+> 2026-08-03：LOOP-037 F3 为 `IN_PROGRESS`：Apply 已编译至既有 Pipeline Graph Validator 并创建既有 Configuration/Pipeline Draft authority，Workbench replay key 冲突会拒绝。真实 Chrome 已完成中文澄清、四类 Agent 正常生命周期发布、推荐与 Apply；修改/重启恢复、英文窄屏和完整负向/cursor 尚未验收。下一步为 LOOP-038；保持 `runtimeApplied=false`、Paper Only、`exchangeWriteAllowed=false`。
 
 > 2026-08-03：LOOP-029 已完成预览后的功能化路线整理。后续固定按“Agent 中心版本基础 → 连接能力完善 → LLM 编排推荐 → 预上线与回测 → 最多三个真实模拟实例”逐步接入，M6 Live 继续暂停。
 

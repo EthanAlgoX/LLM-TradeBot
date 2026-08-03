@@ -1,5 +1,11 @@
 # TradeBot 当前状态与接手说明
 
+## LOOP-037 F3 authority continuation（2026-08-03）
+
+- F3 仍为 `IN_PROGRESS`。Apply 先经既有 Pipeline Graph Validator 校验并写入 immutable Pipeline Draft，再创建既有 Configuration Draft strategy authority；Workbench 仅投影这两个 authority ID。Turn 和 Apply replay key 的 payload 变化会 fail closed。
+- Agent Chrome：已正常 lifecycle 发布 Input/Analysis/Decision/Reflection test Agent，中文验证 clarification、Published Catalog recommendation、锁定链和 Apply 到 `NOT_VALIDATED` Configuration Draft；console error 为 0。
+- 未完成：精确 provenance、cursor/actor/restart 负向测试，中文修改/重启恢复及英文 820×760 responsive/focus 验收。唯一下一入口为 [`LOOP-038`](loop-prompts/loop-038-f3-workbench-final-continuation-v1.md)。全程保持 `runtimeApplied=false`、Paper Only、`exchangeWriteAllowed=false`。
+
 ## LOOP-035 F3 部分实现（2026-08-03）
 
 ## LOOP-036 F3 continuation 部分实现（2026-08-03）

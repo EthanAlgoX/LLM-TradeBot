@@ -362,6 +362,9 @@ export function createCurrentPipelineOrchestrationRuntime(
     database,
     agentDefinitionService,
     conversationReplayRepository,
+    service,
+    productionStrategyOrchestration.configurationDraftService,
+    validator,
   );
   const dataCenterHttpHandler = new DataCenterHttpHandler(
     [...registry.dataSources.values()],

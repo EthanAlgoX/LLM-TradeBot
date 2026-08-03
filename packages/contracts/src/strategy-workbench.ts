@@ -22,4 +22,7 @@ export const StrategyRecommendationSchema = z.object({
   edges: z.array(z.object({ sourceNodeId: Id, targetNodeId: Id, artifactSchemaRef: z.string().max(180) }).strict()).min(5).max(32),
   runtimeApplied: z.literal(false), paperOnly: z.literal(true), exchangeWriteAllowed: z.literal(false),
 }).strict();
-export const StrategyDraftSchema = z.object({ draftId: Id, versionId: Id, fingerprint: Fingerprint, recommendationId: Id, intentId: Id, createdAt: z.string().datetime(), draftStatus: z.literal("NOT_VALIDATED"), runtimeApplied: z.literal(false), paperOnly: z.literal(true), exchangeWriteAllowed: z.literal(false) }).strict();
+/** Workbench Apply is a projection of the established configuration/pipeline
+ * draft authorities.  It intentionally carries their IDs instead of becoming
+ * a second strategy-draft store. */
+export const StrategyDraftSchema = z.object({ draftId: Id, versionId: Id, fingerprint: Fingerprint, recommendationId: Id, intentId: Id, pipelineDraftId: Id, pipelineFingerprint: z.string().min(1).max(180), configurationDraftId: Id, configurationVersionId: Id, createdAt: z.string().datetime(), draftStatus: z.literal("NOT_VALIDATED"), runtimeApplied: z.literal(false), paperOnly: z.literal(true), exchangeWriteAllowed: z.literal(false) }).strict();
