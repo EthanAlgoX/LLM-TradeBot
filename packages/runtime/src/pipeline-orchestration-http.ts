@@ -67,6 +67,7 @@ import type {
 } from "./comparative-trade-review-http.js";
 import type { MultiPaperRuntimeHttpHandler } from "./multi-paper-runtime-http.js";
 import type { AgentDefinitionHttpHandler } from "./agent-definition-http.js";
+import type { ConnectionHttpHandler } from "./connection-http.js";
 
 const defaultMaxBodyBytes = 1_048_576;
 
@@ -94,6 +95,7 @@ export interface PipelineOrchestrationHttpDependencies {
   experimentLabHttpHandler?: ExperimentLabHttpHandler;
   multiPaperRuntimeHttpHandler?: MultiPaperRuntimeHttpHandler;
   agentDefinitionHttpHandler?: AgentDefinitionHttpHandler;
+  connectionHttpHandler?: ConnectionHttpHandler;
   productionWorkspaceCatalog?: object;
   pipelineGraphs?: readonly PipelineGraphVersion[];
   maxBodyBytes?: number;
@@ -339,6 +341,10 @@ export function createPipelineOrchestrationHttpServer(
       if (path.startsWith("/api/orchestration/agents")) {
         if (!dependencies.agentDefinitionHttpHandler) { sendError(response, 503, "AGENT_DEFINITIONS_UNAVAILABLE", "Agent definitions are not configured."); return; }
         await forwardWebHandler(request, response, dependencies.agentDefinitionHttpHandler, maxBodyBytes); return;
+      }
+      if (path.startsWith("/api/orchestration/connections")) {
+        if (!dependencies.connectionHttpHandler) { sendError(response, 503, "CONNECTIONS_UNAVAILABLE", "Connections are not configured."); return; }
+        await forwardWebHandler(request, response, dependencies.connectionHttpHandler, maxBodyBytes); return;
       }
       if (path.startsWith("/api/orchestration/paper-deployments")) {
         if (!dependencies.multiPaperRuntimeHttpHandler) {

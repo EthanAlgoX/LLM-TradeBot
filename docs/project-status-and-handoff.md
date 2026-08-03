@@ -6,6 +6,12 @@
 - Agent Chrome 已验证中文 1440×900、英文 820×760 无横向溢出；Input v1→v2、Diff、Validate→Publish、Archive→Clone、fixture Evidence、Decision/Reflection 创建与刷新恢复。始终 Paper Only、`runtimeApplied=false`、`exchangeWriteAllowed=false`。
 - 自动化：`check`、`test:ts`（自然 TAP 完结）、`build:web`、`diff --check` 通过。下一入口：[`LOOP-033`](loop-prompts/loop-033-f2-connections-v1.md)。
 
+## LOOP-033 F2 进行中（2026-08-03）
+
+- 新增 actor-scoped `ConnectionDefinition` / immutable `ConnectionVersion` SQLite 事实、Bearer `GET/POST /api/orchestration/connections` 和登记能力的严格 allowlist。PUT/PATCH/DELETE、未知字段、未知连接及 URL 等注入均 fail closed。
+- Web Connections 已替换旧浏览器草案与 API Key/Secret 表单；它只显示服务端健康、capability、immutable fingerprint、impact 和 `secretReferenceStatus`，不读取、发送、保存或渲染 Secret。
+- 连接不触及 Agent/Strategy/Runtime/Account/Order/Fill/Shadow；所有响应固定 `runtimeApplied=false`、`exchangeWriteAllowed=false`、`paperOnly=true`。尚待 Chrome 全链、build 与 git 验收。
+
 ## LOOP-031 F1 continuation (2026-08-03)
 
 - REAL：Agent Definition/Version SQLite append-only 事实、Bearer actor 隔离、版本列表与历史的 actor/kind/scope-bound opaque cursor、创建/新版本的持久幂等回放，以及 SQLite 重启恢复。

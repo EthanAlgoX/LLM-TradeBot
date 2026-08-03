@@ -102,6 +102,9 @@ import { ShadowPromotionService, SqliteShadowPromotionRepository } from "./shado
 import { AgentDefinitionService } from "./agent-definition-service.js";
 import { SqliteAgentDefinitionRepository } from "./sqlite-agent-definition-repository.js";
 import { AgentDefinitionHttpHandler } from "./agent-definition-http.js";
+import { ConnectionService } from "./connection-service.js";
+import { SqliteConnectionRepository } from "./sqlite-connection-repository.js";
+import { ConnectionHttpHandler } from "./connection-http.js";
 
 export type ComparativeTradeReviewRuntimeOptions = Omit<
   ProductionComparativeTradeReviewOptions,
@@ -166,6 +169,7 @@ export interface CurrentPipelineOrchestrationRuntime {
   productionStrategyOrchestration: ProductionStrategyOrchestration;
   ephemeralOperatorToken: string;
   agentDefinitionService: AgentDefinitionService;
+  connectionService: ConnectionService;
   server: ReturnType<typeof createPipelineOrchestrationHttpServer>;
   close(): Promise<void>;
 }
@@ -305,6 +309,7 @@ export function createCurrentPipelineOrchestrationRuntime(
     },
   ]);
   const agentDefinitionService = new AgentDefinitionService(new SqliteAgentDefinitionRepository(database));
+  const connectionService = new ConnectionService(new SqliteConnectionRepository(database));
   const evidenceRepository = new SqlitePipelineEvidenceRepository(database);
   if (options.evidenceExecutor && options.historicalRunners) {
     throw new Error(
@@ -657,6 +662,7 @@ export function createCurrentPipelineOrchestrationRuntime(
     dataCenterHttpHandler,
     multiPaperRuntimeHttpHandler,
     agentDefinitionHttpHandler: new AgentDefinitionHttpHandler(agentDefinitionService, authenticator),
+    connectionHttpHandler: new ConnectionHttpHandler(connectionService, authenticator),
     ...(productionStrategyOrchestration.experimentLabHttpHandler ? { experimentLabHttpHandler: productionStrategyOrchestration.experimentLabHttpHandler } : {}),
     ...(productionStrategyOrchestration.strategyEvidenceHttpHandler
       ? {
@@ -723,6 +729,7 @@ export function createCurrentPipelineOrchestrationRuntime(
     ...(artifactLedger ? { artifactLedger } : {}),
     ephemeralOperatorToken: operatorToken,
     agentDefinitionService,
+    connectionService,
     server,
     async close(): Promise<void> {
       if (server.listening) {

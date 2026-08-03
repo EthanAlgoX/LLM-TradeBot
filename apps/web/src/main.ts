@@ -210,6 +210,7 @@ interface AppState {
   agentCenterToken: string;
   selectedRealAgent?: { definition: { definitionId: string; category: AgentCategory; sourceLineage?: { definitionId: string; versionId: string; fingerprint: string } }; version: { versionId: string; versionIndex: number; fingerprint: string; payload: { name: string; dataRef?: string; upstreamArtifactSchemaRefs: string[]; modelRef?: string; userInstructionPrompt: string } }; lifecycle?: { status: string } };
   agentVersions: Array<{ versionId: string; versionIndex: number; fingerprint: string; parentVersionId: string | null }>;
+  realConnections: Array<{ definition: { definitionId: string; kind: "data_source" | "model_adapter" }; version: { versionId: string; versionIndex: number; fingerprint: string; registeredRef: string; name: string; capabilityRefs: string[]; health: string; secretReferenceStatus: string; impact: { agentDefinitionCount: number; strategyReferenceCount: number }; runtimeApplied: false; exchangeWriteAllowed: false; paperOnly: true } }>;
 }
 
 const appRoot = document.querySelector<HTMLDivElement>("#app");
@@ -267,6 +268,7 @@ const state: AppState = {
   realAgents: [],
   agentCenterToken: "",
   agentVersions: [],
+  realConnections: [],
   workspace: {
     stage: 2,
     backtestRunning: false,
@@ -1648,43 +1650,26 @@ function renderActivity(): string {
 }
 
 function renderConnections(): string {
-  const sections: Array<[ConnectionSection, LocalizedText, LocalizedText]> = [
-    ["llm", { zh: "大模型推理", en: "LLM inference" }, { zh: "供应商、模型与智能体授权", en: "Providers, models, and Agent scopes" }],
-    ["exchange", { zh: "交易账户", en: "Trading account" }, { zh: "模拟账户、只读账户与实盘边界", en: "Paper, read-only, and live boundaries" }],
-    ["security", { zh: "密钥与权限", en: "Secrets and permissions" }, { zh: "凭证流转、脱敏与审计", en: "Credential flow, redaction, and audit" }],
-  ];
+  const data = state.realConnections.filter((item) => item.definition.kind === "data_source");
+  const models = state.realConnections.filter((item) => item.definition.kind === "model_adapter");
+  const selected = state.connectionPreviewTab === "data" ? data : models;
+  const refs = state.connectionPreviewTab === "data"
+    ? ["data-source:binance-futures-public", "data-source:csv-historical", "data-source:daily-research"]
+    : ["model-connection:deepseek:default"];
   return `
     <section class="page-intro connections-intro">
       <div>
-        <h1>${tr("连接与权限", "Connections and permissions")}</h1>
-        <p>${tr("配置模型推理与账户读取能力。密钥、智能体授权和交易权限彼此隔离。", "Configure model inference and account-read capabilities. Secrets, Agent authorization, and trading permissions stay isolated.")}</p>
+        <h1>${tr("连接配置", "Connections")}</h1>
+        <p>${tr("服务端权威的连接定义与不可变版本。仅显示健康、能力、影响范围与密钥引用状态。", "Server-authoritative connection definitions and immutable versions. Only health, capability, impact, and secret-reference status are displayed.")}</p>
       </div>
-      <span class="connections-mode">${tr("实盘写入未启用", "Live writes disabled")}</span>
+      <span class="connections-mode">Paper Only · runtimeApplied=false · exchangeWriteAllowed=false</span>
     </section>
-
-    <section class="connection-plane" aria-label="${tr("连接状态", "Connection status")}">
-      <div><span>${tr("配置来源", "Configuration source")}</span><strong>${tr("当前为浏览器模拟，会话结束即清除", "Browser mock, cleared after this session")}</strong></div>
-      <div><span>${tr("运行时密钥", "Runtime secrets")}</span><strong>${tr("必须由服务端密钥库或环境变量注入", "Server vault or environment injection required")}</strong></div>
-      <div class="is-locked"><span>${tr("交易所写权限", "Exchange write access")}</span><strong>${tr("锁定", "Locked")}</strong></div>
+    <section class="connection-section" aria-live="polite">
+      <nav role="tablist" class="connection-nav"><button type="button" data-connection-preview-tab="data" aria-selected="${state.connectionPreviewTab === "data"}">${tr("数据源", "Data sources")}</button><button type="button" data-connection-preview-tab="models" aria-selected="${state.connectionPreviewTab === "models"}">${tr("模型适配器", "Model adapters")}</button></nav>
+      ${selected.length ? `<div class="security-matrix">${selected.map(({ definition, version }) => `<section><h3>${escapeHtml(version.name)}</h3><p>${tr("健康", "Health")}: ${escapeHtml(version.health)} · ${tr("密钥引用", "Secret reference")}: ${escapeHtml(version.secretReferenceStatus)}</p><p>${tr("能力", "Capabilities")}: ${escapeHtml(version.capabilityRefs.join(", "))}</p><p>${tr("影响范围", "Impact")}: ${version.impact.agentDefinitionCount} Agents / ${version.impact.strategyReferenceCount} Strategies</p><small>v${version.versionIndex} · ${escapeHtml(version.fingerprint)}</small></section>`).join("")}</div>` : `<p class="connection-notice">${tr("尚未为此 actor 物化连接定义。", "No connection definitions have been materialized for this actor.")}</p>`}
+      <div class="connection-actions">${refs.map((registeredRef) => `<button type="button" class="secondary-action" data-materialize-connection="${registeredRef}">${tr("登记", "Register")} ${escapeHtml(registeredRef)}</button>`).join("")}</div>
+      <p class="saved-connection">${tr("浏览器不会读取、发送、保存或显示 Secret / Token；服务端仅报告引用状态。", "The browser never reads, sends, stores, or displays Secrets / Tokens; the server reports reference status only.")}</p>
     </section>
-
-    <div class="connections-layout">
-      <nav class="connection-nav" aria-label="${tr("连接配置分类", "Connection settings sections")}">
-        ${sections.map(([id, label, description]) => `
-          <button type="button" data-connection-section="${id}" class="${state.connections.section === id ? "is-active" : ""}" aria-current="${state.connections.section === id ? "page" : "false"}">
-            <strong>${localized(label)}</strong>
-            <small>${localized(description)}</small>
-          </button>
-        `).join("")}
-      </nav>
-      <div class="connection-workspace">
-        ${state.connections.section === "llm"
-          ? renderLlmConnections()
-          : state.connections.section === "exchange"
-            ? renderExchangeConnections()
-            : renderSecurityConnections()}
-      </div>
-    </div>
   `;
 }
 
@@ -2141,7 +2126,7 @@ function render(): void {
                       ? renderExperiment()
                       : state.view === "activity"
                         ? renderActivity()
-                        : renderConnectionSettingsPreview(state.locale, state.connectionPreviewTab);
+                        : renderConnections();
   app.innerHTML = `
     <!--
     THESIS: One Trading Agent narrows a broad universe to one auditable symbol. It refuses fixed coin tabs and equal-weight dashboard cards.
@@ -2283,6 +2268,7 @@ function bindEvents(): void {
     const body = await response.json() as { data?: unknown; error?: { code: string } }; if (!response.ok) throw new Error(body.error?.code ?? "AGENT_API_FAILED"); return body.data;
   };
   const loadRealAgents = async () => { state.realAgents = await agentRequest(`/api/orchestration/agents?category=${state.agentCenterCategory}`) as AppState["realAgents"]; render(); };
+  const loadRealConnections = async () => { state.realConnections = await agentRequest("/api/orchestration/connections") as AppState["realConnections"]; render(); };
   const key = () => `agent:${crypto.randomUUID()}`;
   const selectRealAgent = async (definitionId: string) => { const selected = await agentRequest(`/api/orchestration/agents/${encodeURIComponent(definitionId)}`) as AppState["selectedRealAgent"]; const history = await agentRequest(`/api/orchestration/agents/${encodeURIComponent(definitionId)}/versions?limit=20`) as AppState["agentVersions"]; state.selectedRealAgent = selected; state.agentVersions = history; render(); };
   document.querySelector<HTMLInputElement>("[data-agent-token]")?.addEventListener("input", (event) => { state.agentCenterToken = (event.currentTarget as HTMLInputElement).value; });
@@ -2315,6 +2301,7 @@ function bindEvents(): void {
         fetch(`http://127.0.0.1:8787/api/orchestration/agents?category=${state.agentCenterCategory}`, { headers: { authorization: `Bearer ${state.agentCenterToken}` } })
           .then((response) => response.json()).then((body: { data?: AppState["realAgents"] }) => { if (body.data) { state.realAgents = body.data; render(); } }).catch(() => undefined);
       }
+      if (state.view === "connections" && state.agentCenterToken) void loadRealConnections().catch(() => undefined);
       window.scrollTo({ top: 0, behavior: "smooth" });
     });
   });
@@ -2459,8 +2446,15 @@ function bindEvents(): void {
     button.addEventListener("click", () => {
       state.connectionPreviewTab = (button.dataset.connectionPreviewTab ?? "data") as ConnectionPreviewTab;
       render();
+      if (state.view === "connections" && state.agentCenterToken) void loadRealConnections().catch(() => undefined);
     });
   });
+
+  document.querySelectorAll<HTMLButtonElement>("[data-materialize-connection]").forEach((button) => button.addEventListener("click", () => {
+    const registeredRef = button.dataset.materializeConnection ?? "";
+    const kind = registeredRef.startsWith("data-source:") ? "data_source" : "model_adapter";
+    void agentRequest("/api/orchestration/connections", { method: "POST", body: JSON.stringify({ kind, registeredRef }) }).then(loadRealConnections).then(() => showToast("连接已从注册表物化", "Connection materialized from the registry")).catch((error) => showToast("连接被拒绝", error instanceof Error ? error.message : "Connection rejected"));
+  }));
 
   document.querySelectorAll<HTMLButtonElement>("[data-connection-section]").forEach((button) => {
     button.addEventListener("click", () => {

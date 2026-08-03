@@ -52,3 +52,6 @@ export * from "./shadow-promotion.js";
 export * from "./agent-definition-service.js";
 export * from "./sqlite-agent-definition-repository.js";
 export * from "./agent-definition-http.js";
+export * from "./connection-service.js";
+export * from "./sqlite-connection-repository.js";
+export * from "./connection-http.js";

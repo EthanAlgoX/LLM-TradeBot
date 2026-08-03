@@ -2,6 +2,8 @@
 
 > 2026-08-03：LOOP-032 已完成 F1 Agent Center V1：SQLite append-only 生命周期、服务端 Diff、Catalog、Clone lineage、Archive 和受限 deterministic 测试台均以 Bearer actor/精确版本 authority 持久化；不触发 Runtime 或交易写入。
 
+> 2026-08-03：F2 Connections V1 已开始实现。连接仅能由服务端注册表物化为 actor-scoped immutable Definition/Version；Web 不再提供浏览器内存配置或 Secret 表单，只展示健康、能力、影响范围和 Secret reference 状态。保持 `runtimeApplied=false`、Paper Only、`exchangeWriteAllowed=false`。
+
 > 2026-08-03：LOOP-029 已完成预览后的功能化路线整理。后续固定按“Agent 中心版本基础 → 连接能力完善 → LLM 编排推荐 → 预上线与回测 → 最多三个真实模拟实例”逐步接入，M6 Live 继续暂停。
 
 > 文档角色：汇总 2026-08-01 之前的产品讨论，作为后续产品优化、页面收敛和阶段验收的执行入口

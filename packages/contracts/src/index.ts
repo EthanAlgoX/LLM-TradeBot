@@ -1119,3 +1119,4 @@ export * from "./historical-semantic-evaluation.js";
 export * from "./data-center.js";
 export * from "./experiment-lab.js";
 export * from "./agent-definitions.js";
+export * from "./connections.js";
