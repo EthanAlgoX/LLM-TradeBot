@@ -1,6 +1,6 @@
 # TradeBot 产品路线图与当前进度
 
-> 2026-08-03：F3 `IN_PROGRESS`。LOOP-042 已在 Chrome 验证 `dev:paper` restart 后同一 `local:operator` 恢复 Workbench、Draft 和四类 Published Catalog；旧 provenance-free Recommendation 不可 Apply。仍需干净的全量 TAP 汇总及新鲜 Console/Network 证据；下一步为 LOOP-043。保持 `runtimeApplied=false`、Paper Only、`exchangeWriteAllowed=false`。
+> 2026-08-03：F3 `IN_PROGRESS`。LOOP-043 已确认 `local:operator` 的 Workbench、Draft 与 legacy history 可跨 reload/restart 恢复，旧 provenance-free Recommendation 不可 Apply；但最新 Chrome 仅恢复 Input Agent，Analysis/Decision/Reflection Published Catalog 缺失。聚焦测试自然完成 21/21，全量测试仍缺自然最终 TAP 汇总。下一步为 LOOP-044；保持 `runtimeApplied=false`、Paper Only、`exchangeWriteAllowed=false`。
 
 > 2026-08-03：F3 `IN_PROGRESS`。LOOP-038 已完成精确 provenance、cursor/actor/restart 负向测试；但真实 Chrome Web/API 重启换发本地 Bearer actor，历史正确隔离而不能以同 actor 恢复，中文修改/Apply 和英文窄屏验收也未完成。继续执行 LOOP-039；保持 `runtimeApplied=false`、`exchangeWriteAllowed=false`。
 
@@ -46,7 +46,7 @@ npm run dev:paper   STARTED
 | R1 Four-page Product Preview | `PROTOTYPE_ONLY` | 只保留 Simulation、Workbench、Agent Center、Connections；自然语言推荐与方案库合并，Agent 拆为四类，数据源与模型配置合并 |
 | F1 Agent Center V1 | `COMPLETE` | 真实 immutable Version、服务端 Diff、Validate/Publish/Archive、Published Catalog、Clone lineage 和 `DETERMINISTIC_TEST_ADAPTER` Test Evidence；四类 Agent 同一版本流，不写 Runtime/交易事实 |
 | F2 Connections V1 | `COMPLETE` | actor-scoped immutable Connection Definition/Version、SQLite 重启恢复、Bearer API 与仅展示健康/能力/影响/Secret reference 状态的 Web；Chrome 完整验收已通过，不读取或显示 Secret。 |
-| F3 Workbench V2 | `PLANNED / NEXT` | LOOP-035：自然语言 Intent/澄清、Structured Output 推荐已发布 Agent Version、服务端动态 DAG 校验；Apply 只创建 immutable Strategy Draft |
+| F3 Workbench V2 | `IN_PROGRESS` | Intent/澄清、Published Catalog 推荐、动态 DAG、Apply immutable Draft 与同 actor Workbench restart recovery 已实现；LOOP-044 收敛四类 Catalog 恢复、全量测试自然退出和最终 Chrome 验收 |
 | F4 Preflight / Evidence | `PLANNED` | 复用现有 Validator、Backtest、Walk-Forward、Experiment Evidence 与 stale 规则 |
 | F5 Simulation V2 | `PLANNED` | 四页产品层接回现有 M4；服务端强制最多三个 active Paper Deployment，展示真实 Artifact 对话 |
 | Exchange 写入 | `UNAVAILABLE` | Paper Only，`exchangeWriteAllowed=false`，没有 Binance 或其他交易所写接口 |

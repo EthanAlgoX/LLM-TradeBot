@@ -1,6 +1,6 @@
 # TradeBot 产品优化规划与进度
 
-> 2026-08-03：LOOP-042 F3 仍为 `IN_PROGRESS`。真实 Chrome 已在 Web/API restart 后恢复同一 `local:operator` 的 Workbench、Configuration Draft 与四类 Published Catalog；旧 provenance-free Recommendation 只读且不可 Apply。仍需干净 TAP 汇总及新鲜 Console/Network 证据；下一步为 LOOP-043。保持 `runtimeApplied=false`、Paper Only、`exchangeWriteAllowed=false`。
+> 2026-08-03：LOOP-043 F3 仍为 `IN_PROGRESS`。同一 `local:operator` 的 Workbench、Draft 与 legacy history 已可跨 reload/restart 恢复，且 legacy provenance-free Recommendation 只读不可 Apply；但最新 Chrome 只恢复 Input Agent，Analysis/Decision/Reflection Published Catalog 缺失。聚焦 Copilot 测试自然完成 21/21，全量测试执行到 243 个通过子测试后仍未自然输出最终 TAP 汇总。下一步为 LOOP-044；保持 `runtimeApplied=false`、Paper Only、`exchangeWriteAllowed=false`。
 
 > 2026-08-03：LOOP-032 已完成 F1 Agent Center V1：SQLite append-only 生命周期、服务端 Diff、Catalog、Clone lineage、Archive 和受限 deterministic 测试台均以 Bearer actor/精确版本 authority 持久化；不触发 Runtime 或交易写入。
 
@@ -728,7 +728,7 @@ LOOP-030/031 已完成真实版本合同、Repository/API、Input/Analysis v1→
 
 ### F3：编排工作台 V2——真实 LLM 推荐动态 DAG
 
-状态：`PLANNED / NEXT`（LOOP-035）
+状态：`IN_PROGRESS`（下一步 LOOP-044）
 
 - [ ] 用户自然语言先产生结构化 Strategy Intent；需求不完整时只返回澄清问题，不强行编排；
 - [ ] LLM 通过注册 Tool/Structured Output 返回说明、`nodes`、`edges`、假设、缺口和推荐理由，不返回 HTML；

@@ -1,5 +1,12 @@
 # TradeBot 当前状态与接手说明
 
+## LOOP-043 F3 recovery verification continuation（2026-08-03）
+
+- F3 仍为 `IN_PROGRESS`。同一 local Paper actor 的 Workbench、Draft 与 legacy history 已可在 Chrome reload 和受控 `dev:paper` restart 后恢复；legacy no-provenance Recommendation 明确显示 `PROVENANCE_UNAVAILABLE` 且不可 Apply。安全状态保持 `runtimeApplied=false`、Paper Only、`exchangeWriteAllowed=false`。
+- 最新 Chrome 证据纠正了 LOOP-042 的旧快照：重启后的 Agent Center 只恢复 Input Agent，Analysis、Decision、Reflection 显示 `No real Agents yet`，因此四类 Published Catalog 恢复尚未通过。
+- `tests-ts/orchestration-copilot.test.ts` 已补齐临时 runtime 释放并自然完成 21/21，提交 `fe074ec` 已推送；全量 `npm run test:ts` 虽执行到 243 个通过子测试，仍未自然输出最终 TAP 汇总和退出，不能记为 PASS。
+- 唯一下一入口为 [`LOOP-044`](loop-prompts/loop-044-f3-catalog-recovery-and-test-closeout-v1.md)。实现后必须由 Agent 直接操作真实 Chrome；不进入 F4、F5 或 M6。
+
 ## LOOP-042 F3 browser recovery diagnosis（2026-08-03）
 
 - F3 仍为 `IN_PROGRESS`：同一 Chrome 在 `dev:paper` restart 后已恢复 `local:operator` 的 Workbench、Configuration Draft 与四类 Published Catalog；旧 provenance-free Recommendation 显示 `PROVENANCE_UNAVAILABLE` 且不可 Apply。
