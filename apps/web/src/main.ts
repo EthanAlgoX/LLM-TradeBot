@@ -236,9 +236,6 @@ const sessionConfiguration = resolveOrchestrationSessionConfiguration({
     DEV: import.meta.env.DEV,
     VITE_TRADEBOT_ORCHESTRATION_API:
       import.meta.env.VITE_TRADEBOT_ORCHESTRATION_API,
-    VITE_TRADEBOT_ORCHESTRATION_TOKEN: import.meta.env.DEV
-      ? import.meta.env.VITE_TRADEBOT_ORCHESTRATION_TOKEN
-      : undefined,
   } satisfies OrchestrationViteEnvironment,
 });
 const localeStorageKey = "tradebot.locale";
@@ -294,7 +291,7 @@ const state: AppState = {
   realAgents: [],
   // The loopback-only development session injects its Bearer actor here; it is
   // never rendered, persisted, or accepted as a connection configuration value.
-  agentCenterToken: sessionConfiguration.token ?? "",
+  agentCenterToken: sessionConfiguration.token ? "external-session" : "",
   agentVersions: [],
   realConnections: [],
   workspace: {
@@ -2307,7 +2304,7 @@ function appendConfigurationActivity(title: LocalizedText, summary: LocalizedTex
 
 function bindEvents(): void {
   const agentRequest = async (path: string, init?: RequestInit) => {
-    const response = await fetch(`${sessionConfiguration.apiBase}${path}`, { ...init, headers: { "content-type": "application/json", authorization: `Bearer ${state.agentCenterToken}`, ...(init?.headers ?? {}) } });
+    const response = await fetch(`${sessionConfiguration.apiBase}${path}`, { ...init, credentials: "include", headers: { "content-type": "application/json", ...(init?.headers ?? {}) } });
     const body = await response.json() as { data?: unknown; error?: { code: string } }; if (!response.ok) throw new Error(body.error?.code ?? "AGENT_API_FAILED"); return body.data;
   };
   const loadRealAgents = async () => { state.realAgents = await agentRequest(`/api/orchestration/agents?category=${state.agentCenterCategory}`) as AppState["realAgents"]; render(); };
@@ -2325,7 +2322,6 @@ function bindEvents(): void {
   };
   const key = () => `agent:${crypto.randomUUID()}`;
   const selectRealAgent = async (definitionId: string) => { const selected = await agentRequest(`/api/orchestration/agents/${encodeURIComponent(definitionId)}`) as AppState["selectedRealAgent"]; const history = await agentRequest(`/api/orchestration/agents/${encodeURIComponent(definitionId)}/versions?limit=20`) as AppState["agentVersions"]; state.selectedRealAgent = selected; state.agentVersions = history; render(); };
-  document.querySelector<HTMLInputElement>("[data-agent-token]")?.addEventListener("input", (event) => { state.agentCenterToken = (event.currentTarget as HTMLInputElement).value; });
   document.querySelector<HTMLButtonElement>("[data-create-real-agent]")?.addEventListener("click", async () => {
     try { const category = state.agentCenterCategory; const name = document.querySelector<HTMLInputElement>("[data-agent-name]")?.value.trim() ?? `${category} Agent`; const prompt = document.querySelector<HTMLTextAreaElement>("[data-agent-prompt]")?.value.trim() ?? "Explain registered facts."; const input = category === "input" ? { dataRef: "data-source:binance-futures-public:v1", upstreamArtifactSchemaRefs: [], inputSchemaRef: "schema:market-observation-input:v1" } : { upstreamArtifactSchemaRefs: ["artifact-schema:structured-observation:v1"], inputSchemaRef: "schema:analysis-input:v1", ...(category === "analysis" ? { modelRef: "model-connection:deepseek:default" } : {}) }; const created = await agentRequest("/api/orchestration/agents", { method: "POST", body: JSON.stringify({ category, idempotencyKey: key(), payload: { name, templateRef: `agent-template:${category}:v1`, ...input, userInstructionPrompt: prompt, budget: { maxTokens: 1000, maxCalls: 1, timeoutMs: 5000 } } }) }) as { definition: { definitionId: string } }; await loadRealAgents(); await selectRealAgent(created.definition.definitionId); showToast("已创建真实 Agent v1", "Real Agent v1 created"); } catch (error) { showToast("创建失败", error instanceof Error ? error.message : "Creation failed"); }
   });
@@ -2352,7 +2348,7 @@ function bindEvents(): void {
       state.copilotOpen = false;
       render();
       if (state.view === "agent-center" && state.agentCenterToken) {
-        fetch(`${sessionConfiguration.apiBase}/api/orchestration/agents?category=${state.agentCenterCategory}`, { headers: { authorization: `Bearer ${state.agentCenterToken}` } })
+        fetch(`${sessionConfiguration.apiBase}/api/orchestration/agents?category=${state.agentCenterCategory}`, { credentials: "include" })
           .then((response) => response.json()).then((body: { data?: AppState["realAgents"] }) => { if (body.data) { state.realAgents = body.data; render(); } }).catch(() => undefined);
       }
       if (state.view === "connections" && state.agentCenterToken) void loadRealConnections().catch(() => undefined);
@@ -2411,14 +2407,14 @@ function bindEvents(): void {
     const prompt = document.querySelector<HTMLTextAreaElement>("[data-real-workbench-prompt]")?.value.trim() ?? "";
     if (!prompt || !state.agentCenterToken) { showToast("需要有效会话和策略描述", "A session token and strategy description are required"); return; }
     try {
-      const response = await fetch(`${sessionConfiguration.apiBase}/api/orchestration/workbench/turns`, { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${state.agentCenterToken}` }, body: JSON.stringify({ schemaVersion: "1.0.0", conversationId: "workbench.default", message: prompt, locale: state.locale, idempotencyKey: `workbench-turn:${Date.now()}` }) });
+      const response = await fetch(`${sessionConfiguration.apiBase}/api/orchestration/workbench/turns`, { method: "POST", credentials: "include", headers: { "content-type": "application/json" }, body: JSON.stringify({ schemaVersion: "1.0.0", conversationId: "workbench.default", message: prompt, locale: state.locale, idempotencyKey: `workbench-turn:${Date.now()}` }) });
       const body = await response.json() as { data?: any; error?: { code?: string } }; if (!response.ok || !body.data) throw new Error(body.error?.code ?? "REQUEST_FAILED");
       state.realWorkbenchTurns = [...state.realWorkbenchTurns, { message: prompt, result: body.data }]; state.workbenchDraft = ""; render();
     } catch (error) { showToast(`服务端拒绝：${error instanceof Error ? error.message : "REQUEST_FAILED"}`, `Server rejected: ${error instanceof Error ? error.message : "REQUEST_FAILED"}`); }
   });
   document.querySelectorAll<HTMLButtonElement>("[data-real-apply]").forEach((button) => button.addEventListener("click", async () => {
     try {
-      const response = await fetch(`${sessionConfiguration.apiBase}/api/orchestration/workbench/apply`, { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${state.agentCenterToken}` }, body: JSON.stringify({ recommendationId: button.dataset.realApply, fingerprint: button.dataset.realFingerprint, idempotencyKey: `workbench-apply:${button.dataset.realApply}` }) });
+      const response = await fetch(`${sessionConfiguration.apiBase}/api/orchestration/workbench/apply`, { method: "POST", credentials: "include", headers: { "content-type": "application/json" }, body: JSON.stringify({ recommendationId: button.dataset.realApply, fingerprint: button.dataset.realFingerprint, idempotencyKey: `workbench-apply:${button.dataset.realApply}` }) });
       const body = await response.json() as { data?: any; error?: { code?: string } }; if (!response.ok || !body.data) throw new Error(body.error?.code ?? "APPLY_FAILED");
       state.realWorkbenchTurns = state.realWorkbenchTurns.map((turn) => turn.result.recommendation?.recommendationId === button.dataset.realApply ? { ...turn, draft: body.data } : turn); render();
     } catch (error) { showToast(`应用被拒绝：${error instanceof Error ? error.message : "APPLY_FAILED"}`, `Apply rejected: ${error instanceof Error ? error.message : "APPLY_FAILED"}`); }
@@ -2829,6 +2825,24 @@ document.addEventListener("click", (event) => {
   showToast("多 Agent 策略方案已生成，可放入模拟槽位", "Multi-Agent strategy generated and ready for a simulation slot");
 });
 
+void fetch(`${sessionConfiguration.apiBase}/api/orchestration/local-identity`, {
+  method: "POST",
+  credentials: "include",
+}).then((response) => {
+  if (!response.ok) return;
+  state.agentCenterToken = "http-only-local-identity";
+  if (state.view === "orchestration") {
+    return fetch(`${sessionConfiguration.apiBase}/api/orchestration/workbench/conversations/workbench.default`, { credentials: "include" })
+      .then((result) => result.json())
+      .then((body: { data?: Array<{ intent: unknown; recommendation?: unknown; draft?: unknown }> }) => {
+        if (!body.data) return;
+        state.realWorkbenchTurns = body.data.map((entry) => ({ message: "Recovered server-authoritative turn", result: entry.recommendation ? { kind: "recommendation", intent: entry.intent, recommendation: entry.recommendation } : { kind: "clarification", intent: entry.intent, clarificationQuestions: [] }, ...(entry.draft ? { draft: entry.draft } : {}) }));
+        render();
+      });
+  }
+  render();
+}).catch(() => undefined);
+
 render();
 
 // A direct #connections navigation must hydrate the actor-scoped read model on
@@ -2836,9 +2850,7 @@ render();
 // the existing loopback-only development injection and is never rendered or
 // persisted by this page.
 if (state.view === "connections" && state.agentCenterToken) {
-  void fetch(`${sessionConfiguration.apiBase}/api/orchestration/connections`, {
-    headers: { authorization: `Bearer ${state.agentCenterToken}` },
-  })
+  void fetch(`${sessionConfiguration.apiBase}/api/orchestration/connections`, { credentials: "include" })
     .then((response) => response.json())
     .then((body: { data?: AppState["realConnections"] }) => {
       if (!body.data) return;
@@ -2849,9 +2861,7 @@ if (state.view === "connections" && state.agentCenterToken) {
 }
 
 if (state.view === "orchestration" && state.agentCenterToken) {
-  void fetch(`${sessionConfiguration.apiBase}/api/orchestration/workbench/conversations/workbench.default`, {
-    headers: { authorization: `Bearer ${state.agentCenterToken}` },
-  })
+  void fetch(`${sessionConfiguration.apiBase}/api/orchestration/workbench/conversations/workbench.default`, { credentials: "include" })
     .then((response) => response.json())
     .then((body: { data?: Array<{ intent: unknown; recommendation?: unknown; draft?: unknown }> }) => {
       if (!body.data) return;

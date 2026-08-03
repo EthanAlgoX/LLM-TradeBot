@@ -652,6 +652,7 @@ export function createCurrentPipelineOrchestrationRuntime(
     intentDraftService,
     orchestrationCopilotService,
     authenticator,
+    ...(options.operatorToken ? { localIdentityToken: operatorToken } : {}),
     evidenceWorkflow,
     paperPlanService,
     paperRuntimeActivationService,

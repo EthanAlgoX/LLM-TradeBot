@@ -1,6 +1,7 @@
 export interface OrchestrationViteEnvironment {
   readonly DEV?: boolean;
   readonly VITE_TRADEBOT_ORCHESTRATION_API?: string;
+  /** Legacy input retained for callers; deliberately ignored. */
   readonly VITE_TRADEBOT_ORCHESTRATION_TOKEN?: string;
 }
 
@@ -12,8 +13,8 @@ export interface OrchestrationSessionConfiguration {
 const loopbackApiBase = "http://127.0.0.1:8787";
 
 /**
- * Resolves the local Operator session without persisting any credential.
- * Runtime injection has priority; Vite's token is deliberately DEV-only.
+ * Resolves the local API address. Browser identity is established through a
+ * loopback HttpOnly cookie, so no credential enters the bundle.
  */
 export function resolveOrchestrationSessionConfiguration(input: {
   readonly globalApiBase?: string;
@@ -25,10 +26,6 @@ export function resolveOrchestrationSessionConfiguration(input: {
       input.globalApiBase ??
       input.viteEnvironment?.VITE_TRADEBOT_ORCHESTRATION_API ??
       loopbackApiBase,
-    token:
-      input.globalToken ??
-      (input.viteEnvironment?.DEV
-        ? input.viteEnvironment.VITE_TRADEBOT_ORCHESTRATION_TOKEN
-        : undefined),
+    token: input.globalToken,
   };
 }

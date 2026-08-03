@@ -202,9 +202,6 @@ const viteEnvironment: OrchestrationViteEnvironment = {
   DEV: import.meta.env.DEV,
   VITE_TRADEBOT_ORCHESTRATION_API:
     import.meta.env.VITE_TRADEBOT_ORCHESTRATION_API,
-  VITE_TRADEBOT_ORCHESTRATION_TOKEN: import.meta.env.DEV
-    ? import.meta.env.VITE_TRADEBOT_ORCHESTRATION_TOKEN
-    : undefined,
 };
 const sessionConfiguration = resolveOrchestrationSessionConfiguration({
   globalApiBase: (
@@ -445,6 +442,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   try {
     const response = await fetch(`${apiBase}${path}`, {
       ...init,
+      credentials: "include",
       signal: controller.signal,
       headers: {
         ...(token ? { authorization: `Bearer ${token}` } : {}),

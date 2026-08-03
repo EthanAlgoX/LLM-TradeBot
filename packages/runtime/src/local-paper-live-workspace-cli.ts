@@ -1,16 +1,16 @@
-import { randomBytes } from "node:crypto";
 import { spawn, type ChildProcess } from "node:child_process";
 import { join } from "node:path";
 import {
   BINANCE_PUBLIC_PAPER_MARKET_DATA_LABEL,
   prepareLocalPaperLiveWorkspace,
 } from "./local-paper-live-workspace.js";
+import { loadLocalPaperOperatorToken } from "./local-paper-operator-identity.js";
 
 const projectRoot = process.cwd();
 const workspace = prepareLocalPaperLiveWorkspace(
   join(projectRoot, "data", "local-paper-live-workspace"),
 );
-const operatorToken = randomBytes(32).toString("hex");
+const operatorToken = loadLocalPaperOperatorToken(workspace.directory);
 let shuttingDown = false;
 
 const apiEnvironment = {
@@ -21,7 +21,6 @@ const apiEnvironment = {
 const webEnvironment = {
   ...process.env,
   VITE_TRADEBOT_ORCHESTRATION_API: "http://127.0.0.1:8787",
-  VITE_TRADEBOT_ORCHESTRATION_TOKEN: operatorToken,
   VITE_TRADEBOT_MARKET_DATA_LABEL:
     BINANCE_PUBLIC_PAPER_MARKET_DATA_LABEL,
 };
@@ -88,9 +87,7 @@ console.log(
 console.log(
   `${workspace.historicalSourceLabel} is used for release evidence; ${workspace.paperMarketDataLabel} is used for Paper cycles.`,
 );
-console.log(
-  "The development Operator Token is injected into the loopback-only Vite process and is not written to disk.",
-);
+console.log("The local operator identity is handed to the browser through an HttpOnly loopback cookie.");
 console.log(
   "No Binance credentials are loaded; exchange write capability remains disabled.",
 );

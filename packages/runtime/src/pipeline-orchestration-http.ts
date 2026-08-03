@@ -78,6 +78,7 @@ export interface PipelineOrchestrationHttpDependencies {
   intentDraftService?: OrchestrationIntentDraftService;
   orchestrationCopilotService?: OrchestrationCopilotService;
   authenticator: PipelineOrchestrationAuthenticator;
+  localIdentityToken?: string;
   evidenceWorkflow: PipelineEvidenceWorkflow;
   paperPlanService?: ApprovedPaperPlanService;
   paperRuntimeActivationService?: PaperRuntimeActivationService;
@@ -295,6 +296,17 @@ function loopbackOrigin(origin: string | undefined): string | undefined {
   return undefined;
 }
 
+function cookieValue(cookie: string | undefined, name: string): string | undefined {
+  if (!cookie) return undefined;
+  return cookie.split(";").map((part) => part.trim()).find((part) => part.startsWith(`${name}=`))?.slice(name.length + 1);
+}
+
+const localIdentityCookie = "tradebot_local_operator";
+
+function localIdentityCookieHeader(token: string): string {
+  return `${localIdentityCookie}=${encodeURIComponent(token)}; HttpOnly; SameSite=Strict; Path=/api/orchestration; Max-Age=86400`;
+}
+
 export function createPipelineOrchestrationHttpServer(
   dependencies: PipelineOrchestrationHttpDependencies,
 ): Server {
@@ -305,6 +317,7 @@ export function createPipelineOrchestrationHttpServer(
       if (allowedOrigin) {
         response.setHeader("access-control-allow-origin", allowedOrigin);
         response.setHeader("vary", "origin");
+        response.setHeader("access-control-allow-credentials", "true");
       }
       if (request.method === "OPTIONS") {
         if (!allowedOrigin) {
@@ -325,6 +338,19 @@ export function createPipelineOrchestrationHttpServer(
         return;
       }
       const url = new URL(request.url ?? "/", "http://127.0.0.1");
+      const path = url.pathname;
+      if (request.method === "POST" && path === "/api/orchestration/local-identity") {
+        if (!allowedOrigin || !dependencies.localIdentityToken) { sendError(response, 403, "ORIGIN_NOT_ALLOWED", "Only a configured loopback Paper workspace may establish a local identity."); return; }
+        // The server moves its existing local Paper operator identity into an
+        // HttpOnly cookie. It is never returned to application JavaScript.
+        response.setHeader("set-cookie", localIdentityCookieHeader(dependencies.localIdentityToken));
+        sendJson(response, 204, undefined);
+        return;
+      }
+      if (!request.headers.authorization) {
+        const token = cookieValue(request.headers.cookie, localIdentityCookie);
+        if (token) request.headers.authorization = `Bearer ${decodeURIComponent(token)}`;
+      }
       if (dependencies.operationalOutboxDispatcher) {
         const operationalOutboxHandler = createOperationalOutboxHttpHandler({
           dispatcher: dependencies.operationalOutboxDispatcher,
@@ -339,7 +365,6 @@ export function createPipelineOrchestrationHttpServer(
           return;
         }
       }
-      const path = url.pathname;
       if (path.startsWith("/api/orchestration/workbench/")) {
         if (!dependencies.strategyWorkbenchHttpHandler) { sendError(response, 503, "WORKBENCH_NOT_CONFIGURED", "Structured workbench is not configured."); return; }
         await forwardWebHandler(request, response, dependencies.strategyWorkbenchHttpHandler, maxBodyBytes); return;

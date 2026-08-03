@@ -1,13 +1,13 @@
-import { randomBytes } from "node:crypto";
 import { spawn, type ChildProcess } from "node:child_process";
 import { join, resolve } from "node:path";
 import { prepareLocalPaperWorkspace } from "./local-paper-workspace.js";
+import { loadLocalPaperOperatorToken } from "./local-paper-operator-identity.js";
 
 const projectRoot = resolve(process.cwd());
 const workspace = prepareLocalPaperWorkspace(
   join(projectRoot, "data", "local-paper-workspace"),
 );
-const operatorToken = randomBytes(24).toString("base64url");
+const operatorToken = loadLocalPaperOperatorToken(workspace.directory);
 const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
 const children: ChildProcess[] = [];
 let shuttingDown = false;
@@ -74,7 +74,6 @@ const web = start(
   {
     VITE_TRADEBOT_ORCHESTRATION_API:
       "http://127.0.0.1:8787",
-    VITE_TRADEBOT_ORCHESTRATION_TOKEN: operatorToken,
     VITE_TRADEBOT_MARKET_DATA_LABEL:
       workspace.paperMarketDataLabel,
   },
@@ -86,9 +85,7 @@ console.log(
 console.log(
   `${workspace.historicalSourceLabel} is used for evidence; ${workspace.paperMarketDataLabel} is used for Paper cycles.`,
 );
-console.log(
-  "The development Operator Token is injected into the loopback-only Vite process and is not written to disk.",
-);
+console.log("The local operator identity is handed to the browser through an HttpOnly loopback cookie.");
 console.log("Exchange write capability remains disabled.");
 
 runtime.once("exit", (code) => shutdown(code ?? 1));
