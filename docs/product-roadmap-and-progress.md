@@ -1,5 +1,7 @@
 # TradeBot 产品路线图与当前进度
 
+> 2026-08-03：F3 `IN_PROGRESS`。LOOP-045 的真实 Chrome 验证通过中文完整 Recommendation 的 Published provenance、DAG 与锁定安全链，且 reload/受控 `dev:paper` restart 后同 actor 恢复四类 Published Catalog、Turns、legacy `PROVENANCE_UNAVAILABLE` 和 Draft references。英文 820×760 无横向溢出并有可见键盘焦点；Network 为 `TOOL_UNAVAILABLE`。阻塞是有效修改 Apply 后创建新的 Draft `version:1`，没有产生同一 Draft 的 immutable `version:2` parent/reference 关系；下一步 LOOP-046，不进入 F4～F5。
+
 > 2026-08-03：F3 `IN_PROGRESS`。LOOP-044 修复分类切换 Catalog hydration，受控重启后的真实 Chrome 恢复四类 Published Agent；全量 `test:ts` 现自然 TAP 完结 `376/376`。中文已复核澄清、provenance/DAG、锁定安全链和 legacy `PROVENANCE_UNAVAILABLE`；Apply→修改→重启及英文 820×760/focus/stale-response 尚未完成。下一步 LOOP-045 F3 continuation；保持 `runtimeApplied=false`、Paper Only、`exchangeWriteAllowed=false`。
 
 > 2026-08-03：F3 `IN_PROGRESS`。LOOP-038 已完成精确 provenance、cursor/actor/restart 负向测试；但真实 Chrome Web/API 重启换发本地 Bearer actor，历史正确隔离而不能以同 actor 恢复，中文修改/Apply 和英文窄屏验收也未完成。继续执行 LOOP-039；保持 `runtimeApplied=false`、`exchangeWriteAllowed=false`。

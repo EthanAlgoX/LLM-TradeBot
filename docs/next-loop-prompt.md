@@ -2,14 +2,14 @@
 
 ```text
 当前状态：F3 IN_PROGRESS
-最近完成：LOOP-044 的 Catalog hydration 与自然测试退出修复
-下一任务：LOOP-045 — F3 final Chrome lifecycle continuation
+最近完成：LOOP-045 的 Chrome lifecycle / recovery / narrow-screen 验证
+下一任务：LOOP-046 — F3 Draft revision lineage continuation
 浏览器要求：必需，由 Agent 直接操作真实 Chrome
 ```
 
-执行：[`loop-045-f3-final-chrome-continuation-v1.md`](loop-prompts/loop-045-f3-final-chrome-continuation-v1.md)
+执行：[`loop-046-f3-draft-revision-lineage-continuation-v1.md`](loop-prompts/loop-046-f3-draft-revision-lineage-continuation-v1.md)
 
-LOOP-044 已修复分类切换未 hydration 的 Catalog 缺陷，并关闭测试 runtime 所有资源；同 actor 的四类 Published Catalog 已跨受控重启恢复，`npm run test:ts` 自然完成 376/376。LOOP-045 只完成剩余真实 Chrome 生命周期和窄屏验收，不能进入 F4～F5。
+LOOP-045 已完成 Catalog、Turns、Draft references 和 legacy history 的 Chrome reload/受控重启恢复，并通过英文窄屏 overflow/focus。唯一未通过项是完整有效修改在 Apply 后创建新的 `configuration-draft:*:version:1`，未形成同一 Draft 的 immutable `version:2` parent/reference；LOOP-046 只收敛该 authority/lineage 缺陷并重做受影响验证，不能进入 F4～F5。
 
 在此之前不得：
 
