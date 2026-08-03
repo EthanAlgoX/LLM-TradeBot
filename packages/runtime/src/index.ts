@@ -49,3 +49,6 @@ export * from "./experiment-lab.js";
 export * from "./multi-paper-runtime.js";
 export * from "./multi-paper-runtime-http.js";
 export * from "./shadow-promotion.js";
+export * from "./agent-definition-service.js";
+export * from "./sqlite-agent-definition-repository.js";
+export * from "./agent-definition-http.js";

@@ -1,6 +1,6 @@
 # TradeBot 产品路线图与当前进度
 
-> 2026-08-03：F1 `IN_PROGRESS`。REAL：Agent Version 的 immutable SQLite trigger、服务端 Registry refs、Input/Analysis 创建、fingerprint，且始终 `runtimeApplied=false`、`exchangeWriteAllowed=false`。不接入 Runtime、Backtest、Live 或交易所写入。
+> 2026-08-03：F1 `IN_PROGRESS`。REAL：Agent Version 的 immutable SQLite trigger、服务端 Registry refs、Input/Analysis 创建与 v1→v2 parent `versionId + fingerprint` 保护、actor-scoped opaque cursor、持久幂等与重启恢复；界面读取服务端权威版本历史，且始终 `runtimeApplied=false`、`exchangeWriteAllowed=false`。不接入 Runtime、Backtest、Live 或交易所写入。
 
 > 2026-08-03：LOOP-029 已将四页预览拆成 F1～F6 功能化路线。下一步从 Agent 中心真实版本管理开始，随后完善连接配置、LLM 动态 DAG、Preflight/Backtest 和最多三个真实 Paper 实例；M6 Live 继续未授权。
 

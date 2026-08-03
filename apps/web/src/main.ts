@@ -208,6 +208,8 @@ interface AppState {
   simulationDialogueId: string;
   realAgents: Array<{ definition: { definitionId: string; category: AgentCategory }; version: { versionId: string; versionIndex: number; fingerprint: string; payload: { name: string; dataRef?: string; upstreamArtifactSchemaRefs: string[]; modelRef?: string } } }>;
   agentCenterToken: string;
+  selectedRealAgent?: { definition: { definitionId: string; category: AgentCategory }; version: { versionId: string; versionIndex: number; fingerprint: string; payload: { name: string; dataRef?: string; upstreamArtifactSchemaRefs: string[]; modelRef?: string; userInstructionPrompt: string } } };
+  agentVersions: Array<{ versionId: string; versionIndex: number; fingerprint: string; parentVersionId: string | null }>;
 }
 
 const appRoot = document.querySelector<HTMLDivElement>("#app");
@@ -264,6 +266,7 @@ const state: AppState = {
   simulationDialogueId: "hk-quality-trend",
   realAgents: [],
   agentCenterToken: "",
+  agentVersions: [],
   workspace: {
     stage: 2,
     backtestRunning: false,
@@ -1564,6 +1567,8 @@ function strategyPreviewContext() {
     workbenchDraft: state.workbenchDraft,
     realAgents: state.realAgents,
     agentCenterToken: state.agentCenterToken,
+    selectedRealAgent: state.selectedRealAgent,
+    agentVersions: state.agentVersions,
   };
 }
 
@@ -2278,12 +2283,18 @@ function bindEvents(): void {
     const body = await response.json() as { data?: unknown; error?: { code: string } }; if (!response.ok) throw new Error(body.error?.code ?? "AGENT_API_FAILED"); return body.data;
   };
   const loadRealAgents = async () => { state.realAgents = await agentRequest(`/api/orchestration/agents?category=${state.agentCenterCategory}`) as AppState["realAgents"]; render(); };
+  const key = () => `agent:${crypto.randomUUID()}`;
+  const selectRealAgent = async (definitionId: string) => { const selected = await agentRequest(`/api/orchestration/agents/${encodeURIComponent(definitionId)}`) as AppState["selectedRealAgent"]; const history = await agentRequest(`/api/orchestration/agents/${encodeURIComponent(definitionId)}/versions?limit=20`) as AppState["agentVersions"]; state.selectedRealAgent = selected; state.agentVersions = history; render(); };
   document.querySelector<HTMLInputElement>("[data-agent-token]")?.addEventListener("input", (event) => { state.agentCenterToken = (event.currentTarget as HTMLInputElement).value; });
   document.querySelector<HTMLButtonElement>("[data-create-real-agent]")?.addEventListener("click", async () => {
-    try { const name = document.querySelector<HTMLInputElement>("[data-agent-name]")?.value.trim() ?? "Market Input"; const prompt = document.querySelector<HTMLTextAreaElement>("[data-agent-prompt]")?.value.trim() ?? "Explain normalized facts."; await agentRequest("/api/orchestration/agents", { method: "POST", body: JSON.stringify({ category: "input", payload: { name, templateRef: "agent-template:input:v1", dataRef: "data-source:binance-futures-public:v1", upstreamArtifactSchemaRefs: [], userInstructionPrompt: prompt, inputSchemaRef: "schema:market-observation-input:v1", budget: { maxTokens: 1000, maxCalls: 1, timeoutMs: 5000 } } }) }); await loadRealAgents(); showToast("已创建真实 Input Agent v1", "Real Input Agent v1 created"); } catch (error) { showToast("创建失败", error instanceof Error ? error.message : "Creation failed"); }
+    try { const name = document.querySelector<HTMLInputElement>("[data-agent-name]")?.value.trim() ?? "Market Input"; const prompt = document.querySelector<HTMLTextAreaElement>("[data-agent-prompt]")?.value.trim() ?? "Explain normalized facts."; const created = await agentRequest("/api/orchestration/agents", { method: "POST", body: JSON.stringify({ category: "input", idempotencyKey: key(), payload: { name, templateRef: "agent-template:input:v1", dataRef: "data-source:binance-futures-public:v1", upstreamArtifactSchemaRefs: [], userInstructionPrompt: prompt, inputSchemaRef: "schema:market-observation-input:v1", budget: { maxTokens: 1000, maxCalls: 1, timeoutMs: 5000 } } }) }) as { definition: { definitionId: string } }; await loadRealAgents(); await selectRealAgent(created.definition.definitionId); showToast("已创建真实 Input Agent v1", "Real Input Agent v1 created"); } catch (error) { showToast("创建失败", error instanceof Error ? error.message : "Creation failed"); }
   });
   document.querySelector<HTMLButtonElement>("[data-create-real-analysis]")?.addEventListener("click", async () => {
-    try { const name = document.querySelector<HTMLInputElement>("[data-agent-name]")?.value.trim() ?? "Analysis Agent"; const prompt = document.querySelector<HTMLTextAreaElement>("[data-agent-prompt]")?.value.trim() ?? "Explain normalized facts."; await agentRequest("/api/orchestration/agents", { method: "POST", body: JSON.stringify({ category: "analysis", payload: { name, templateRef: "agent-template:analysis:v1", upstreamArtifactSchemaRefs: ["artifact-schema:structured-observation:v1"], modelRef: "model-connection:deepseek:default", userInstructionPrompt: prompt, inputSchemaRef: "schema:analysis-input:v1", budget: { maxTokens: 2000, maxCalls: 2, timeoutMs: 10000 } } }) }); await loadRealAgents(); showToast("已创建真实 Analysis Agent", "Real Analysis Agent created"); } catch (error) { showToast("创建失败", error instanceof Error ? error.message : "Creation failed"); }
+    try { const name = document.querySelector<HTMLInputElement>("[data-agent-name]")?.value.trim() ?? "Analysis Agent"; const prompt = document.querySelector<HTMLTextAreaElement>("[data-agent-prompt]")?.value.trim() ?? "Explain normalized facts."; const created = await agentRequest("/api/orchestration/agents", { method: "POST", body: JSON.stringify({ category: "analysis", idempotencyKey: key(), payload: { name, templateRef: "agent-template:analysis:v1", upstreamArtifactSchemaRefs: ["artifact-schema:structured-observation:v1"], modelRef: "model-connection:deepseek:default", userInstructionPrompt: prompt, inputSchemaRef: "schema:analysis-input:v1", budget: { maxTokens: 2000, maxCalls: 2, timeoutMs: 10000 } } }) }) as { definition: { definitionId: string } }; await loadRealAgents(); await selectRealAgent(created.definition.definitionId); showToast("已创建真实 Analysis Agent", "Real Analysis Agent created"); } catch (error) { showToast("创建失败", error instanceof Error ? error.message : "Creation failed"); }
+  });
+  document.querySelectorAll<HTMLButtonElement>("[data-real-agent]").forEach((button) => button.addEventListener("click", () => { void selectRealAgent(button.dataset.realAgent ?? "").catch((error) => showToast("读取失败", error instanceof Error ? error.message : "Read failed")); }));
+  document.querySelector<HTMLButtonElement>("[data-save-agent-v2]")?.addEventListener("click", async () => {
+    try { const selected = state.selectedRealAgent; if (!selected) throw new Error("AGENT_DEFINITION_NOT_SELECTED"); const prompt = document.querySelector<HTMLTextAreaElement>("[data-agent-prompt]")?.value.trim(); if (!prompt) throw new Error("USER_PROMPT_REQUIRED"); const payload = { ...selected.version.payload, userInstructionPrompt: prompt }; await agentRequest(`/api/orchestration/agents/${encodeURIComponent(selected.definition.definitionId)}/versions`, { method: "POST", body: JSON.stringify({ parentVersionId: selected.version.versionId, parentFingerprint: selected.version.fingerprint, idempotencyKey: key(), payload }) }); await loadRealAgents(); await selectRealAgent(selected.definition.definitionId); showToast("已创建不可变 v2", "Immutable v2 created"); } catch (error) { showToast("保存失败", error instanceof Error ? error.message : "Save failed"); }
   });
   document.querySelector("#toggle-language")?.addEventListener("click", () => {
     state.locale = state.locale === "zh-CN" ? "en" : "zh-CN";
@@ -2421,6 +2432,7 @@ function bindEvents(): void {
       };
       state.selectedPreviewAgentId = firstAgentByCategory[state.agentCenterCategory];
       state.agentCenterSearch = "";
+      state.selectedRealAgent = undefined; state.agentVersions = [];
       render();
     });
   });

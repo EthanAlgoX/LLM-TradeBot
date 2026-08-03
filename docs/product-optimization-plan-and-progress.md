@@ -694,16 +694,16 @@ README 中的 `320/320 PASS` 当前已过期。恢复稳定测试基线是后续
 
 ### F1：Agent 中心 V1——可版本化配置
 
-状态：`PLANNED / NEXT`（从 LOOP-030 开始）
+状态：`IN_PROGRESS`（LOOP-031）
 
 目标：把当前 Sample Catalog 变成四类 Agent 的真实管理与版本中心，并优先复用已有 Registry、Configuration Draft、Model Adapter 与 Dataset 事实。
 
-- [ ] 定义 `AgentDefinition` 与不可变 `AgentVersion`，覆盖 Input、Analysis、Decision、Reflection 四类；
+- [x] 定义 `AgentDefinition` 与不可变 `AgentVersion`，覆盖 Input、Analysis、Decision、Reflection 四类；Input/Analysis 可创建，Decision/Reflection 保持 Planned；
 - [ ] 每个版本精确绑定 Agent Template、数据或上游 Artifact、Model Connection Ref、Prompt Bundle、输入/输出 Schema、工具权限、预算和 fingerprint；
 - [ ] Input Agent 将确定性 Connector/Normalizer 与可编辑语义解读 Prompt 分开，禁止 LLM 改写原始事实；
 - [ ] 用户可编辑层显示为 System Prompt，但平台安全规则、工具权限、输出 Schema、Risk/Execution 边界保持系统锁定；
-- [ ] Prompt 修改、模型修改、数据源修改或上游合同修改都创建新 Draft Version，不能覆盖 Published/Running Version；
-- [ ] Agent 详情提供概览、数据/上游、模型、Prompt、Schema、测试、版本历史七个区域；
+- [x] Prompt 修改、模型修改、数据源修改或上游合同修改都创建新 Draft Version，不能覆盖 Published/Running Version；v2 要求精确 parent `versionId + fingerprint`；
+- [x] Agent 详情提供服务端权威概览、数据/上游、模型、可编辑行为 Prompt、锁定 System Prompt 边界、Schema/测试台状态与版本历史；
 - [ ] 支持创建、克隆、保存 Draft、校验、发布到 Catalog 和归档；不支持动态上传代码或 Adapter。
 
 建议分三轮完成：第一轮建立真实版本合同、Repository/API 和详情骨架；第二轮接入数据/模型/Prompt 编辑与严格校验；第三轮补测试台、版本 Diff、发布/归档和 Chrome 收尾。每轮有修改都提交、推送，但只有真实持久化、恢复、隔离和 UI 全链均通过时 F1 才能标记 `COMPLETE`。
