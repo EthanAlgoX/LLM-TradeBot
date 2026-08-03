@@ -694,7 +694,7 @@ README 中的 `320/320 PASS` 当前已过期。恢复稳定测试基线是后续
 
 ### F1：Agent 中心 V1——可版本化配置
 
-状态：`IN_PROGRESS`（LOOP-031）
+状态：`IN_PROGRESS`（下一步 LOOP-032）
 
 目标：把当前 Sample Catalog 变成四类 Agent 的真实管理与版本中心，并优先复用已有 Registry、Configuration Draft、Model Adapter 与 Dataset 事实。
 
@@ -706,7 +706,7 @@ README 中的 `320/320 PASS` 当前已过期。恢复稳定测试基线是后续
 - [x] Agent 详情提供服务端权威概览、数据/上游、模型、可编辑行为 Prompt、锁定 System Prompt 边界、Schema/测试台状态与版本历史；
 - [ ] 支持创建、克隆、保存 Draft、校验、发布到 Catalog 和归档；不支持动态上传代码或 Adapter。
 
-建议分三轮完成：第一轮建立真实版本合同、Repository/API 和详情骨架；第二轮接入数据/模型/Prompt 编辑与严格校验；第三轮补测试台、版本 Diff、发布/归档和 Chrome 收尾。每轮有修改都提交、推送，但只有真实持久化、恢复、隔离和 UI 全链均通过时 F1 才能标记 `COMPLETE`。
+LOOP-030/031 已完成真实版本合同、Repository/API、Input/Analysis v1→v2、服务端 authority、历史、持久幂等和重启恢复。LOOP-032 只补测试台、版本 Diff、校验/发布/克隆/归档、四类 Agent 真实边界、SQLite 测试资源释放和 Chrome 收尾。每轮有修改都提交、推送，但只有真实持久化、恢复、隔离和 UI 全链均通过时 F1 才能标记 `COMPLETE`。
 
 浏览器要求：实现后必需，由 Agent 直接操作真实 Chrome；文档和纯合同中间轮可标记 `NOT_REQUIRED`，但不能据此关闭 F1。
 

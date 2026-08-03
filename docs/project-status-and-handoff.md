@@ -1,5 +1,12 @@
 # TradeBot 当前状态与接手说明
 
+## LOOP-032 F1 收尾入口（2026-08-03）
+
+- 下一任务：版本 Diff、校验/发布/克隆/归档治理、真实受限 Agent 测试台、四类 Agent 真实性边界，以及完整测试套件的 SQLite 资源释放。
+- 浏览器要求：Prompt 文档生成不需要；实现完成后必须由 Agent 直接操作真实 Chrome，不接受用户手工代验。
+- F1 当前保持 `IN_PROGRESS`；不进入 F2，不修改 M4/M5、账户、订单、Shadow、Live 或交易所写入。
+- 唯一入口：[`LOOP-032`](loop-prompts/loop-032-f1-agent-center-governance-testbench-closeout-v1.md)。
+
 ## LOOP-031 F1 continuation (2026-08-03)
 
 - REAL：Agent Definition/Version SQLite append-only 事实、Bearer actor 隔离、版本列表与历史的 actor/kind/scope-bound opaque cursor、创建/新版本的持久幂等回放，以及 SQLite 重启恢复。
@@ -28,7 +35,7 @@
 - 覆盖或回退无关修改
 - 未经明确要求提交 Git
 
-当前最新完成 Loop 是 **F1～F6 功能化规划（LOOP-029）**。它只更新文档，不修改实现或 Runtime。下一实现入口是 **F1 Agent 中心 V1（LOOP-030）**，浏览器在实现后必需；M5 真实边界继续 fail closed。
+当前最新完成 Loop 是 **LOOP-031**：已实现真实 Agent Definition/immutable Version、Input/Analysis v1→v2、版本历史、持久幂等与重启恢复。下一实现入口是 **LOOP-032 F1 收尾**，浏览器在实现后必需；M5 真实边界继续 fail closed。
 
 ## 2. 当前可运行链路
 
@@ -218,11 +225,11 @@ LOOP-029 只整理规划与进度文档：不修改产品代码、SQLite、浏�
 
 ## 7. 下一阶段
 
-状态为 **FUNCTIONALIZATION_PLANNED / READY_FOR_F1**：
+状态为 **F1 IN_PROGRESS / READY_FOR_LOOP-032**：
 
-1. 执行 [`LOOP-030`](loop-prompts/loop-030-f1-agent-center-versioned-configuration-v1.md)，建立真实 Agent Definition/Version、Repository/API 和 Agent 中心详情工作台；
-2. LOOP-030 实现后必须由 Agent 直接操作真实 Chrome 验证；禁止用静态 DOM、API 或用户手工代替 UI 证据；
-3. F1 允许引用已有 Registry、Dataset 和 Model facts，但不得动态上传代码、暴露 Secret 或实现 Runtime Apply；
+1. 执行 [`LOOP-032`](loop-prompts/loop-032-f1-agent-center-governance-testbench-closeout-v1.md)，补齐 Agent Version Diff、发布治理、克隆/归档、真实受限测试台和测试资源释放；
+2. LOOP-032 实现后必须由 Agent 直接操作真实 Chrome 验证；禁止用静态 DOM、API 或用户手工代替 UI 证据；
+3. F1 继续复用已有 Registry、Dataset 和 Model facts，不得动态上传代码、暴露 Secret 或实现 Runtime Apply；
 4. 保持 M0～M5 runtime、M5 Shadow、账户和交易所写边界不变；不执行 LOOP-025 / M6。
 
 ### LOOP-021 审计与验证（2026-08-02）

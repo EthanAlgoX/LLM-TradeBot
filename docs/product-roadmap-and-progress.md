@@ -40,7 +40,7 @@ npm run dev:paper   STARTED
 | M5 Shadow / Promotion Recommendation | `REAL` | 仅消费明确 M4 persisted cycle/artifact snapshot；独立 append-only Shadow facts、cursor history、同 scope 对比和 terminal read-only recommendation；无 Execution Port |
 | R0 Strategy App Product Preview | `PROTOTYPE_ONLY` | Advisor、Strategy App、Agent Center、Market Radar、Experiment handoff 与三槽位信息架构；刷新恢复 Sample，不调用 LLM、API、SQLite、Runtime 或交易 |
 | R1 Four-page Product Preview | `PROTOTYPE_ONLY` | 只保留 Simulation、Workbench、Agent Center、Connections；自然语言推荐与方案库合并，Agent 拆为四类，数据源与模型配置合并 |
-| F1 Agent Center V1 | `PLANNED / NEXT` | 四类 Agent 的真实 Definition/Version、数据或上游、Model Ref、用户 Prompt、Schema、测试与版本历史 |
+| F1 Agent Center V1 | `IN_PROGRESS` | 已有真实 Definition/immutable Version、Input/Analysis v1→v2、版本历史、持久幂等和重启恢复；待版本 Diff、发布治理、归档与真实测试台收尾 |
 | F2 Connections V1 | `PLANNED` | Data/Dataset 与 Model Provider 的真实能力、健康、后端 Secret 引用和影响范围 |
 | F3 Workbench V2 | `PLANNED` | LLM Structured Output 推荐已发布 Agent Version 组成的动态 DAG；Apply 只创建 Strategy Draft |
 | F4 Preflight / Evidence | `PLANNED` | 复用现有 Validator、Backtest、Walk-Forward、Experiment Evidence 与 stale 规则 |
