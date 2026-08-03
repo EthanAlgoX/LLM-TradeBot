@@ -2,7 +2,7 @@
 
 > 2026-08-03：LOOP-032 已完成 F1 Agent Center V1：SQLite append-only 生命周期、服务端 Diff、Catalog、Clone lineage、Archive 和受限 deterministic 测试台均以 Bearer actor/精确版本 authority 持久化；不触发 Runtime 或交易写入。
 
-> 2026-08-03：F2 Connections V1 已 `COMPLETE`。连接由服务端注册表物化为 actor-scoped immutable Definition/Version；Web 只展示健康、能力、影响范围和 Secret reference 状态。下一步 LOOP-035 进入 F3 结构化动态 DAG，保持 `runtimeApplied=false`、Paper Only、`exchangeWriteAllowed=false`。
+> 2026-08-03：LOOP-035 F3 为 `IN_PROGRESS`：新增严格 Strategy Intent/Recommendation/Draft 合同、SQLite immutable 记录、Published Catalog-only deterministic structured adapter、锁定 Portfolio/Risk/Paper 链和与 Sample 隔离的 REAL SERVER Web 面。尚未完成既有 Conversation/Draft/Graph Validator 融合、全量负向覆盖和 Chrome 闭环，下一步为 LOOP-036；保持 `runtimeApplied=false`、Paper Only、`exchangeWriteAllowed=false`。
 
 > 2026-08-03：LOOP-029 已完成预览后的功能化路线整理。后续固定按“Agent 中心版本基础 → 连接能力完善 → LLM 编排推荐 → 预上线与回测 → 最多三个真实模拟实例”逐步接入，M6 Live 继续暂停。
 

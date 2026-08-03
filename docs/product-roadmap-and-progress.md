@@ -1,6 +1,6 @@
 # TradeBot 产品路线图与当前进度
 
-> 2026-08-03：F2 `COMPLETE`。Connections 为 actor-scoped immutable SQLite Definition/Version；受控 Bearer session 只用于 loopback API，页面不会显示、持久化或接受 Secret/Token。Chrome 已验证全部注册连接的 health/capability/impact/secret-reference/fingerprint、刷新与 Web/API 重启恢复、中文 1440×900、英文 820×760、无横向溢出与可见焦点；保持 `runtimeApplied=false`、`exchangeWriteAllowed=false`。
+> 2026-08-03：F3 `IN_PROGRESS`。LOOP-035 已接入严格结构化 Intent/Recommendation/Draft、Catalog-only deterministic adapter、immutable SQLite 与 REAL SERVER 工作台；尚缺既有 Conversation/Draft/validator authority 融合、恢复与 Chrome 端到端验收，不能标记 COMPLETE。继续执行 LOOP-036；保持 `runtimeApplied=false`、`exchangeWriteAllowed=false`。
 
 > 2026-08-03：F1 `COMPLETE`。REAL：Agent Version immutable SQLite、append-only Draft→Validated→Published→Archived lifecycle、服务端 Diff、Published Catalog、Clone lineage、registered-fixture deterministic Test Evidence、actor 隔离与重启恢复；始终 `runtimeApplied=false`、`exchangeWriteAllowed=false`。不接入 Runtime、Backtest、Live 或交易所写入。
 

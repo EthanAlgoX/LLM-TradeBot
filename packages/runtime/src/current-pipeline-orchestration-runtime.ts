@@ -105,6 +105,8 @@ import { AgentDefinitionHttpHandler } from "./agent-definition-http.js";
 import { ConnectionService } from "./connection-service.js";
 import { SqliteConnectionRepository } from "./sqlite-connection-repository.js";
 import { ConnectionHttpHandler } from "./connection-http.js";
+import { StrategyWorkbenchService } from "./strategy-workbench-service.js";
+import { StrategyWorkbenchHttpHandler } from "./strategy-workbench-http.js";
 
 export type ComparativeTradeReviewRuntimeOptions = Omit<
   ProductionComparativeTradeReviewOptions,
@@ -170,6 +172,7 @@ export interface CurrentPipelineOrchestrationRuntime {
   ephemeralOperatorToken: string;
   agentDefinitionService: AgentDefinitionService;
   connectionService: ConnectionService;
+  strategyWorkbenchService: StrategyWorkbenchService;
   server: ReturnType<typeof createPipelineOrchestrationHttpServer>;
   close(): Promise<void>;
 }
@@ -310,6 +313,7 @@ export function createCurrentPipelineOrchestrationRuntime(
   ]);
   const agentDefinitionService = new AgentDefinitionService(new SqliteAgentDefinitionRepository(database));
   const connectionService = new ConnectionService(new SqliteConnectionRepository(database));
+  const strategyWorkbenchService = new StrategyWorkbenchService(database, agentDefinitionService);
   const evidenceRepository = new SqlitePipelineEvidenceRepository(database);
   if (options.evidenceExecutor && options.historicalRunners) {
     throw new Error(
@@ -663,6 +667,7 @@ export function createCurrentPipelineOrchestrationRuntime(
     multiPaperRuntimeHttpHandler,
     agentDefinitionHttpHandler: new AgentDefinitionHttpHandler(agentDefinitionService, authenticator),
     connectionHttpHandler: new ConnectionHttpHandler(connectionService, authenticator),
+    strategyWorkbenchHttpHandler: new StrategyWorkbenchHttpHandler(strategyWorkbenchService, authenticator),
     ...(productionStrategyOrchestration.experimentLabHttpHandler ? { experimentLabHttpHandler: productionStrategyOrchestration.experimentLabHttpHandler } : {}),
     ...(productionStrategyOrchestration.strategyEvidenceHttpHandler
       ? {
@@ -730,6 +735,7 @@ export function createCurrentPipelineOrchestrationRuntime(
     ephemeralOperatorToken: operatorToken,
     agentDefinitionService,
     connectionService,
+    strategyWorkbenchService,
     server,
     async close(): Promise<void> {
       if (server.listening) {

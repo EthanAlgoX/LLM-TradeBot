@@ -209,6 +209,7 @@ interface AppState {
   connectionPreviewTab: ConnectionPreviewTab;
   experimentHandoffAppName?: string;
   workbenchDraft: string;
+  realWorkbenchTurns: Array<{ message: string; result: any; draft?: any }>;
   simulationDialogueId: string;
   realAgents: Array<{ definition: { definitionId: string; category: AgentCategory; sourceLineage?: { definitionId: string; versionId: string; fingerprint: string } }; version: { versionId: string; versionIndex: number; fingerprint: string; payload: { name: string; dataRef?: string; upstreamArtifactSchemaRefs: string[]; modelRef?: string } }; lifecycle?: { status: string } }>;
   agentCenterToken: string;
@@ -288,6 +289,7 @@ const state: AppState = {
   agentCenterSearch: "",
   connectionPreviewTab: "data",
   workbenchDraft: "",
+  realWorkbenchTurns: [],
   simulationDialogueId: "hk-quality-trend",
   realAgents: [],
   // The loopback-only development session injects its Bearer actor here; it is
@@ -1577,7 +1579,18 @@ function renderProductLoop(): string {
 }
 
 function renderOrchestration(): string {
-  return renderStrategyWorkbench(strategyPreviewContext());
+  const real = state.realWorkbenchTurns;
+  const turns = real.map((turn, index) => {
+    const result = turn.result;
+    const clarification = result.kind === "clarification";
+    const recommendation = result.recommendation;
+    const topology = recommendation ? `<ul class="workbench-flow-list">${recommendation.nodes.map((node: any) => `<li><strong>${escapeHtml(node.label)}</strong> <small>${node.systemOwned ? "SYSTEM LOCKED" : `${escapeHtml(node.agentVersionId)} · ${escapeHtml(node.agentFingerprint?.slice(0, 18) ?? "")}`}</small></li>`).join("")}</ul><p><small>${recommendation.edges.map((edge: any) => `${edge.sourceNodeId} → ${edge.targetNodeId}`).join(" · ")}</small></p>` : "";
+    const assistantBody = clarification
+      ? `<p>${tr("还需要以下信息：", "More information is required:")}</p><ul>${result.clarificationQuestions.map((q: string) => `<li>${escapeHtml(q)}</li>`).join("")}</ul>`
+      : `<p>${escapeHtml(recommendation.explanation)}</p><p><small>DETERMINISTIC_STRUCTURED_ADAPTER · ${escapeHtml(recommendation.catalogSnapshotFingerprint)}</small></p>${topology}<p>runtimeApplied=false · Paper Only · exchangeWriteAllowed=false</p>${turn.draft ? `<p><strong>Strategy Draft: ${escapeHtml(turn.draft.draftId)}</strong><br><small>${escapeHtml(turn.draft.versionId)} · ${escapeHtml(turn.draft.fingerprint)} · F4 PRECHECK PENDING</small></p>` : `<button type="button" class="primary-action" data-real-apply="${escapeHtml(recommendation.recommendationId)}" data-real-fingerprint="${escapeHtml(recommendation.fingerprint)}">${tr("应用此方案", "Apply this plan")}</button>`}`;
+    return `<article class="workbench-message is-user"><div><header><strong>${tr("你", "You")}</strong><time>${index + 1}</time></header><p>${escapeHtml(turn.message)}</p></div><div class="workbench-message__avatar">ME</div></article><article class="workbench-message is-assistant"><div class="workbench-message__avatar">AI</div><div><header><strong>${tr("策略助手", "Strategy Advisor")}</strong><time>${clarification ? "CLARIFICATION" : "VALIDATED_RECOMMENDATION"}</time></header>${assistantBody}</div></article>`;
+  }).join("");
+  return `<section class="page-intro"><div><span>STRATEGY WORKBENCH · REAL SERVER</span><h1>${tr("编排工作台", "Strategy Workbench")}</h1><p>${tr("真实服务端会话与结构化推荐；旧 Sample 已与此视图隔离。", "Server-authoritative conversation and structured recommendations; legacy samples are isolated from this view.")}</p></div><div class="orchestration-version"><strong>Paper Only</strong><small>runtimeApplied=false · exchangeWriteAllowed=false</small></div></section><section class="workbench-conversation"><header class="workbench-conversation__bar"><div><span></span><strong>${tr("策略助手在线", "Strategy Advisor online")}</strong></div><small>Published Catalog only</small></header><div class="workbench-thread" role="log">${turns || `<article class="workbench-message is-assistant"><div class="workbench-message__avatar">AI</div><div><p>${tr("描述市场、周期、目标和风险偏好。信息不足时我只会提问，不会生成草案。", "Describe market, horizon, objective and risk preference. Insufficient details produce clarification only.")}</p></div></article>`}</div><footer class="workbench-composer"><label class="workbench-prompt"><span>${tr("继续描述或修改策略", "Describe or revise strategy")}</span><textarea rows="4" data-real-workbench-prompt>${escapeHtml(state.workbenchDraft)}</textarea></label><div class="workbench-composer__actions"><small>REAL · DETERMINISTIC_STRUCTURED_ADAPTER</small><button type="button" class="primary-action" data-real-recommend>${tr("发送", "Send")}</button></div></footer></section>`;
 }
 
 function strategyPreviewContext() {
@@ -2377,6 +2390,23 @@ function bindEvents(): void {
     window.requestAnimationFrame(() => document.querySelector(".workbench-thread")?.scrollTo({ top: 100_000, behavior: "smooth" }));
     showToast("已在对话中生成新的动态编排方案", "A new dynamic plan was generated in the conversation");
   });
+
+  document.querySelector<HTMLButtonElement>("[data-real-recommend]")?.addEventListener("click", async () => {
+    const prompt = document.querySelector<HTMLTextAreaElement>("[data-real-workbench-prompt]")?.value.trim() ?? "";
+    if (!prompt || !state.agentCenterToken) { showToast("需要有效会话和策略描述", "A session token and strategy description are required"); return; }
+    try {
+      const response = await fetch(`${sessionConfiguration.apiBase}/api/orchestration/workbench/turns`, { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${state.agentCenterToken}` }, body: JSON.stringify({ schemaVersion: "1.0.0", conversationId: "workbench.default", message: prompt, locale: state.locale, idempotencyKey: `workbench-turn:${Date.now()}` }) });
+      const body = await response.json() as { data?: any; error?: { code?: string } }; if (!response.ok || !body.data) throw new Error(body.error?.code ?? "REQUEST_FAILED");
+      state.realWorkbenchTurns = [...state.realWorkbenchTurns, { message: prompt, result: body.data }]; state.workbenchDraft = ""; render();
+    } catch (error) { showToast(`服务端拒绝：${error instanceof Error ? error.message : "REQUEST_FAILED"}`, `Server rejected: ${error instanceof Error ? error.message : "REQUEST_FAILED"}`); }
+  });
+  document.querySelectorAll<HTMLButtonElement>("[data-real-apply]").forEach((button) => button.addEventListener("click", async () => {
+    try {
+      const response = await fetch(`${sessionConfiguration.apiBase}/api/orchestration/workbench/apply`, { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${state.agentCenterToken}` }, body: JSON.stringify({ recommendationId: button.dataset.realApply, fingerprint: button.dataset.realFingerprint, idempotencyKey: `workbench-apply:${button.dataset.realApply}` }) });
+      const body = await response.json() as { data?: any; error?: { code?: string } }; if (!response.ok || !body.data) throw new Error(body.error?.code ?? "APPLY_FAILED");
+      state.realWorkbenchTurns = state.realWorkbenchTurns.map((turn) => turn.result.recommendation?.recommendationId === button.dataset.realApply ? { ...turn, draft: body.data } : turn); render();
+    } catch (error) { showToast(`应用被拒绝：${error instanceof Error ? error.message : "APPLY_FAILED"}`, `Apply rejected: ${error instanceof Error ? error.message : "APPLY_FAILED"}`); }
+  }));
 
   document.querySelectorAll<HTMLButtonElement>("[data-simulation-dialogue]").forEach((button) => {
     button.addEventListener("click", () => {

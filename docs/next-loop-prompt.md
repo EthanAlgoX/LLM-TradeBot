@@ -1,15 +1,15 @@
 # Next Loop Prompt Index
 
 ```text
-当前状态：F2 COMPLETE
-最近完成：LOOP-034 — F2 Connections Chrome Closeout V1
-下一任务：LOOP-035 — F3 编排工作台结构化动态 DAG V1
-浏览器要求：本次 Prompt 文档生成不需要；LOOP-035 实现完成后必需，由 Agent 直接操作真实 Chrome
+当前状态：F3 IN_PROGRESS
+最近完成：LOOP-035 的部分实现
+下一任务：LOOP-036 — F3 编排工作台结构化动态 DAG continuation
+浏览器要求：必需，由 Agent 直接操作真实 Chrome
 ```
 
-执行：[`loop-035-f3-workbench-structured-dag-v1.md`](loop-prompts/loop-035-f3-workbench-structured-dag-v1.md)
+执行：[`loop-036-f3-workbench-continuation-v1.md`](loop-prompts/loop-036-f3-workbench-continuation-v1.md)
 
-LOOP-034 已关闭 F2。下一轮只实现自然语言 Strategy Intent、澄清、已发布 Agent Version 的结构化推荐、服务端动态 DAG 校验，以及 Apply 创建 immutable Strategy Draft；不并行进入 F4～F5。
+LOOP-035 已开始 F3，但必须先将新结构化推荐路径与既有 Conversation、Draft 与 Graph Validator authority 融合并完成 Chrome 闭环；不并行进入 F4～F5。
 
 在此之前不得：
 

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { ReflectionLessonCandidateSchema } from "./semantic-agent-artifacts.js";
 export * from "./multi-paper-runtime.js";
+export * from "./strategy-workbench.js";
 export * from "./shadow-promotion.js";
 
 export const SCHEMA_VERSION = "v1" as const;

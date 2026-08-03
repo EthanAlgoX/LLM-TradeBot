@@ -68,6 +68,7 @@ import type {
 import type { MultiPaperRuntimeHttpHandler } from "./multi-paper-runtime-http.js";
 import type { AgentDefinitionHttpHandler } from "./agent-definition-http.js";
 import type { ConnectionHttpHandler } from "./connection-http.js";
+import type { StrategyWorkbenchHttpHandler } from "./strategy-workbench-http.js";
 
 const defaultMaxBodyBytes = 1_048_576;
 
@@ -96,6 +97,7 @@ export interface PipelineOrchestrationHttpDependencies {
   multiPaperRuntimeHttpHandler?: MultiPaperRuntimeHttpHandler;
   agentDefinitionHttpHandler?: AgentDefinitionHttpHandler;
   connectionHttpHandler?: ConnectionHttpHandler;
+  strategyWorkbenchHttpHandler?: StrategyWorkbenchHttpHandler;
   productionWorkspaceCatalog?: object;
   pipelineGraphs?: readonly PipelineGraphVersion[];
   maxBodyBytes?: number;
@@ -338,6 +340,10 @@ export function createPipelineOrchestrationHttpServer(
         }
       }
       const path = url.pathname;
+      if (path.startsWith("/api/orchestration/workbench/")) {
+        if (!dependencies.strategyWorkbenchHttpHandler) { sendError(response, 503, "WORKBENCH_NOT_CONFIGURED", "Structured workbench is not configured."); return; }
+        await forwardWebHandler(request, response, dependencies.strategyWorkbenchHttpHandler, maxBodyBytes); return;
+      }
       if (path.startsWith("/api/orchestration/agents")) {
         if (!dependencies.agentDefinitionHttpHandler) { sendError(response, 503, "AGENT_DEFINITIONS_UNAVAILABLE", "Agent definitions are not configured."); return; }
         await forwardWebHandler(request, response, dependencies.agentDefinitionHttpHandler, maxBodyBytes); return;

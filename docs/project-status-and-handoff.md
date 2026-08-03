@@ -1,5 +1,11 @@
 # TradeBot 当前状态与接手说明
 
+## LOOP-035 F3 部分实现（2026-08-03）
+
+- F3 为 `IN_PROGRESS`，不可标记完成。已新增严格结构化 Intent/Recommendation/Draft 合同、Published Catalog-only deterministic adapter、immutable SQLite 记录和与 Sample 隔离的 `REAL SERVER` Web 面。
+- `npm run check`、`npm run test:ts`（exit 0）和 `npm run build:web` 已通过；尚未作 Agent Chrome 验收。
+- 必须在 LOOP-036 把新路径折入既有 append-only Conversation、Configuration/Pipeline Draft 和 Graph Validator authority，并完成完整负向验收和重启恢复。禁止 Preflight、Backtest、Runtime、部署或交易副作用。
+
 ## LOOP-035 F3 编排工作台入口（2026-08-03）
 
 - 下一任务：把浏览器内存 Sample 工作台替换为真实 Strategy Intent/澄清、Published Agent Version 结构化推荐、服务端动态 DAG 校验和 immutable Strategy Draft Apply。
