@@ -1,15 +1,15 @@
 # Next Loop Prompt Index
 
 ```text
-当前状态：F1 IN_PROGRESS
-最近完成：LOOP-031 — Agent Version v1→v2、版本历史、持久幂等与重启恢复
-下一任务：LOOP-032 — F1 Agent 中心治理、测试台与收尾 V1
-浏览器要求：本次 Prompt 文档生成不需要；LOOP-032 实现后必需，由 Agent 直接操作真实 Chrome
+当前状态：F1 COMPLETE
+最近完成：LOOP-032 — F1 Agent Center 治理、Diff、Catalog、受限测试台与 Chrome 收尾
+下一任务：LOOP-033 — F2 连接配置 V1
+浏览器要求：LOOP-033 实现后必需，由 Agent 直接操作真实 Chrome
 ```
 
-执行：[`loop-032-f1-agent-center-governance-testbench-closeout-v1.md`](loop-prompts/loop-032-f1-agent-center-governance-testbench-closeout-v1.md)
+执行：[`loop-033-f2-connections-v1.md`](loop-prompts/loop-033-f2-connections-v1.md)
 
-LOOP-030/031 已建立真实 Agent Definition/immutable Version 与服务端 authority。下一轮只收尾 F1：版本 Diff、校验/发布/克隆/归档治理、真实受限测试台、四类 Agent 边界和测试 SQLite 资源释放；不并行实现 F2～F5。
+LOOP-032 已关闭 F1。下一轮只进入 F2 的服务端连接能力、健康、影响范围和后端 Secret reference，不并行实现 F3～F5。
 
 在此之前不得：
 

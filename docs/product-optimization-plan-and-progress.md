@@ -1,6 +1,6 @@
 # TradeBot 产品优化规划与进度
 
-> 2026-08-03：LOOP-030 已建立 REAL SQLite/Bearer actor-scoped Agent Definition 与 append-only Version API，并完成 Input/Analysis v1 的真实 Web 创建。PARTIAL：尚缺 parent-bound v2、恢复 UX、完整测试与双尺寸 Chrome；F1 保持 `IN_PROGRESS`。
+> 2026-08-03：LOOP-032 已完成 F1 Agent Center V1：SQLite append-only 生命周期、服务端 Diff、Catalog、Clone lineage、Archive 和受限 deterministic 测试台均以 Bearer actor/精确版本 authority 持久化；不触发 Runtime 或交易写入。
 
 > 2026-08-03：LOOP-029 已完成预览后的功能化路线整理。后续固定按“Agent 中心版本基础 → 连接能力完善 → LLM 编排推荐 → 预上线与回测 → 最多三个真实模拟实例”逐步接入，M6 Live 继续暂停。
 

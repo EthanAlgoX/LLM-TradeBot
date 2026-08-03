@@ -1,11 +1,10 @@
 # TradeBot 当前状态与接手说明
 
-## LOOP-032 F1 收尾入口（2026-08-03）
+## LOOP-032 F1 收尾完成（2026-08-03）
 
-- 下一任务：版本 Diff、校验/发布/克隆/归档治理、真实受限 Agent 测试台、四类 Agent 真实性边界，以及完整测试套件的 SQLite 资源释放。
-- 浏览器要求：Prompt 文档生成不需要；实现完成后必须由 Agent 直接操作真实 Chrome，不接受用户手工代验。
-- F1 当前保持 `IN_PROGRESS`；不进入 F2，不修改 M4/M5、账户、订单、Shadow、Live 或交易所写入。
-- 唯一入口：[`LOOP-032`](loop-prompts/loop-032-f1-agent-center-governance-testbench-closeout-v1.md)。
+- F1 `COMPLETE`：新增 append-only lifecycle、服务端 Diff、Published Catalog、Clone lineage、Archive 历史可读和 registered-fixture `DETERMINISTIC_TEST_ADAPTER` Evidence。
+- Agent Chrome 已验证中文 1440×900、英文 820×760 无横向溢出；Input v1→v2、Diff、Validate→Publish、Archive→Clone、fixture Evidence、Decision/Reflection 创建与刷新恢复。始终 Paper Only、`runtimeApplied=false`、`exchangeWriteAllowed=false`。
+- 自动化：`check`、`test:ts`（自然 TAP 完结）、`build:web`、`diff --check` 通过。下一入口：[`LOOP-033`](loop-prompts/loop-033-f2-connections-v1.md)。
 
 ## LOOP-031 F1 continuation (2026-08-03)
 

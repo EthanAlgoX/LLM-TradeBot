@@ -32,3 +32,25 @@ test("Agent versions are immutable, parent-bound, actor-scoped, idempotent, curs
     assert.equal(service.versions("actor:one", created.definition.definitionId).data.length, 2);
   } finally { db.close(); rmSync(folder, { recursive: true, force: true }); }
 });
+
+test("Agent governance, catalog, clone, server diff and deterministic test evidence are append-only and fail closed", () => {
+  const folder = mkdtempSync(join(tmpdir(), "tradebot-agent-governance-")); const path = join(folder, "agents.sqlite"); const db = new DatabaseSync(path); const service = new AgentDefinitionService(new SqliteAgentDefinitionRepository(db));
+  try {
+    const created = service.create("actor:one", "input", input(), "agent:governance:create");
+    assert.equal(service.get("actor:one", created.definition.definitionId).lifecycle.status, "draft");
+    assert.throws(() => service.transition("actor:one", created.definition.definitionId, { versionId: created.version.versionId, fingerprint: created.version.fingerprint, action: "publish" }), /LIFECYCLE_TRANSITION_INVALID/);
+    const v2 = service.createVersion("actor:one", created.definition.definitionId, { parentVersionId: created.version.versionId, parentFingerprint: created.version.fingerprint, payload: input("changed"), idempotencyKey: "agent:governance:v2" });
+    const diff = service.diff("actor:one", created.definition.definitionId, created.version.versionId, v2.versionId); assert.ok(diff.changes.some((item) => item.field === "userInstructionPrompt"));
+    service.transition("actor:one", created.definition.definitionId, { versionId: v2.versionId, fingerprint: v2.fingerprint, action: "validate" });
+    service.transition("actor:one", created.definition.definitionId, { versionId: v2.versionId, fingerprint: v2.fingerprint, action: "publish" });
+    assert.equal(service.catalog("actor:one").length, 1);
+    assert.throws(() => service.createVersion("actor:one", created.definition.definitionId, { parentVersionId: v2.versionId, parentFingerprint: v2.fingerprint, payload: input("illegal"), idempotencyKey: "agent:published-edit" }), /PARENT_VERSION_CONFLICT/);
+    const clone = service.clone("actor:one", created.definition.definitionId, { versionId: v2.versionId, fingerprint: v2.fingerprint, idempotencyKey: "agent:clone:001" }); const cloneDefinition = clone.definition; assert.ok(cloneDefinition);
+    assert.notEqual(cloneDefinition.definitionId, created.definition.definitionId); assert.equal(cloneDefinition.sourceLineage?.versionId, v2.versionId); assert.equal(service.get("actor:one", cloneDefinition.definitionId).lifecycle.status, "draft");
+    const evidence = service.test("actor:one", created.definition.definitionId, { versionId: v2.versionId, fingerprint: v2.fingerprint, fixtureRef: "fixture:market-observation:v1" });
+    assert.equal(evidence.adapter, "DETERMINISTIC_TEST_ADAPTER"); assert.equal(service.evidence("actor:one", created.definition.definitionId, v2.versionId).length, 1);
+    assert.throws(() => service.test("actor:one", created.definition.definitionId, { versionId: v2.versionId, fingerprint: v2.fingerprint, fixtureRef: "https://injected.invalid" }), /FIXTURE_REF_UNREGISTERED/);
+    service.transition("actor:one", created.definition.definitionId, { versionId: v2.versionId, fingerprint: v2.fingerprint, action: "archive" });
+    assert.equal(service.get("actor:one", created.definition.definitionId).lifecycle.status, "archived");
+  } finally { db.close(); rmSync(folder, { recursive: true, force: true }); }
+});

@@ -27,5 +27,17 @@ export type AgentVersion = z.infer<typeof AgentVersionSchema>;
 
 export const AgentDefinitionSchema = z.object({
   definitionId: z.string().min(1), category: AgentCategorySchema, createdByActorId: z.string().min(1), createdAt: z.string().datetime(),
+  sourceLineage: z.object({ definitionId: z.string().min(1), versionId: z.string().min(1), fingerprint: z.string().regex(/^sha256:[a-f0-9]{64}$/) }).strict().optional(),
 }).strict();
 export type AgentDefinition = z.infer<typeof AgentDefinitionSchema>;
+
+export const AgentLifecycleStatusSchema = z.enum(["draft", "validated", "published", "archived"]);
+export type AgentLifecycleStatus = z.infer<typeof AgentLifecycleStatusSchema>;
+
+export const AgentTestEvidenceSchema = z.object({
+  testRunId: z.string().min(1), agentVersionId: z.string().min(1), fingerprint: z.string().regex(/^sha256:[a-f0-9]{64}$/), fixtureRef: z.string().min(1),
+  adapter: z.literal("DETERMINISTIC_TEST_ADAPTER"), status: z.enum(["succeeded", "failed"]), inputSummary: z.string().max(1_000), outputSummary: z.string().max(1_000),
+  schemaValid: z.boolean(), durationMs: z.number().int().nonnegative(), usage: z.object({ calls: z.number().int().nonnegative(), tokens: z.number().int().nonnegative() }).strict(),
+  errorCode: z.string().min(1).optional(), createdByActorId: z.string().min(1), createdAt: z.string().datetime(), runtimeApplied: z.literal(false), exchangeWriteAllowed: z.literal(false), paperOnly: z.literal(true),
+}).strict();
+export type AgentTestEvidence = z.infer<typeof AgentTestEvidenceSchema>;
