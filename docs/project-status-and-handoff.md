@@ -2,6 +2,12 @@
 
 ## LOOP-035 F3 部分实现（2026-08-03）
 
+## LOOP-036 F3 continuation 部分实现（2026-08-03）
+
+- F3 仍为 `IN_PROGRESS`。Workbench 现在把澄清/推荐 Turn 写入既有 SQLite append-only Conversation Replay；Apply 后以 append-only Draft reference 关联，并以 GET history 在刷新时恢复真实服务端 Turn、Recommendation 与 Draft。
+- Agent Chrome：英文页面验证了“收益高策略”只出现 3 个澄清问题、没有 Apply/Draft；Agent Center 正常 lifecycle 创建、Validate、Publish 了一个 Input Agent。没有创建 Runtime 或交易副作用。
+- 不得将这部分集成误写为 COMPLETE：Apply 还没有复用既有 Configuration/Pipeline Draft authority，Recommendation 尚未被完整现有 Graph Validator 编译/验证，且未完成要求的负向、重启、中文/英文全链验收。唯一下一入口为 [`LOOP-037`](loop-prompts/loop-037-f3-workbench-authority-continuation-v1.md)。
+
 - F3 为 `IN_PROGRESS`，不可标记完成。已新增严格结构化 Intent/Recommendation/Draft 合同、Published Catalog-only deterministic adapter、immutable SQLite 记录和与 Sample 隔离的 `REAL SERVER` Web 面。
 - `npm run check`、`npm run test:ts`（exit 0）和 `npm run build:web` 已通过；尚未作 Agent Chrome 验收。
 - 必须在 LOOP-036 把新路径折入既有 append-only Conversation、Configuration/Pipeline Draft 和 Graph Validator authority，并完成完整负向验收和重启恢复。禁止 Preflight、Backtest、Runtime、部署或交易副作用。

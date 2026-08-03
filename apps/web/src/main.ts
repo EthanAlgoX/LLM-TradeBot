@@ -2308,6 +2308,17 @@ function bindEvents(): void {
   };
   const loadRealAgents = async () => { state.realAgents = await agentRequest(`/api/orchestration/agents?category=${state.agentCenterCategory}`) as AppState["realAgents"]; render(); };
   const loadRealConnections = async () => { state.realConnections = await agentRequest("/api/orchestration/connections") as AppState["realConnections"]; render(); };
+  const loadRealWorkbench = async () => {
+    const history = await agentRequest("/api/orchestration/workbench/conversations/workbench.default") as Array<{ intent: unknown; recommendation?: unknown; draft?: unknown }>;
+    state.realWorkbenchTurns = history.map((entry) => ({
+      message: (entry.intent as { market?: string; horizon?: string; objective?: string; riskPreference?: string }).market
+        ? `${(entry.intent as { market?: string }).market} · ${(entry.intent as { horizon?: string }).horizon} · ${(entry.intent as { objective?: string }).objective} · ${(entry.intent as { riskPreference?: string }).riskPreference}`
+        : "Strategy requirements",
+      result: entry.recommendation ? { kind: "recommendation", intent: entry.intent, recommendation: entry.recommendation } : { kind: "clarification", intent: entry.intent, clarificationQuestions: [] },
+      ...(entry.draft ? { draft: entry.draft } : {}),
+    }));
+    render();
+  };
   const key = () => `agent:${crypto.randomUUID()}`;
   const selectRealAgent = async (definitionId: string) => { const selected = await agentRequest(`/api/orchestration/agents/${encodeURIComponent(definitionId)}`) as AppState["selectedRealAgent"]; const history = await agentRequest(`/api/orchestration/agents/${encodeURIComponent(definitionId)}/versions?limit=20`) as AppState["agentVersions"]; state.selectedRealAgent = selected; state.agentVersions = history; render(); };
   document.querySelector<HTMLInputElement>("[data-agent-token]")?.addEventListener("input", (event) => { state.agentCenterToken = (event.currentTarget as HTMLInputElement).value; });
@@ -2341,6 +2352,7 @@ function bindEvents(): void {
           .then((response) => response.json()).then((body: { data?: AppState["realAgents"] }) => { if (body.data) { state.realAgents = body.data; render(); } }).catch(() => undefined);
       }
       if (state.view === "connections" && state.agentCenterToken) void loadRealConnections().catch(() => undefined);
+      if (state.view === "orchestration" && state.agentCenterToken) void loadRealWorkbench().catch(() => undefined);
       window.scrollTo({ top: 0, behavior: "smooth" });
     });
   });
@@ -2827,6 +2839,23 @@ if (state.view === "connections" && state.agentCenterToken) {
     .then((body: { data?: AppState["realConnections"] }) => {
       if (!body.data) return;
       state.realConnections = body.data;
+      render();
+    })
+    .catch(() => undefined);
+}
+
+if (state.view === "orchestration" && state.agentCenterToken) {
+  void fetch(`${sessionConfiguration.apiBase}/api/orchestration/workbench/conversations/workbench.default`, {
+    headers: { authorization: `Bearer ${state.agentCenterToken}` },
+  })
+    .then((response) => response.json())
+    .then((body: { data?: Array<{ intent: unknown; recommendation?: unknown; draft?: unknown }> }) => {
+      if (!body.data) return;
+      state.realWorkbenchTurns = body.data.map((entry) => ({
+        message: "Recovered server-authoritative turn",
+        result: entry.recommendation ? { kind: "recommendation", intent: entry.intent, recommendation: entry.recommendation } : { kind: "clarification", intent: entry.intent, clarificationQuestions: [] },
+        ...(entry.draft ? { draft: entry.draft } : {}),
+      }));
       render();
     })
     .catch(() => undefined);

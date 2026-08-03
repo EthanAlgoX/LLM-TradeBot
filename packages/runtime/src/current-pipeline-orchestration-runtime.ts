@@ -313,7 +313,6 @@ export function createCurrentPipelineOrchestrationRuntime(
   ]);
   const agentDefinitionService = new AgentDefinitionService(new SqliteAgentDefinitionRepository(database));
   const connectionService = new ConnectionService(new SqliteConnectionRepository(database));
-  const strategyWorkbenchService = new StrategyWorkbenchService(database, agentDefinitionService);
   const evidenceRepository = new SqlitePipelineEvidenceRepository(database);
   if (options.evidenceExecutor && options.historicalRunners) {
     throw new Error(
@@ -359,6 +358,11 @@ export function createCurrentPipelineOrchestrationRuntime(
     );
   const conversationReplayRepository =
     new SqliteConversationReplayRepository(database);
+  const strategyWorkbenchService = new StrategyWorkbenchService(
+    database,
+    agentDefinitionService,
+    conversationReplayRepository,
+  );
   const dataCenterHttpHandler = new DataCenterHttpHandler(
     [...registry.dataSources.values()],
     [...registry.capabilities.values()],
