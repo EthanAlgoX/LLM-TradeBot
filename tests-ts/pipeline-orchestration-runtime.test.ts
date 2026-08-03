@@ -167,6 +167,44 @@ test("HTTP API exposes controlled catalog, draft, validation, and compile routes
   database.close();
 });
 
+test("local Paper identity ignores a stale pre-versioned cookie after reload", async () => {
+  const database = new DatabaseSync(":memory:");
+  const fixture = runtimeFixture(database);
+  const server = createPipelineOrchestrationHttpServer({
+    ...fixture,
+    localIdentityToken: operatorToken,
+  });
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const address = server.address();
+  assert.ok(address && typeof address === "object");
+  const baseUrl = `http://127.0.0.1:${address.port}`;
+
+  const handoff = await fetch(`${baseUrl}/api/orchestration/local-identity`, {
+    method: "POST",
+    headers: { origin: "http://127.0.0.1:5174" },
+  });
+  assert.equal(handoff.status, 204);
+  assert.match(
+    handoff.headers.get("set-cookie") ?? "",
+    /^tradebot_local_operator_v2=/u,
+  );
+
+  const session = await fetch(`${baseUrl}/api/orchestration/session`, {
+    headers: {
+      cookie:
+        "tradebot_local_operator=stale; tradebot_local_operator_v2=test-operator-token",
+    },
+  });
+  assert.equal(session.status, 200);
+  const body = (await session.json()) as { data: { actor: { actorId: string } } };
+  assert.equal(body.data.actor.actorId, "test:operator");
+
+  server.close();
+  await once(server, "close");
+  database.close();
+});
+
 test("HTTP API rejects unsupported mutation routes and oversized bodies", async () => {
   const database = new DatabaseSync(":memory:");
   const fixture = runtimeFixture(database);

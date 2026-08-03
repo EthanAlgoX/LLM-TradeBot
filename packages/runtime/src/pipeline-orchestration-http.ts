@@ -301,7 +301,12 @@ function cookieValue(cookie: string | undefined, name: string): string | undefin
   return cookie.split(";").map((part) => part.trim()).find((part) => part.startsWith(`${name}=`))?.slice(name.length + 1);
 }
 
-const localIdentityCookie = "tradebot_local_operator";
+// Version the cookie name when changing the loopback handoff. Older local
+// workspaces may retain a same-name domain cookie alongside a host-only one;
+// accepting that stale value would make the otherwise persistent operator
+// appear as a different actor after reload. This remains the one existing
+// local Paper credential, not a second identity mechanism.
+const localIdentityCookie = "tradebot_local_operator_v2";
 
 function localIdentityCookieHeader(token: string): string {
   return `${localIdentityCookie}=${encodeURIComponent(token)}; HttpOnly; SameSite=Strict; Path=/api/orchestration; Max-Age=86400`;

@@ -1,5 +1,11 @@
 # TradeBot 当前状态与接手说明
 
+## LOOP-041 F3 restart recovery continuation（2026-08-03）
+
+- F3 仍为 `IN_PROGRESS`。真实 Chrome 经正常 Agent Center lifecycle 发布了 Analysis、Decision、Reflection（Input 已发布），并完成中文澄清、Published Catalog `VALIDATED_RECOMMENDATION`、Apply 到 `NOT_VALIDATED` Configuration Draft 与中文修改；全程保持 `runtimeApplied=false`、Paper Only、`exchangeWriteAllowed=false`。
+- Chrome reload 与 `npm run dev:paper` Web/API restart 后仍复现恢复失败：本地 Paper SQLite 中 `local:operator` 的 Agent/Workbench 事实存在，但页面只剩既有 Input Agent 与空 Workbench。Console error 为 0，Network capability 不可用。没有读取或暴露 HttpOnly cookie/token。
+- 已将现有 loopback HttpOnly cookie 名迁移至 v2，以隔离潜在的遗留同名 cookie，并新增 stale-cookie 回归测试；该测试通过，但不能替代 Chrome recovery。唯一下一入口为 [`LOOP-042`](loop-prompts/loop-042-f3-workbench-browser-recovery-diagnosis-v1.md)。
+
 ## LOOP-038 F3 final continuation（2026-08-03）
 
 - F3 仍为 `IN_PROGRESS`。Recommendation 现持久化 provider/model-connection/adapter/catalog snapshot/generated-at/fallback provenance；新增 actor/scope-bound conversations/turns cursor APIs，并以自动化覆盖 actor 隔离、非法 cursor、unsafe input、Apply 严格合同和 SQLite restart authority recovery。
