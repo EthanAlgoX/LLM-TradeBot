@@ -117,6 +117,7 @@ test("an explicit CSV Historical preset wins over overlapping Current Crypto ali
     assert.equal(response.context.selected.draftReference?.versionId.endsWith(":version:1"), true);
     assert.equal(response.runtimeApplied, false);
   } finally {
+    await runtime.close();
     database.close();
   }
 });
@@ -365,6 +366,7 @@ test("registered Crypto preset creates persistent Configuration and Pipeline Dra
       "strategy",
     );
   } finally {
+    await runtime.close();
     database.close();
   }
 });
@@ -383,6 +385,7 @@ test("tool activity is bounded, strict, correlated, and omits raw arguments and 
     assert.equal(ToolActivityListSchema.safeParse([...activity, ...activity, ...activity, ...activity, ...activity]).success, false);
     assert.equal(ToolActivityListSchema.safeParse([{ ...activity[0]!, output: { secret: "never" } }]).success, false);
   } finally {
+    await runtime.close();
     database.close();
   }
 });
@@ -418,6 +421,7 @@ test("daily-only source rejects a 5m Trigger observation without creating a vers
     assert.match(response.assistantMessage, /不能反向生成 5m/u);
     assert.equal(response.runtimeApplied, false);
   } finally {
+    await runtime.close();
     database.close();
   }
 });
@@ -492,6 +496,7 @@ test("allowed Agent field update creates a new immutable version and field Diff"
       );
     assert.equal(versions.length, 2);
   } finally {
+    await runtime.close();
     database.close();
   }
 });
@@ -536,6 +541,7 @@ test("forbidden Agent field and stale parent fingerprint fail closed", async () 
         error.code === "COPILOT_CONVERSATION_DRAFT_REFERENCE_CONFLICT",
     );
   } finally {
+    await runtime.close();
     database.close();
   }
 });
@@ -558,6 +564,7 @@ test("idempotency replay does not create another Draft Version", async () => {
       );
     assert.equal(versions.length, 1);
   } finally {
+    await runtime.close();
     database.close();
   }
 });
@@ -603,6 +610,8 @@ test("Conversation idempotency survives service restart and rejects key reuse wi
         error instanceof OrchestrationCopilotError &&
         error.code === "COPILOT_IDEMPOTENCY_CONFLICT",
     );
+    await firstRuntime.close();
+    await restartedRuntime.close();
   } finally {
     database.close();
   }
@@ -643,6 +652,7 @@ test("unregistered Tool, Preset, Market, Data Source, and Agent are rejected", a
       assert.equal(response.runtimeApplied, false);
     }
   } finally {
+    await runtime.close();
     database.close();
   }
 });
@@ -676,6 +686,7 @@ test("Human Approval is blocked until Backtest and Walk-Forward pass", async () 
     );
     assert.equal(response.runtimeApplied, false);
   } finally {
+    await runtime.close();
     database.close();
   }
 });
@@ -698,6 +709,7 @@ test("Copilot rejects secrets before compiling intent", async () => {
         error.code === "COPILOT_SENSITIVE_CONTENT_REJECTED",
     );
   } finally {
+    await runtime.close();
     database.close();
   }
 });
@@ -830,7 +842,10 @@ test("conversation authority requires the complete server draft reference before
     assert.equal(restored.context.selected.draftReference?.draftId, authoritative.draftId);
     const clean = await runtime.orchestrationCopilotService.handle({ ...currentCommand, conversationId: "conversation.test.clean", idempotencyKey: "idempotency.test.authority.clean", draftReference: authoritative }, actor);
     assert.notEqual(clean.context.selected.draftReference?.draftId, authoritative.draftId);
-  } finally { database.close(); }
+  } finally {
+    await runtime.close();
+    database.close();
+  }
 });
 
 test("SQLite conversation replay pagination is SQL-bounded, stable, actor-isolated, and fail-closed", async () => {
@@ -858,7 +873,10 @@ test("SQLite conversation replay pagination is SQL-bounded, stable, actor-isolat
     database.prepare("INSERT INTO orchestration_conversation_replays (actor_id, conversation_id, idempotency_key, command_json, response_json, created_at) VALUES (?, ?, ?, ?, ?, ?)").run(actor.actorId, "conversation.test.corrupt", "idempotency.test.corrupt", "{}", "{}", new Date().toISOString());
     assert.throws(() => repository.getConversation(actor.actorId, "conversation.test.corrupt"), (error: unknown) => error instanceof ConversationReplayReadError && error.code === "CORRUPT_CONVERSATION_REPLAY");
     assert.throws(() => database.prepare("DELETE FROM orchestration_conversation_replays WHERE conversation_id = ?").run("conversation.test.corrupt"));
-  } finally { database.close(); }
+  } finally {
+    await runtime.close();
+    database.close();
+  }
 });
 
 test("SQLite conversation history and its authoritative Draft reference survive runtime restart", async () => {
