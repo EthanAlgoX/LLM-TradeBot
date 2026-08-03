@@ -105,3 +105,26 @@ test("catalog retains the newest Published version when a later version is not p
     assert.equal(catalog[0]?.lifecycle.status, "published");
   } finally { await runtime.close(); }
 });
+
+test("all four Published Catalog kinds, fingerprints, actor-bound cursors, and order recover across runtime restart", async () => {
+  const directory = mkdtempSync(join(tmpdir(), "tradebot-catalog-recovery-"));
+  const databasePath = join(directory, "catalog.sqlite");
+  let runtime = createCurrentPipelineOrchestrationRuntime({ databasePath });
+  try {
+    publishCatalog(runtime, "actor:catalog-recovery");
+    const first = runtime.agentDefinitionService.catalog("actor:catalog-recovery");
+    assert.deepEqual([...first.map((item) => item.definition.category)].sort(), ["analysis", "decision", "input", "reflection"]);
+    const facts = first.map((item) => ({ definitionId: item.definition.definitionId, versionId: item.version.versionId, fingerprint: item.version.fingerprint, status: item.lifecycle.status }));
+    assert.ok(facts.every((item) => item.status === "published"));
+    const page = runtime.agentDefinitionService.list("actor:catalog-recovery", undefined, 1);
+    assert.ok(page.nextCursor);
+    assert.throws(() => runtime.agentDefinitionService.list("actor:other", undefined, 1, page.nextCursor), /CURSOR_INVALID/);
+    await runtime.close();
+    runtime = createCurrentPipelineOrchestrationRuntime({ databasePath });
+    assert.deepEqual(runtime.agentDefinitionService.catalog("actor:catalog-recovery").map((item) => ({ definitionId: item.definition.definitionId, versionId: item.version.versionId, fingerprint: item.version.fingerprint, status: item.lifecycle.status })), facts);
+    assert.deepEqual(runtime.agentDefinitionService.catalog("actor:other"), []);
+  } finally {
+    await runtime.close();
+    rmSync(directory, { recursive: true, force: true });
+  }
+});

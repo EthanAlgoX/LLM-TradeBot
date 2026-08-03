@@ -17,7 +17,7 @@ test("Operator session configuration prioritizes runtime injection", () => {
   );
 });
 
-test("Operator session configuration uses the Vite credential only in development", () => {
+test("Operator session configuration never exposes a Vite credential to the bundle", () => {
   assert.deepEqual(
     resolveOrchestrationSessionConfiguration({
       viteEnvironment: {
@@ -26,7 +26,7 @@ test("Operator session configuration uses the Vite credential only in developmen
         VITE_TRADEBOT_ORCHESTRATION_TOKEN: "vite-token",
       },
     }),
-    { apiBase: "http://vite.test", token: "vite-token" },
+    { apiBase: "http://vite.test", token: undefined },
   );
   assert.deepEqual(
     resolveOrchestrationSessionConfiguration({

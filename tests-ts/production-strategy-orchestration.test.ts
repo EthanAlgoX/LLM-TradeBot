@@ -174,7 +174,7 @@ test("production composition mounts Configuration Draft API and fails closed for
   }
 });
 
-test("production composition registers durable Graph Evidence dependencies in the same SQLite boundary", () => {
+test("production composition registers durable Graph Evidence dependencies in the same SQLite boundary", async () => {
   const database = new DatabaseSync(":memory:");
   const createdAt = "2026-07-26T12:00:00.000Z";
   const fingerprint = (id: string) => graphEvidenceFingerprint({ id });
@@ -268,6 +268,7 @@ test("production composition registers durable Graph Evidence dependencies in th
     );
     assert.equal(production.workspaceCatalog.runtimeApplied, false);
   } finally {
+    await runtime.close();
     database.close();
   }
 });

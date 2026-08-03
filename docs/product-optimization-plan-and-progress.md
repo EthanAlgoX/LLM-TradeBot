@@ -1,6 +1,6 @@
 # TradeBot 产品优化规划与进度
 
-> 2026-08-03：LOOP-043 F3 仍为 `IN_PROGRESS`。同一 `local:operator` 的 Workbench、Draft 与 legacy history 已可跨 reload/restart 恢复，且 legacy provenance-free Recommendation 只读不可 Apply；但最新 Chrome 只恢复 Input Agent，Analysis/Decision/Reflection Published Catalog 缺失。聚焦 Copilot 测试自然完成 21/21，全量测试执行到 243 个通过子测试后仍未自然输出最终 TAP 汇总。下一步为 LOOP-044；保持 `runtimeApplied=false`、Paper Only、`exchangeWriteAllowed=false`。
+> 2026-08-03：LOOP-044 F3 仍为 `IN_PROGRESS`。修复 Agent Center 分类切换未请求服务端 Catalog 的 hydration 缺陷；同一 `local:operator` 经受控 `dev:paper` 重启后，真实 Chrome 已恢复 Input、Analysis、Decision、Reflection Published entries。补齐 runtime 生命周期释放后，`npm run test:ts` 自然打印 `376/376` TAP 汇总并退出 0。中文已验证澄清、Published provenance/DAG、锁定 Portfolio → Risk Gate → Paper Execution 链与 legacy `PROVENANCE_UNAVAILABLE` 只读边界；完整 Apply→修改→reload/restart 和英文窄屏/focus/快速切换仍须由 LOOP-045 收尾。保持 `runtimeApplied=false`、Paper Only、`exchangeWriteAllowed=false`。
 
 > 2026-08-03：LOOP-032 已完成 F1 Agent Center V1：SQLite append-only 生命周期、服务端 Diff、Catalog、Clone lineage、Archive 和受限 deterministic 测试台均以 Bearer actor/精确版本 authority 持久化；不触发 Runtime 或交易写入。
 

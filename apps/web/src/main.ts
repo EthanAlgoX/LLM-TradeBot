@@ -2491,6 +2491,7 @@ function bindEvents(): void {
       state.agentCenterSearch = "";
       state.selectedRealAgent = undefined; state.agentVersions = [];
       render();
+      void loadRealAgents().catch(() => undefined);
     });
   });
 

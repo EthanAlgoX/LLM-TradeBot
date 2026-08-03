@@ -59,7 +59,7 @@ test("strict intent contract expresses single, multi-window and event-only reque
   );
 });
 
-test("registered Crypto intent compiles to an authoritative validated Draft without runtime mutation", () => {
+test("registered Crypto intent compiles to an authoritative validated Draft without runtime mutation", async () => {
   const { database, runtime } = fixture();
   try {
     const result = runtime.intentDraftService.createDraft(currentIntent);
@@ -84,11 +84,12 @@ test("registered Crypto intent compiles to an authoritative validated Draft with
     assert.ok(result.draft.graph.nodes.some((node) => node.nodeId === "execution"));
     assert.ok(result.draft.graph.nodes.some((node) => node.nodeId === "reflection"));
   } finally {
+    await runtime.close();
     database.close();
   }
 });
 
-test("registered CSV Historical preset creates an exact-set validated draft without runtime mutation", () => {
+test("registered CSV Historical preset creates an exact-set validated draft without runtime mutation", async () => {
   const { database, runtime } = fixture();
   try {
     const result = runtime.intentDraftService.createDraft({
@@ -107,11 +108,12 @@ test("registered CSV Historical preset creates an exact-set validated draft with
       (error) => error instanceof OrchestrationIntentError && error.code === "DATA_SOURCE_SET_NOT_SUPPORTED_BY_GRAPH",
     );
   } finally {
+    await runtime.close();
     database.close();
   }
 });
 
-test("capability-gated daily and event presets remain expressible but fail closed", () => {
+test("capability-gated daily and event presets remain expressible but fail closed", async () => {
   const { database, runtime } = fixture();
   try {
     for (const request of [
@@ -138,11 +140,12 @@ test("capability-gated daily and event presets remain expressible but fail close
       );
     }
   } finally {
+    await runtime.close();
     database.close();
   }
 });
 
-test("compiler rejects inaccurate windows, unknown Agents and injected implementation fields", () => {
+test("compiler rejects inaccurate windows, unknown Agents and injected implementation fields", async () => {
   const { database, runtime } = fixture();
   try {
     assert.throws(
@@ -176,6 +179,7 @@ test("compiler rejects inaccurate windows, unknown Agents and injected implement
         error.code === "INVALID_ORCHESTRATION_INTENT",
     );
   } finally {
+    await runtime.close();
     database.close();
   }
 });

@@ -1,5 +1,12 @@
 # TradeBot 当前状态与接手说明
 
+## LOOP-044 F3 catalog recovery and test closeout（2026-08-03）
+
+- F3 保持 `IN_PROGRESS`。根因一是测试创建 runtime 后只关闭 SQLite、未关闭已启动的 multi-Paper supervisor；已在精确测试所有权边界 `await runtime.close()`，`npm run test:ts` 现自然输出 `1..376`、376/376 PASS、exit 0。另修正 HttpOnly 身份测试，确保 Vite token 从不进入 bundle。
+- 根因二是 Agent Center 切换分类只重绘页面、未请求相应 actor/category Catalog。切换后现调用既有 `loadRealAgents()`；受控 `dev:paper` Web/API restart 后，真实 Chrome 已确认同一 actor 的 Input、Analysis、Decision、Reflection Published entries 均恢复。自动化覆盖四类 Published version/fingerprint、actor-bound cursor、另一 actor 隔离和 SQLite/runtime restart 稳定顺序。
+- Chrome 中文确认：不完整请求只返回澄清问题；已恢复的 Recommendation 显示 Published version provenance 和分支/汇合 DAG；Portfolio → Risk Gate → Paper Execution 为 system locked，legacy provenance-free history 显示 `PROVENANCE_UNAVAILABLE` 且无 Apply。保持 `runtimeApplied=false`、Paper Only、`exchangeWriteAllowed=false`，未执行 Preflight、Backtest、Runtime 或交易所写入。
+- 尚未完成完整新鲜的 Apply → immutable Draft → modification 新版本 → reload/restart Chrome 路径，以及英文 820×760 overflow/focus/rapid-switch 和最终 Console/Network 证据。唯一下一入口为 [`LOOP-045`](loop-prompts/loop-045-f3-final-chrome-continuation-v1.md)。
+
 ## LOOP-043 F3 recovery verification continuation（2026-08-03）
 
 - F3 仍为 `IN_PROGRESS`。同一 local Paper actor 的 Workbench、Draft 与 legacy history 已可在 Chrome reload 和受控 `dev:paper` restart 后恢复；legacy no-provenance Recommendation 明确显示 `PROVENANCE_UNAVAILABLE` 且不可 Apply。安全状态保持 `runtimeApplied=false`、Paper Only、`exchangeWriteAllowed=false`。
