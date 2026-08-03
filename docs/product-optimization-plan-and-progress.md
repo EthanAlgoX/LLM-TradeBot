@@ -2,7 +2,7 @@
 
 > 2026-08-03：LOOP-032 已完成 F1 Agent Center V1：SQLite append-only 生命周期、服务端 Diff、Catalog、Clone lineage、Archive 和受限 deterministic 测试台均以 Bearer actor/精确版本 authority 持久化；不触发 Runtime 或交易写入。
 
-> 2026-08-03：F2 Connections V1 已开始实现。连接仅能由服务端注册表物化为 actor-scoped immutable Definition/Version；Web 不再提供浏览器内存配置或 Secret 表单，只展示健康、能力、影响范围和 Secret reference 状态。保持 `runtimeApplied=false`、Paper Only、`exchangeWriteAllowed=false`。
+> 2026-08-03：F2 Connections V1 已 `COMPLETE`。连接由服务端注册表物化为 actor-scoped immutable Definition/Version；Web 只展示健康、能力、影响范围和 Secret reference 状态。下一步 LOOP-035 进入 F3 结构化动态 DAG，保持 `runtimeApplied=false`、Paper Only、`exchangeWriteAllowed=false`。
 
 > 2026-08-03：LOOP-029 已完成预览后的功能化路线整理。后续固定按“Agent 中心版本基础 → 连接能力完善 → LLM 编排推荐 → 预上线与回测 → 最多三个真实模拟实例”逐步接入，M6 Live 继续暂停。
 
@@ -714,19 +714,19 @@ LOOP-030/031 已完成真实版本合同、Repository/API、Input/Analysis v1→
 
 ### F2：连接配置 V1——数据与模型能力
 
-状态：`PLANNED`
+状态：`COMPLETE`（LOOP-033/034）
 
-- [ ] 数据连接显示 Provider、Market、Capability、Schema、Observation Window、历史覆盖、实时性、质量与 Dataset Snapshot；
-- [ ] 模型连接显示 Provider、Model、Base URL 类型、JSON/Tool 能力、上下文窗口、限流、成本预算和健康状态；
-- [ ] Secret 只在后端安全存储或引用，任何 GET、日志、浏览器 Storage、Artifact 和 Prompt 都不得返回 Secret value；
-- [ ] 提供连接测试、能力探测、禁用和影响范围，已被 Agent Version 引用的连接不能静默删除；
-- [ ] Agent 中心选择的是 Connection/Dataset 的稳定 ID 与版本，不复制凭证或自由 URL。
+- [x] 数据连接显示 Provider、Market、Capability、Schema、Observation Window、历史覆盖、实时性、质量与 Dataset Snapshot；
+- [x] 模型连接显示 Provider、Model、Base URL 类型、JSON/Tool 能力、上下文窗口、限流、成本预算和健康状态；
+- [x] Secret 只在后端安全存储或引用，任何 GET、日志、浏览器 Storage、Artifact 和 Prompt 都不得返回 Secret value；
+- [x] 提供连接测试、能力探测、禁用和影响范围，已被 Agent Version 引用的连接不能静默删除；
+- [x] Agent 中心选择的是 Connection/Dataset 的稳定 ID 与版本，不复制凭证或自由 URL。
 
 依赖：复用 M2 Data Asset/Capability 事实和现有 Model Provider 配置；不建立第二套 Dataset 或 Secret 模型。浏览器要求：实现后必需。
 
 ### F3：编排工作台 V2——真实 LLM 推荐动态 DAG
 
-状态：`PLANNED`
+状态：`PLANNED / NEXT`（LOOP-035）
 
 - [ ] 用户自然语言先产生结构化 Strategy Intent；需求不完整时只返回澄清问题，不强行编排；
 - [ ] LLM 通过注册 Tool/Structured Output 返回说明、`nodes`、`edges`、假设、缺口和推荐理由，不返回 HTML；

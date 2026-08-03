@@ -19,7 +19,7 @@ TradeBot 已从固定 Crypto Paper Pipeline 扩展出真实的 Registry、Capabi
 
 当前不是多市场生产系统，也不是通用 Graph Runtime。生产可运行范围仍是服务端注册的 Current Crypto Paper Binding；M4 已能从已物化 Strategy Version 启动多个隔离的 Paper deployment。Draft、Approval、Lesson Candidate 和 Validation Handoff 均不会自动修改正在运行的 Runtime。
 
-用户已经确认四页、对话内动态 DAG、Agent 中心可配置数据/模型/Prompt/版本的方向。当前从 `AWAITING_USER_PRODUCT_REVIEW` 转为 `FUNCTIONALIZATION_PLANNED`；下一项是 F1 Agent 中心，不进入 M6。
+用户已经确认四页、对话内动态 DAG、Agent 中心可配置数据/模型/Prompt/版本的方向。F1 Agent Center 与 F2 Connections 已完成；下一项是 F3 Workbench V2，不进入 M6。
 
 当前验证基线：
 
@@ -44,7 +44,7 @@ npm run dev:paper   STARTED
 | R1 Four-page Product Preview | `PROTOTYPE_ONLY` | 只保留 Simulation、Workbench、Agent Center、Connections；自然语言推荐与方案库合并，Agent 拆为四类，数据源与模型配置合并 |
 | F1 Agent Center V1 | `COMPLETE` | 真实 immutable Version、服务端 Diff、Validate/Publish/Archive、Published Catalog、Clone lineage 和 `DETERMINISTIC_TEST_ADAPTER` Test Evidence；四类 Agent 同一版本流，不写 Runtime/交易事实 |
 | F2 Connections V1 | `COMPLETE` | actor-scoped immutable Connection Definition/Version、SQLite 重启恢复、Bearer API 与仅展示健康/能力/影响/Secret reference 状态的 Web；Chrome 完整验收已通过，不读取或显示 Secret。 |
-| F3 Workbench V2 | `PLANNED` | LLM Structured Output 推荐已发布 Agent Version 组成的动态 DAG；Apply 只创建 Strategy Draft |
+| F3 Workbench V2 | `PLANNED / NEXT` | LOOP-035：自然语言 Intent/澄清、Structured Output 推荐已发布 Agent Version、服务端动态 DAG 校验；Apply 只创建 immutable Strategy Draft |
 | F4 Preflight / Evidence | `PLANNED` | 复用现有 Validator、Backtest、Walk-Forward、Experiment Evidence 与 stale 规则 |
 | F5 Simulation V2 | `PLANNED` | 四页产品层接回现有 M4；服务端强制最多三个 active Paper Deployment，展示真实 Artifact 对话 |
 | Exchange 写入 | `UNAVAILABLE` | Paper Only，`exchangeWriteAllowed=false`，没有 Binance 或其他交易所写接口 |

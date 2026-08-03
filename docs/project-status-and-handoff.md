@@ -1,5 +1,12 @@
 # TradeBot 当前状态与接手说明
 
+## LOOP-035 F3 编排工作台入口（2026-08-03）
+
+- 下一任务：把浏览器内存 Sample 工作台替换为真实 Strategy Intent/澄清、Published Agent Version 结构化推荐、服务端动态 DAG 校验和 immutable Strategy Draft Apply。
+- 浏览器要求：Prompt 文档生成不需要；实现完成后必须由 Agent 直接操作真实 Chrome，禁止用户手工代验。
+- F3 当前为 `PLANNED / NEXT`；本轮不执行 F4 Preflight/Backtest、F5 Simulation、M6 Live 或任何 Runtime/交易写入。
+- 唯一入口：[`LOOP-035`](loop-prompts/loop-035-f3-workbench-structured-dag-v1.md)。
+
 ## LOOP-034 F2 Connections 收尾完成（2026-08-03）
 
 - F2 `COMPLETE`：修复 Connections 首屏未采用已有 loopback Bearer actor 会话、刷新后没有自动水合的问题；会话只用于受控 API 请求，绝不显示、持久化或作为连接配置接受。
@@ -237,11 +244,11 @@ LOOP-029 只整理规划与进度文档：不修改产品代码、SQLite、浏�
 
 ## 7. 下一阶段
 
-状态为 **F1 IN_PROGRESS / READY_FOR_LOOP-032**：
+状态为 **F2 COMPLETE / READY_FOR_LOOP-035**：
 
-1. 执行 [`LOOP-032`](loop-prompts/loop-032-f1-agent-center-governance-testbench-closeout-v1.md)，补齐 Agent Version Diff、发布治理、克隆/归档、真实受限测试台和测试资源释放；
-2. LOOP-032 实现后必须由 Agent 直接操作真实 Chrome 验证；禁止用静态 DOM、API 或用户手工代替 UI 证据；
-3. F1 继续复用已有 Registry、Dataset 和 Model facts，不得动态上传代码、暴露 Secret 或实现 Runtime Apply；
+1. 执行 [`LOOP-035`](loop-prompts/loop-035-f3-workbench-structured-dag-v1.md)，完成 Strategy Intent/澄清、Published Agent 推荐、动态 DAG Validator 和 immutable Strategy Draft Apply；
+2. LOOP-035 实现后必须由 Agent 直接操作真实 Chrome 验证；禁止用静态 DOM、API 或用户手工代替 UI 证据；
+3. F3 复用 F1 Agent Catalog、F2 Connection facts、现有 Conversation/Draft/Validator，不得建立平行事实模型、暴露 Secret 或实现 Runtime Apply；
 4. 保持 M0～M5 runtime、M5 Shadow、账户和交易所写边界不变；不执行 LOOP-025 / M6。
 
 ### LOOP-021 审计与验证（2026-08-02）
