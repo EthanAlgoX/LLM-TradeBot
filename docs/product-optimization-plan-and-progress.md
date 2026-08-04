@@ -730,22 +730,22 @@ LOOP-030/031 已完成真实版本合同、Repository/API、Input/Analysis v1→
 
 ### F3：编排工作台 V2——真实 LLM 推荐动态 DAG
 
-状态：`IN_PROGRESS`（下一步 LOOP-044）
+状态：`COMPLETE`（LOOP-035～046）
 
-- [ ] 用户自然语言先产生结构化 Strategy Intent；需求不完整时只返回澄清问题，不强行编排；
-- [ ] LLM 通过注册 Tool/Structured Output 返回说明、`nodes`、`edges`、假设、缺口和推荐理由，不返回 HTML；
-- [ ] 所有节点必须引用 F1 已发布的精确 Agent Version，禁止发明 Agent、Prompt、Model、Data Source 或实现；
-- [ ] 支持一对多、多对一、并行分支和汇聚，例如 K 线 → 短/中/长周期，新闻 → 情绪，全部汇入 Decision；
-- [ ] 服务端校验 DAG 无非法环、Artifact Schema 兼容、数据能力可达、必需输入完整、并发/Token/成本有界；
-- [ ] Portfolio、Risk Gate、Paper Execution 是系统补齐并锁定的动作链，LLM 不能删除、绕过或重排；
-- [ ] 前端把结构化结果渲染为当前对话内动态拓扑；窄屏降级为明确的上游/下游列表；
-- [ ] “应用此方案”创建不可变 Strategy Draft 和完整 Agent/Data/Model/Prompt fingerprints，不启动 Runtime。
+- [x] 用户自然语言先产生结构化 Strategy Intent；需求不完整时只返回澄清问题，不强行编排；
+- [x] LLM 通过注册 Tool/Structured Output 返回说明、`nodes`、`edges`、假设、缺口和推荐理由，不返回 HTML；
+- [x] 所有节点必须引用 F1 已发布的精确 Agent Version，禁止发明 Agent、Prompt、Model、Data Source 或实现；
+- [x] 支持一对多、多对一、并行分支和汇聚，例如 K 线 → 短/中/长周期，新闻 → 情绪，全部汇入 Decision；
+- [x] 服务端校验 DAG 无非法环、Artifact Schema 兼容、数据能力可达、必需输入完整、并发/Token/成本有界；
+- [x] Portfolio、Risk Gate、Paper Execution 是系统补齐并锁定的动作链，LLM 不能删除、绕过或重排；
+- [x] 前端把结构化结果渲染为当前对话内动态拓扑；窄屏降级为明确的上游/下游列表；
+- [x] “应用此方案”创建不可变 Strategy Draft 和完整 Agent/Data/Model/Prompt fingerprints，不启动 Runtime；同一 Draft 修改追加精确 parent lineage 的 immutable v2。
 
 依赖：F1 Agent Version Catalog；模型能力来自 F2。浏览器要求：实现后必需。
 
 ### F4：预上线检查与历史验证
 
-状态：`PLANNED`
+状态：`PLANNED / NEXT`（LOOP-047）
 
 - [ ] Preflight 检查 Agent/Graph/Data/Model/Prompt/Schema/Tool/预算与固定安全链；
 - [ ] 验证失败返回稳定 issue code、具体节点和修复建议，绝不自动降级为可运行；

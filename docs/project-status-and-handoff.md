@@ -1,10 +1,11 @@
 # TradeBot 当前状态与接手说明
 
-## LOOP-045 F3 final Chrome lifecycle continuation（2026-08-03）
+## LOOP-046 F3 Draft revision lineage closeout（2026-08-04）
 
 - F3 `COMPLETE`（LOOP-046）。工作台修改现在复用既有 Configuration Draft authority：完整有效的“最大仓位 5%”修改经 Apply 为同一 Draft 的不可变 `version:2`，带精确 `parentVersionId + parentFingerprint`；v1 继续可读且未改变。未新增 Catalog、identity、Conversation 或 Draft authority。
 - 真实 Agent Chrome 中文验证了新鲜请求的 v1→5% 修改 v2、Published provenance、分支/汇聚 DAG 与锁定 Portfolio → Risk Gate → Paper Execution 链。reload 与两次受控 `npm run dev:paper` Web/API restart 后，同一 HttpOnly actor 恢复四类 Published Catalog、Turns、legacy `PROVENANCE_UNAVAILABLE`（只读、不可 Apply）以及该 Draft 的 v1/v2 references。全程保持 `runtimeApplied=false`、Paper Only、`exchangeWriteAllowed=false`。
 - 英文 820×760：`scrollWidth=clientWidth=820`，composer 键盘焦点 2px；Network capability 为 `TOOL_UNAVAILABLE`。Console 仅有两条 Chrome 扩展 listener channel-closed error，无应用错误。`npm run check`、`npm run test:ts`（376/376）、`npm run build:web` 与 `git diff --check` 均通过。
+- 下一入口为 [`LOOP-047`](loop-prompts/loop-047-f4-preflight-historical-evidence-v1.md)：复用现有 Validator、Strategy Evidence、Backtest、Walk-Forward 与 stale authority 完成 F4。实现后浏览器验收必需且只能由 Agent 操作真实 Chrome；本阶段禁止 Approval、Paper Deployment、Runtime Apply 与交易写入。
 
 ## LOOP-044 F3 catalog recovery and test closeout（2026-08-03）
 
