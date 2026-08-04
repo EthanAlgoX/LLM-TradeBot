@@ -365,6 +365,9 @@ export function createCurrentPipelineOrchestrationRuntime(
     service,
     productionStrategyOrchestration.configurationDraftService,
     validator,
+    productionStrategyOrchestration.strategyEvidenceApprovalService
+      ? { evidence: productionStrategyOrchestration.strategyEvidenceApprovalService, scopes: productionStrategyOrchestration.lessonEvidenceScopes, actor: (actorId) => ({ actorId, displayName: "Workbench operator", roles: ["operator"] }) }
+      : undefined,
   );
   const dataCenterHttpHandler = new DataCenterHttpHandler(
     [...registry.dataSources.values()],

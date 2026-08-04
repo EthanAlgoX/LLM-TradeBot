@@ -2,6 +2,8 @@
 
 > 2026-08-04：F3 `COMPLETE`（LOOP-046）。同一 Workbench Configuration Draft 的有效修改现在追加 immutable v2，保留精确 `parentVersionId + parentFingerprint` 与不变可读的 v1；真实 Chrome 中文、reload、两次受控重启恢复、四类 Published Catalog 和英文 820×760 均通过。下一步 LOOP-047 进入 F4 Preflight/Backtest/Walk-Forward；仍不执行 Approval、Runtime Apply、模拟启动或交易所写入。
 
+> 2026-08-04：F4 `IN_PROGRESS`（LOOP-047）。真实 Workbench Draft 已接入服务器权威 Preflight/Evidence 投影；后续只允许走已有注册 Historical scope，Approval 仍明确留给 F5。
+
 > 2026-08-03：F3 `IN_PROGRESS`。LOOP-045 的真实 Chrome 验证通过中文完整 Recommendation 的 Published provenance、DAG 与锁定安全链，且 reload/受控 `dev:paper` restart 后同 actor 恢复四类 Published Catalog、Turns、legacy `PROVENANCE_UNAVAILABLE` 和 Draft references。英文 820×760 无横向溢出并有可见键盘焦点；Network 为 `TOOL_UNAVAILABLE`。阻塞是有效修改 Apply 后创建新的 Draft `version:1`，没有产生同一 Draft 的 immutable `version:2` parent/reference 关系；下一步 LOOP-046，不进入 F4～F5。
 
 > 2026-08-03：F3 `IN_PROGRESS`。LOOP-044 修复分类切换 Catalog hydration，受控重启后的真实 Chrome 恢复四类 Published Agent；全量 `test:ts` 现自然 TAP 完结 `376/376`。中文已复核澄清、provenance/DAG、锁定安全链和 legacy `PROVENANCE_UNAVAILABLE`；Apply→修改→重启及英文 820×760/focus/stale-response 尚未完成。下一步 LOOP-045 F3 continuation；保持 `runtimeApplied=false`、Paper Only、`exchangeWriteAllowed=false`。

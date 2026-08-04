@@ -8,6 +8,8 @@ import type { PipelineOrchestrationService } from "../../core/src/pipeline-orche
 import type { ConfigurationDraftService } from "../../core/src/configuration-draft-service.js";
 import type { PipelineGraphVersion } from "../../contracts/src/index.js";
 import { CURRENT_CRYPTO_PIPELINE_GRAPH } from "../../core/src/current-crypto-pipeline-graph.js";
+import type { StrategyEvidenceApprovalService } from "../../core/src/strategy-evidence-approval-service.js";
+import type { OrchestrationActor } from "../../contracts/src/index.js";
 
 const hash = (value: unknown) => `sha256:${createHash("sha256").update(JSON.stringify(value)).digest("hex")}`;
 const now = () => new Date().toISOString();
@@ -41,6 +43,7 @@ export class StrategyWorkbenchService {
     private readonly pipelines?: PipelineOrchestrationService,
     private readonly configurations?: ConfigurationDraftService,
     private readonly validateGraph?: (graph: PipelineGraphVersion) => { valid: boolean },
+    private readonly f4Authority?: { evidence: StrategyEvidenceApprovalService; scopes: readonly { datasetId: string; backtestProfileId: string; walkForwardCandidateSetId: string; walkForwardPlanId: string; startAt: string; endAt: string }[]; actor: (actorId: string) => OrchestrationActor },
   ) {
     db.exec(`CREATE TABLE IF NOT EXISTS strategy_workbench_intents (intent_id TEXT PRIMARY KEY, actor_id TEXT NOT NULL, conversation_id TEXT NOT NULL, turn_id TEXT NOT NULL, intent_json TEXT NOT NULL, created_at TEXT NOT NULL, UNIQUE(actor_id, conversation_id, turn_id));
 CREATE TABLE IF NOT EXISTS strategy_workbench_recommendations (recommendation_id TEXT PRIMARY KEY, actor_id TEXT NOT NULL, conversation_id TEXT NOT NULL, intent_id TEXT NOT NULL, request_fingerprint TEXT NOT NULL, recommendation_json TEXT NOT NULL, created_at TEXT NOT NULL, UNIQUE(actor_id, request_fingerprint));
@@ -48,9 +51,43 @@ CREATE TABLE IF NOT EXISTS strategy_workbench_drafts (draft_id TEXT PRIMARY KEY,
 CREATE TABLE IF NOT EXISTS strategy_workbench_draft_references (actor_id TEXT NOT NULL, recommendation_id TEXT NOT NULL, draft_id TEXT NOT NULL, version_id TEXT NOT NULL, draft_json TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY(actor_id, recommendation_id));
 CREATE TABLE IF NOT EXISTS strategy_workbench_turn_replays (actor_id TEXT NOT NULL, idempotency_key TEXT NOT NULL, request_fingerprint TEXT NOT NULL, result_json TEXT NOT NULL, PRIMARY KEY(actor_id, idempotency_key));
 CREATE TABLE IF NOT EXISTS strategy_workbench_apply_replays (actor_id TEXT NOT NULL, idempotency_key TEXT NOT NULL, request_fingerprint TEXT NOT NULL, draft_json TEXT NOT NULL, PRIMARY KEY(actor_id, idempotency_key));
+CREATE TABLE IF NOT EXISTS strategy_workbench_preflights (actor_id TEXT NOT NULL, version_id TEXT NOT NULL, input_fingerprint TEXT NOT NULL, result_json TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY(actor_id, version_id));
 CREATE TRIGGER IF NOT EXISTS strategy_workbench_intents_no_update BEFORE UPDATE ON strategy_workbench_intents BEGIN SELECT RAISE(ABORT, 'WORKBENCH_IMMUTABLE'); END;
 CREATE TRIGGER IF NOT EXISTS strategy_workbench_recommendations_no_update BEFORE UPDATE ON strategy_workbench_recommendations BEGIN SELECT RAISE(ABORT, 'WORKBENCH_IMMUTABLE'); END;
 CREATE TRIGGER IF NOT EXISTS strategy_workbench_drafts_no_update BEFORE UPDATE ON strategy_workbench_drafts BEGIN SELECT RAISE(ABORT, 'WORKBENCH_IMMUTABLE'); END;`);
+  }
+
+  async f4(actorId: string, draftId: string, action?: "preflight" | "backtest" | "walk-forward", idempotencyKey?: string) {
+    if (!this.configurations || !this.pipelines || !this.f4Authority) throw new StrategyWorkbenchError("F4_UNAVAILABLE");
+    if (!/^[a-z0-9][a-z0-9._:@-]{2,239}$/u.test(draftId)) throw new StrategyWorkbenchError("DRAFT_NOT_FOUND");
+    const ref = this.db.prepare("SELECT draft_json FROM strategy_workbench_draft_references WHERE actor_id=? AND draft_id=? ORDER BY created_at DESC LIMIT 1").get(actorId, draftId) as { draft_json: string } | undefined;
+    if (!ref) throw new StrategyWorkbenchError("DRAFT_NOT_FOUND");
+    const draft = StrategyDraftSchema.parse(JSON.parse(ref.draft_json));
+    const config = this.configurations.get(draft.configurationVersionId);
+    const existing = this.db.prepare("SELECT result_json FROM strategy_workbench_preflights WHERE actor_id=? AND version_id=?").get(actorId, config.versionId) as { result_json: string } | undefined;
+    let preflight = existing ? JSON.parse(existing.result_json) as any : undefined;
+    if (action === "preflight") {
+      if (!idempotencyKey || !/^[a-z0-9][a-z0-9._:@-]{7,159}$/u.test(idempotencyKey)) throw new StrategyWorkbenchError("REQUEST_CONTRACT_INVALID");
+      const inputFingerprint = hash({ configuration: config.fingerprint, pipeline: draft.pipelineFingerprint });
+      if (!preflight || preflight.inputFingerprint !== inputFingerprint) {
+        const results = [this.configurations.validate(config.versionId), this.pipelines.validateDraft(draft.pipelineDraftId)];
+        const issues = results.flatMap((result: any) => result.issues).slice(0, 20).map((issue: any) => ({ code: issue.code ?? "PREFLIGHT_VALIDATION_FAILED", nodeId: issue.nodeId, suggestion: issue.message ?? "Repair the referenced contract and retry." }));
+        preflight = { status: issues.length ? "failed" : "passed", issues, inputFingerprint, checkedAt: now() };
+        this.db.prepare("INSERT INTO strategy_workbench_preflights VALUES (?, ?, ?, ?, ?) ON CONFLICT(actor_id, version_id) DO UPDATE SET input_fingerprint=excluded.input_fingerprint,result_json=excluded.result_json,created_at=excluded.created_at").run(actorId, config.versionId, inputFingerprint, JSON.stringify(preflight), preflight.checkedAt);
+      }
+    }
+    const scope = this.f4Authority.scopes[0];
+    let binding = this.f4Authority.evidence.findCurrentForConfiguration(config.versionId);
+    if (action && action !== "preflight") {
+      if (preflight?.status !== "passed") throw new StrategyWorkbenchError("PREFLIGHT_REQUIRED");
+      if (!scope) throw new StrategyWorkbenchError("HISTORICAL_SCOPE_UNAVAILABLE");
+      binding ??= this.f4Authority.evidence.createBinding({ schemaVersion: "1.0.0", strategyConfigurationVersionId: config.versionId, ...scope, idempotencyKey: `f4-binding:${config.versionId}`.slice(0, 160) }, this.f4Authority.actor(actorId));
+      if (!idempotencyKey) throw new StrategyWorkbenchError("REQUEST_CONTRACT_INVALID");
+      binding = action === "backtest" ? await this.f4Authority.evidence.runBacktest(binding.bindingId, { schemaVersion: "1.0.0", idempotencyKey }, this.f4Authority.actor(actorId)) : await this.f4Authority.evidence.runWalkForward(binding.bindingId, { schemaVersion: "1.0.0", idempotencyKey }, this.f4Authority.actor(actorId));
+    }
+    const stale = binding?.lifecycleStatus === "stale";
+    const gates = [{ id: "draft", status: "current" }, { id: "preflight", status: stale ? "stale" : preflight?.status ?? "pending" }, { id: "backtest", status: stale ? "stale" : binding?.backtestJob ? "succeeded" : "locked" }, { id: "walk_forward", status: stale ? "stale" : binding?.walkForwardJob ? "succeeded" : "locked" }, { id: "approval_required", status: stale ? "stale" : binding?.lifecycleStatus === "evidence_ready" ? "approval_required" : "locked" }];
+    return { draft, preflight: preflight ?? { status: "pending", issues: [] }, binding, gates, nextAction: stale ? undefined : !preflight || preflight.status !== "passed" ? "preflight" : !binding?.backtestJob ? "backtest" : !binding?.walkForwardJob ? "walk-forward" : undefined, runtimeApplied: false, paperOnly: true, exchangeWriteAllowed: false };
   }
 
   recommend(actorId: string, input: unknown) {

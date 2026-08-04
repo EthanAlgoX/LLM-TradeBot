@@ -2,6 +2,8 @@
 
 ## LOOP-046 F3 Draft revision lineage closeout（2026-08-04）
 
+- F4 `IN_PROGRESS`（LOOP-047）。在 F3 的真实 Workbench Draft 上加入 actor-scoped F4 状态端点和卡片；Preflight 只调用 Configuration/Pipeline validators，Backtest/Walk-Forward 只调用 `StrategyEvidenceApprovalService` 的登记 scope。没有 Approval、Paper plan、deployment、run、account、order、fill 或 exchange write。
+
 - F3 `COMPLETE`（LOOP-046）。工作台修改现在复用既有 Configuration Draft authority：完整有效的“最大仓位 5%”修改经 Apply 为同一 Draft 的不可变 `version:2`，带精确 `parentVersionId + parentFingerprint`；v1 继续可读且未改变。未新增 Catalog、identity、Conversation 或 Draft authority。
 - 真实 Agent Chrome 中文验证了新鲜请求的 v1→5% 修改 v2、Published provenance、分支/汇聚 DAG 与锁定 Portfolio → Risk Gate → Paper Execution 链。reload 与两次受控 `npm run dev:paper` Web/API restart 后，同一 HttpOnly actor 恢复四类 Published Catalog、Turns、legacy `PROVENANCE_UNAVAILABLE`（只读、不可 Apply）以及该 Draft 的 v1/v2 references。全程保持 `runtimeApplied=false`、Paper Only、`exchangeWriteAllowed=false`。
 - 英文 820×760：`scrollWidth=clientWidth=820`，composer 键盘焦点 2px；Network capability 为 `TOOL_UNAVAILABLE`。Console 仅有两条 Chrome 扩展 listener channel-closed error，无应用错误。`npm run check`、`npm run test:ts`（376/376）、`npm run build:web` 与 `git diff --check` 均通过。

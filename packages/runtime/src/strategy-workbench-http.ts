@@ -8,6 +8,11 @@ export class StrategyWorkbenchHttpHandler {
     try { const actor = this.authenticator.authenticate(request.headers.get("authorization") ?? undefined); const path = new URL(request.url).pathname;
       if (request.method === "POST" && path === "/api/orchestration/workbench/turns") return json({ data: this.service.recommend(actor.actorId, await request.json()) }, 201);
       if (request.method === "POST" && path === "/api/orchestration/workbench/apply") return json({ data: this.service.apply(actor.actorId, await request.json()) }, 201);
+      const f4 = path.match(/^\/api\/orchestration\/workbench\/drafts\/([^/]+)\/f4(?:\/(preflight|backtest|walk-forward))?$/u);
+      if (f4 && (request.method === "GET" || request.method === "POST")) {
+        const body = request.method === "POST" ? await request.json() as { idempotencyKey?: string } : undefined;
+        return json({ data: await this.service.f4(actor.actorId, decodeURIComponent(f4[1]!), f4[2] as "preflight" | "backtest" | "walk-forward" | undefined, body?.idempotencyKey) }, request.method === "POST" ? 201 : 200);
+      }
       if (request.method === "GET" && path === "/api/orchestration/workbench/conversations") return json({ data: this.service.listConversations(actor.actorId, Object.fromEntries(new URL(request.url).searchParams.entries())) });
       const history = path.match(/^\/api\/orchestration\/workbench\/conversations\/([^/]+)$/u);
       if (request.method === "GET" && history) return json({ data: this.service.history(actor.actorId, decodeURIComponent(history[1]!)), runtimeApplied: false, paperOnly: true, exchangeWriteAllowed: false });
