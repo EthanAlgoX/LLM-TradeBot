@@ -1,5 +1,7 @@
 # TradeBot 产品路线图与当前进度
 
+> 2026-08-05：LOOP-049 修复 F4 UI hydration：直达 Workbench 现加载每个 Draft Version 的 F4 projection，错误 Draft 独立显示且不阻塞当前 Draft，F4 API/UI 精确绑定 `versionId`。reload 和受控重启后 loading 消失，自动化 377/377；完整 Evidence UI 链、v1/v2 stale 与双尺寸 Chrome 仍由 LOOP-050 收尾，F4 保持 `IN_PROGRESS`。
+
 > 2026-08-04：F3 `COMPLETE`（LOOP-046）。同一 Workbench Configuration Draft 的有效修改现在追加 immutable v2，保留精确 `parentVersionId + parentFingerprint` 与不变可读的 v1；真实 Chrome 中文、reload、两次受控重启恢复、四类 Published Catalog 和英文 820×760 均通过。下一步 LOOP-047 进入 F4 Preflight/Backtest/Walk-Forward；仍不执行 Approval、Runtime Apply、模拟启动或交易所写入。
 
 > 2026-08-04：F4 `IN_PROGRESS`（LOOP-047）。真实 Workbench Draft 已接入服务器权威 Preflight/Evidence 投影；后续只允许走已有注册 Historical scope，Approval 仍明确留给 F5。
@@ -35,7 +37,7 @@ TradeBot 已从固定 Crypto Paper Pipeline 扩展出真实的 Registry、Capabi
 
 ```text
 npm run check       PASS
-npm run test:ts     PASS (376/376)
+npm run test:ts     PASS (377/377)
 npm run build:web   PASS (31 modules, 70ms)
 git diff --check    PASS
 npm run dev:paper   STARTED
@@ -55,7 +57,7 @@ npm run dev:paper   STARTED
 | F1 Agent Center V1 | `COMPLETE` | 真实 immutable Version、服务端 Diff、Validate/Publish/Archive、Published Catalog、Clone lineage 和 `DETERMINISTIC_TEST_ADAPTER` Test Evidence；四类 Agent 同一版本流，不写 Runtime/交易事实 |
 | F2 Connections V1 | `COMPLETE` | actor-scoped immutable Connection Definition/Version、SQLite 重启恢复、Bearer API 与仅展示健康/能力/影响/Secret reference 状态的 Web；Chrome 完整验收已通过，不读取或显示 Secret。 |
 | F3 Workbench V2 | `COMPLETE` | Intent/澄清、Published Catalog 推荐、动态 DAG、Apply immutable Draft、同一 Draft v1→v2 精确 parent lineage、HttpOnly actor reload/restart recovery 和 Chrome 双语言验收均已完成；始终 Paper Only |
-| F4 Preflight / Evidence | `IN_PROGRESS` | 已接入 actor-scoped F4 projection、注册 CSV Historical graph 与 durable idempotency；LOOP-049 正在收尾 UI hydration 和完整 Preflight → Backtest → Walk-Forward Evidence 链 |
+| F4 Preflight / Evidence | `IN_PROGRESS` | UI hydration、version-targeted projection 和 legacy-error 隔离已修复；LOOP-050 收尾完整 Preflight → Backtest → Walk-Forward、v1/v2 stale 与 Chrome 验收 |
 | F5 Simulation V2 | `PLANNED` | 四页产品层接回现有 M4；服务端强制最多三个 active Paper Deployment，展示真实 Artifact 对话 |
 | Exchange 写入 | `UNAVAILABLE` | Paper Only，`exchangeWriteAllowed=false`，没有 Binance 或其他交易所写接口 |
 | Market/Data/Agent Registry | `REAL` | Market Pack、Data Source Capability、Agent Template、Preset 均由服务端注册；客户端不能上传实现 |

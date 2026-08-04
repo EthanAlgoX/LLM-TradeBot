@@ -71,7 +71,7 @@ CREATE TRIGGER IF NOT EXISTS strategy_workbench_drafts_no_update BEFORE UPDATE O
         return JSON.parse(replay.result_json) as never;
       }
     }
-    const ref = this.db.prepare("SELECT draft_json FROM strategy_workbench_draft_references WHERE actor_id=? AND draft_id=? ORDER BY created_at DESC LIMIT 1").get(actorId, draftId) as { draft_json: string } | undefined;
+    const ref = this.db.prepare("SELECT draft_json FROM strategy_workbench_draft_references WHERE actor_id=? AND version_id=? LIMIT 1").get(actorId, draftId) as { draft_json: string } | undefined;
     if (!ref) throw new StrategyWorkbenchError("DRAFT_NOT_FOUND");
     const draft = StrategyDraftSchema.parse(JSON.parse(ref.draft_json));
     const config = this.configurations.get(draft.configurationVersionId);

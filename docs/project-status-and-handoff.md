@@ -1,5 +1,12 @@
 # TradeBot 当前状态与接手说明
 
+## LOOP-049 F4 UI hydration diagnosis（2026-08-05）
+
+- F4 保持 `IN_PROGRESS`。根因是直达 Workbench 的初始身份流程只加载 Conversation history、没有请求每个 Draft Version 的 F4 projection；单个错误 projection 还会在 `gates.map` 触发渲染异常。
+- 已统一初始与交互 hydration、增加 epoch 隔离和 legacy-error 独立投影，并将 F4 GET/Action 精确绑定 actor 所属 `versionId`；reload 与受控 `dev:paper` restart 后 `F4 loading…` 已消失。
+- 自动化：`npm run check` PASS；`npm run test:ts` 自然 TAP 汇总 377/377 PASS；`npm run build:web` PASS；`git diff --check` PASS。全程 `runtimeApplied=false`、Paper Only、`exchangeWriteAllowed=false`，没有 Approval、Runtime 或交易副作用。
+- 未完成真实 Chrome 的 Preflight → Backtest → Walk-Forward、v1/v2 stale、中文 1440×900、英文 820×760 和最终清空 Console 验收；Network 为 `TOOL_UNAVAILABLE`。下一入口为 [`LOOP-050`](loop-prompts/loop-050-f4-evidence-chain-chrome-closeout-v1.md)，不得进入 F5。
+
 ## LOOP-048 F4 registered fixture continuation（2026-08-04）
 
 - F4 仍为 `IN_PROGRESS`。已复用既有 CSV registered historical graph、Configuration/Pipeline validator 与 `StrategyEvidenceApprovalService`；没有创建新 validator、runner、artifact、evidence、approval 或 runtime authority。

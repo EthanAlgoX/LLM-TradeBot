@@ -1,5 +1,7 @@
 # TradeBot 产品优化规划与进度
 
+> 2026-08-05：LOOP-049 F4 仍为 `IN_PROGRESS`。已修复 Workbench 初始身份路径漏加载 F4 projection、legacy error 在 gate 渲染时抛错，以及 action 未精确绑定 Draft Version 的问题；reload/受控重启后 loading 消失，377/377 自动化通过。真实 Preflight/Backtest/Walk-Forward、v1/v2 stale 和双尺寸 Chrome 交由 LOOP-050，仍禁止 Approval、Runtime 与交易副作用。
+
 > 2026-08-04：LOOP-047 F4 为 `IN_PROGRESS`。Workbench 已增加 actor-scoped F4 投影：只复用既有 Configuration/Pipeline validator 与 Strategy Evidence/registered historical jobs，按 `Draft → Preflight → Backtest → Walk-Forward → Approval required` 返回唯一下一动作；不含 Approval、Paper Plan、Runtime 或交易写入。自动化基础回归已通过；真实 Chrome、完整 F4 fixture 链路和恢复验收仍待完成。
 
 > 2026-08-04：LOOP-048 F4 仍为 `IN_PROGRESS`。已将有历史权威的 Workbench Draft 对齐既有注册 CSV 历史图，并将 Preflight/Backtest/Walk-Forward 请求纳入 actor-scoped durable replay/conflict；遗留 Draft 失败被单独隔离。376/376 自动化通过。Chrome 的当前 F4 UI hydration 仍显示 loading 占位，未进行 Approval、Paper Plan、Runtime 或交易写入；下一步 LOOP-049 只排查这个可见状态阻塞。

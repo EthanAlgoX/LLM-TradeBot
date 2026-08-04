@@ -44,6 +44,7 @@ import {
   resolveOrchestrationSessionConfiguration,
   type OrchestrationViteEnvironment,
 } from "./orchestration-session.js";
+import { hydrateWorkbenchF4Turns } from "./workbench-f4-hydration.js";
 
 type Locale = "zh-CN" | "en";
 type ViewId = "overview" | "advisor" | "strategy-apps" | "strategy-app-detail" | "agent-center" | "trade-center" | "data-center" | "orchestration" | "lab" | "experiment" | "activity" | "connections";
@@ -240,6 +241,7 @@ const sessionConfiguration = resolveOrchestrationSessionConfiguration({
 });
 const localeStorageKey = "tradebot.locale";
 let overlayReturnFocusSelector: string | null = null;
+let realWorkbenchHydrationEpoch = 0;
 
 function initialLocale(): Locale {
   try {
@@ -319,6 +321,29 @@ let runtimeDashboard: RuntimeDashboardSnapshot = {
   controlMode: "normal",
   eventCount: 0,
 };
+
+async function hydrateRealWorkbench(): Promise<void> {
+  const epoch = ++realWorkbenchHydrationEpoch;
+  const response = await fetch(`${sessionConfiguration.apiBase}/api/orchestration/workbench/conversations/workbench.default`, { credentials: "include" });
+  const body = await response.json() as { data?: Array<{ intent: unknown; recommendation?: unknown; draft?: unknown }> };
+  if (!response.ok || !body.data || epoch !== realWorkbenchHydrationEpoch) return;
+  const turns: AppState["realWorkbenchTurns"] = body.data.map((entry) => ({
+    message: (entry.intent as { market?: string; horizon?: string; objective?: string; riskPreference?: string }).market
+      ? `${(entry.intent as { market?: string }).market} · ${(entry.intent as { horizon?: string }).horizon} · ${(entry.intent as { objective?: string }).objective} · ${(entry.intent as { riskPreference?: string }).riskPreference}`
+      : "Strategy requirements",
+    result: entry.recommendation ? { kind: "recommendation", intent: entry.intent, recommendation: entry.recommendation } : { kind: "clarification", intent: entry.intent, clarificationQuestions: [] },
+    ...(entry.draft ? { draft: entry.draft } : {}),
+  }));
+  const hydrated = await hydrateWorkbenchF4Turns(turns.map((turn) => turn.draft ? { ...turn, draft: { draftId: turn.draft.versionId } } : turn), async (draftId) => {
+    const f4Response = await fetch(`${sessionConfiguration.apiBase}/api/orchestration/workbench/drafts/${encodeURIComponent(draftId)}/f4`, { credentials: "include", headers: { "content-type": "application/json" } });
+    const f4Body = await f4Response.json() as { data?: unknown; error?: { code?: string } };
+    if (!f4Response.ok) throw new Error(f4Body.error?.code ?? "F4_UNAVAILABLE");
+    return f4Body.data;
+  });
+  if (epoch !== realWorkbenchHydrationEpoch || state.view !== "orchestration") return;
+  state.realWorkbenchTurns = hydrated.map((turn, index) => ({ ...turn, draft: turns[index]?.draft }));
+  render();
+}
 
 window.addEventListener("tradebot:runtime-context", (event) => {
   runtimeDashboard = (
@@ -1588,7 +1613,7 @@ function renderOrchestration(): string {
       : "PROVENANCE_UNAVAILABLE";
     const assistantBody = clarification
       ? `<p>${tr("还需要以下信息：", "More information is required:")}</p><ul>${result.clarificationQuestions.map((q: string) => `<li>${escapeHtml(q)}</li>`).join("")}</ul>`
-      : `<p>${escapeHtml(recommendation.explanation)}</p><p><small>${provenanceText}</small></p>${topology}<p>runtimeApplied=false · Paper Only · exchangeWriteAllowed=false</p>${turn.draft ? `<section class="workbench-f4"><p><strong>Strategy Draft: ${escapeHtml(turn.draft.draftId)}</strong><br><small>${escapeHtml(turn.draft.versionId)} · ${escapeHtml(turn.draft.fingerprint)}</small></p>${turn.f4 ? `<p>${turn.f4.gates.map((gate: any) => `${escapeHtml(gate.id)}: <strong>${escapeHtml(gate.status)}</strong>`).join(" → ")}</p>${turn.f4.preflight?.issues?.length ? `<p class="paper-unavailable">${turn.f4.preflight.issues.map((issue: any) => escapeHtml(`${issue.code}: ${issue.suggestion}`)).join(" · ")}</p>` : ""}${turn.f4.binding ? `<p><small>${escapeHtml(turn.f4.binding.bindingId)} · ${escapeHtml(turn.f4.binding.datasetRef?.id ?? "")}</small></p>` : ""}${turn.f4.nextAction ? `<button type="button" class="primary-action" data-f4-action="${escapeHtml(turn.f4.nextAction)}" data-f4-draft="${escapeHtml(turn.draft.draftId)}">${escapeHtml(turn.f4.nextAction)}</button>` : ""}` : `<small>F4 loading…</small>`}</section>` : provenance ? `<button type="button" class="primary-action" data-real-apply="${escapeHtml(recommendation.recommendationId)}" data-real-fingerprint="${escapeHtml(recommendation.fingerprint)}">${tr("应用此方案", "Apply this plan")}</button>` : `<p><small>${tr("历史方案缺少当前所需的来源证明，不能应用。", "This historical recommendation lacks required provenance and cannot be applied.")}</small></p>`}`;
+      : `<p>${escapeHtml(recommendation.explanation)}</p><p><small>${provenanceText}</small></p>${topology}<p>runtimeApplied=false · Paper Only · exchangeWriteAllowed=false</p>${turn.draft ? `<section class="workbench-f4"><p><strong>Strategy Draft: ${escapeHtml(turn.draft.draftId)}</strong><br><small>${escapeHtml(turn.draft.versionId)} · ${escapeHtml(turn.draft.fingerprint)}</small></p>${turn.f4 ? (turn.f4.error ? `<p class="paper-unavailable">${escapeHtml(turn.f4.error)}</p>` : `<p>${turn.f4.gates.map((gate: any) => `${escapeHtml(gate.id)}: <strong>${escapeHtml(gate.status)}</strong>`).join(" → ")}</p>${turn.f4.preflight?.issues?.length ? `<p class="paper-unavailable">${turn.f4.preflight.issues.map((issue: any) => escapeHtml(`${issue.code}: ${issue.suggestion}`)).join(" · ")}</p>` : ""}${turn.f4.binding ? `<p><small>${escapeHtml(turn.f4.binding.bindingId)} · ${escapeHtml(turn.f4.binding.datasetRef?.id ?? "")}</small></p>` : ""}${turn.f4.nextAction ? `<button type="button" class="primary-action" data-f4-action="${escapeHtml(turn.f4.nextAction)}" data-f4-draft="${escapeHtml(turn.draft.versionId)}">${escapeHtml(turn.f4.nextAction)}</button>` : ""}`) : `<small>F4 loading…</small>`}</section>` : provenance ? `<button type="button" class="primary-action" data-real-apply="${escapeHtml(recommendation.recommendationId)}" data-real-fingerprint="${escapeHtml(recommendation.fingerprint)}">${tr("应用此方案", "Apply this plan")}</button>` : `<p><small>${tr("历史方案缺少当前所需的来源证明，不能应用。", "This historical recommendation lacks required provenance and cannot be applied.")}</small></p>`}`;
     return `<article class="workbench-message is-user"><div><header><strong>${tr("你", "You")}</strong><time>${index + 1}</time></header><p>${escapeHtml(turn.message)}</p></div><div class="workbench-message__avatar">ME</div></article><article class="workbench-message is-assistant"><div class="workbench-message__avatar">AI</div><div><header><strong>${tr("策略助手", "Strategy Advisor")}</strong><time>${clarification ? "CLARIFICATION" : "VALIDATED_RECOMMENDATION"}</time></header>${assistantBody}</div></article>`;
   }).join("");
   return `<section class="page-intro"><div><span>STRATEGY WORKBENCH · REAL SERVER</span><h1>${tr("编排工作台", "Strategy Workbench")}</h1><p>${tr("真实服务端会话与结构化推荐；旧 Sample 已与此视图隔离。", "Server-authoritative conversation and structured recommendations; legacy samples are isolated from this view.")}</p></div><div class="orchestration-version"><strong>Paper Only</strong><small>runtimeApplied=false · exchangeWriteAllowed=false</small></div></section><section class="workbench-conversation"><header class="workbench-conversation__bar"><div><span></span><strong>${tr("策略助手在线", "Strategy Advisor online")}</strong></div><small>Published Catalog only</small></header><div class="workbench-thread" role="log">${turns || `<article class="workbench-message is-assistant"><div class="workbench-message__avatar">AI</div><div><p>${tr("描述市场、周期、目标和风险偏好。信息不足时我只会提问，不会生成草案。", "Describe market, horizon, objective and risk preference. Insufficient details produce clarification only.")}</p></div></article>`}</div><footer class="workbench-composer"><label class="workbench-prompt"><span>${tr("继续描述或修改策略", "Describe or revise strategy")}</span><textarea rows="4" data-real-workbench-prompt>${escapeHtml(state.workbenchDraft)}</textarea></label><div class="workbench-composer__actions"><small>REAL · DETERMINISTIC_STRUCTURED_ADAPTER</small><button type="button" class="primary-action" data-real-recommend>${tr("发送", "Send")}</button></div></footer></section>`;
@@ -2309,26 +2334,7 @@ function bindEvents(): void {
   };
   const loadRealAgents = async () => { state.realAgents = await agentRequest(`/api/orchestration/agents?category=${state.agentCenterCategory}`) as AppState["realAgents"]; render(); };
   const loadRealConnections = async () => { state.realConnections = await agentRequest("/api/orchestration/connections") as AppState["realConnections"]; render(); };
-  const loadRealWorkbench = async () => {
-    const history = await agentRequest("/api/orchestration/workbench/conversations/workbench.default") as Array<{ intent: unknown; recommendation?: unknown; draft?: unknown }>;
-    state.realWorkbenchTurns = history.map((entry) => ({
-      message: (entry.intent as { market?: string; horizon?: string; objective?: string; riskPreference?: string }).market
-        ? `${(entry.intent as { market?: string }).market} · ${(entry.intent as { horizon?: string }).horizon} · ${(entry.intent as { objective?: string }).objective} · ${(entry.intent as { riskPreference?: string }).riskPreference}`
-        : "Strategy requirements",
-      result: entry.recommendation ? { kind: "recommendation", intent: entry.intent, recommendation: entry.recommendation } : { kind: "clarification", intent: entry.intent, clarificationQuestions: [] },
-      ...(entry.draft ? { draft: entry.draft } : {}),
-    }));
-    await Promise.all(state.realWorkbenchTurns.filter((turn) => turn.draft).map(async (turn) => {
-      try {
-        turn.f4 = await agentRequest(`/api/orchestration/workbench/drafts/${encodeURIComponent(turn.draft.draftId)}/f4`);
-      } catch (error) {
-        // A legacy or stale Draft must not prevent current Drafts from
-        // hydrating their independent server-authoritative F4 projection.
-        turn.f4 = { error: error instanceof Error ? error.message : "F4_UNAVAILABLE" };
-      }
-    }));
-    render();
-  };
+  const loadRealWorkbench = hydrateRealWorkbench;
   const key = () => `agent:${crypto.randomUUID()}`;
   const selectRealAgent = async (definitionId: string) => { const selected = await agentRequest(`/api/orchestration/agents/${encodeURIComponent(definitionId)}`) as AppState["selectedRealAgent"]; const history = await agentRequest(`/api/orchestration/agents/${encodeURIComponent(definitionId)}/versions?limit=20`) as AppState["agentVersions"]; state.selectedRealAgent = selected; state.agentVersions = history; render(); };
   document.querySelector<HTMLButtonElement>("[data-create-real-agent]")?.addEventListener("click", async () => {
@@ -2351,6 +2357,7 @@ function bindEvents(): void {
 
   document.querySelectorAll<HTMLElement>("[data-view]").forEach((element) => {
     element.addEventListener("click", () => {
+      ++realWorkbenchHydrationEpoch;
       state.view = element.dataset.view as ViewId;
       window.history.replaceState(null, "", `#${state.view}`);
       state.panel = null;
@@ -2429,7 +2436,7 @@ function bindEvents(): void {
     } catch (error) { showToast(`应用被拒绝：${error instanceof Error ? error.message : "APPLY_FAILED"}`, `Apply rejected: ${error instanceof Error ? error.message : "APPLY_FAILED"}`); }
   }));
   document.querySelectorAll<HTMLButtonElement>("[data-f4-action]").forEach((button) => button.addEventListener("click", async () => {
-    try { const data = await agentRequest(`/api/orchestration/workbench/drafts/${encodeURIComponent(button.dataset.f4Draft ?? "")}/f4/${button.dataset.f4Action}`, { method: "POST", body: JSON.stringify({ idempotencyKey: `f4:${button.dataset.f4Action}:${Date.now()}` }) }); state.realWorkbenchTurns = state.realWorkbenchTurns.map((turn) => turn.draft?.draftId === button.dataset.f4Draft ? { ...turn, f4: data } : turn); render(); }
+    try { const data = await agentRequest(`/api/orchestration/workbench/drafts/${encodeURIComponent(button.dataset.f4Draft ?? "")}/f4/${button.dataset.f4Action}`, { method: "POST", body: JSON.stringify({ idempotencyKey: `f4:${button.dataset.f4Action}:${Date.now()}` }) }); state.realWorkbenchTurns = state.realWorkbenchTurns.map((turn) => turn.draft?.versionId === button.dataset.f4Draft ? { ...turn, f4: data } : turn); render(); }
     catch (error) { showToast(`F4 被拒绝：${error instanceof Error ? error.message : "REQUEST_FAILED"}`, `F4 rejected: ${error instanceof Error ? error.message : "REQUEST_FAILED"}`); }
   }));
 
@@ -2846,13 +2853,7 @@ void fetch(`${sessionConfiguration.apiBase}/api/orchestration/local-identity`, {
   if (!response.ok) return;
   state.agentCenterToken = "http-only-local-identity";
   if (state.view === "orchestration") {
-    return fetch(`${sessionConfiguration.apiBase}/api/orchestration/workbench/conversations/workbench.default`, { credentials: "include" })
-      .then((result) => result.json())
-      .then((body: { data?: Array<{ intent: unknown; recommendation?: unknown; draft?: unknown }> }) => {
-        if (!body.data) return;
-        state.realWorkbenchTurns = body.data.map((entry) => ({ message: "Recovered server-authoritative turn", result: entry.recommendation ? { kind: "recommendation", intent: entry.intent, recommendation: entry.recommendation } : { kind: "clarification", intent: entry.intent, clarificationQuestions: [] }, ...(entry.draft ? { draft: entry.draft } : {}) }));
-        render();
-      });
+    return hydrateRealWorkbench();
   }
   render();
 }).catch(() => undefined);
@@ -2869,21 +2870,6 @@ if (state.view === "connections" && state.agentCenterToken) {
     .then((body: { data?: AppState["realConnections"] }) => {
       if (!body.data) return;
       state.realConnections = body.data;
-      render();
-    })
-    .catch(() => undefined);
-}
-
-if (state.view === "orchestration" && state.agentCenterToken) {
-  void fetch(`${sessionConfiguration.apiBase}/api/orchestration/workbench/conversations/workbench.default`, { credentials: "include" })
-    .then((response) => response.json())
-    .then((body: { data?: Array<{ intent: unknown; recommendation?: unknown; draft?: unknown }> }) => {
-      if (!body.data) return;
-      state.realWorkbenchTurns = body.data.map((entry) => ({
-        message: "Recovered server-authoritative turn",
-        result: entry.recommendation ? { kind: "recommendation", intent: entry.intent, recommendation: entry.recommendation } : { kind: "clarification", intent: entry.intent, clarificationQuestions: [] },
-        ...(entry.draft ? { draft: entry.draft } : {}),
-      }));
       render();
     })
     .catch(() => undefined);
