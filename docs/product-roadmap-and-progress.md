@@ -4,6 +4,8 @@
 
 > 2026-08-04：F4 `IN_PROGRESS`（LOOP-047）。真实 Workbench Draft 已接入服务器权威 Preflight/Evidence 投影；后续只允许走已有注册 Historical scope，Approval 仍明确留给 F5。
 
+> 2026-08-04：LOOP-048 为 `PARTIAL`。当 F4 历史权威已配置时，Workbench Draft 现持久化既有注册 CSV 历史图；F4 动作具有 actor-scoped durable idempotency replay/conflict。旧 Draft 的 F4 失败不会阻塞当前 Draft hydration。`check`、`test:ts` 376/376、Web build、diff-check 均通过；Chrome 中文 1440×900、reload 和受控 `dev:paper` 重启确认无 Runtime/Approval 副作用，但当前页面仍未显示最新 F4 控件，完整 Evidence 链交由 LOOP-049 诊断。
+
 > 2026-08-03：F3 `IN_PROGRESS`。LOOP-045 的真实 Chrome 验证通过中文完整 Recommendation 的 Published provenance、DAG 与锁定安全链，且 reload/受控 `dev:paper` restart 后同 actor 恢复四类 Published Catalog、Turns、legacy `PROVENANCE_UNAVAILABLE` 和 Draft references。英文 820×760 无横向溢出并有可见键盘焦点；Network 为 `TOOL_UNAVAILABLE`。阻塞是有效修改 Apply 后创建新的 Draft `version:1`，没有产生同一 Draft 的 immutable `version:2` parent/reference 关系；下一步 LOOP-046，不进入 F4～F5。
 
 > 2026-08-03：F3 `IN_PROGRESS`。LOOP-044 修复分类切换 Catalog hydration，受控重启后的真实 Chrome 恢复四类 Published Agent；全量 `test:ts` 现自然 TAP 完结 `376/376`。中文已复核澄清、provenance/DAG、锁定安全链和 legacy `PROVENANCE_UNAVAILABLE`；Apply→修改→重启及英文 820×760/focus/stale-response 尚未完成。下一步 LOOP-045 F3 continuation；保持 `runtimeApplied=false`、Paper Only、`exchangeWriteAllowed=false`。

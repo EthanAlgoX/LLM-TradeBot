@@ -2,6 +2,8 @@
 
 > 2026-08-04：LOOP-047 F4 为 `IN_PROGRESS`。Workbench 已增加 actor-scoped F4 投影：只复用既有 Configuration/Pipeline validator 与 Strategy Evidence/registered historical jobs，按 `Draft → Preflight → Backtest → Walk-Forward → Approval required` 返回唯一下一动作；不含 Approval、Paper Plan、Runtime 或交易写入。自动化基础回归已通过；真实 Chrome、完整 F4 fixture 链路和恢复验收仍待完成。
 
+> 2026-08-04：LOOP-048 F4 仍为 `IN_PROGRESS`。已将有历史权威的 Workbench Draft 对齐既有注册 CSV 历史图，并将 Preflight/Backtest/Walk-Forward 请求纳入 actor-scoped durable replay/conflict；遗留 Draft 失败被单独隔离。376/376 自动化通过。Chrome 的当前 F4 UI hydration 仍显示 loading 占位，未进行 Approval、Paper Plan、Runtime 或交易写入；下一步 LOOP-049 只排查这个可见状态阻塞。
+
 > 2026-08-03：LOOP-044 F3 仍为 `IN_PROGRESS`。修复 Agent Center 分类切换未请求服务端 Catalog 的 hydration 缺陷；同一 `local:operator` 经受控 `dev:paper` 重启后，真实 Chrome 已恢复 Input、Analysis、Decision、Reflection Published entries。补齐 runtime 生命周期释放后，`npm run test:ts` 自然打印 `376/376` TAP 汇总并退出 0。中文已验证澄清、Published provenance/DAG、锁定 Portfolio → Risk Gate → Paper Execution 链与 legacy `PROVENANCE_UNAVAILABLE` 只读边界；完整 Apply→修改→reload/restart 和英文窄屏/focus/快速切换仍须由 LOOP-045 收尾。保持 `runtimeApplied=false`、Paper Only、`exchangeWriteAllowed=false`。
 
 > 2026-08-03：LOOP-032 已完成 F1 Agent Center V1：SQLite append-only 生命周期、服务端 Diff、Catalog、Clone lineage、Archive 和受限 deterministic 测试台均以 Bearer actor/精确版本 authority 持久化；不触发 Runtime 或交易写入。

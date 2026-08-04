@@ -8,6 +8,7 @@ import type { PipelineOrchestrationService } from "../../core/src/pipeline-orche
 import type { ConfigurationDraftService } from "../../core/src/configuration-draft-service.js";
 import type { PipelineGraphVersion } from "../../contracts/src/index.js";
 import { CURRENT_CRYPTO_PIPELINE_GRAPH } from "../../core/src/current-crypto-pipeline-graph.js";
+import { CURRENT_CRYPTO_SEMANTIC_CSV_PIPELINE_GRAPH } from "../../core/src/current-crypto-semantic-historical-graph.js";
 import type { StrategyEvidenceApprovalService } from "../../core/src/strategy-evidence-approval-service.js";
 import type { OrchestrationActor } from "../../contracts/src/index.js";
 
@@ -51,6 +52,7 @@ CREATE TABLE IF NOT EXISTS strategy_workbench_drafts (draft_id TEXT PRIMARY KEY,
 CREATE TABLE IF NOT EXISTS strategy_workbench_draft_references (actor_id TEXT NOT NULL, recommendation_id TEXT NOT NULL, draft_id TEXT NOT NULL, version_id TEXT NOT NULL, draft_json TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY(actor_id, recommendation_id));
 CREATE TABLE IF NOT EXISTS strategy_workbench_turn_replays (actor_id TEXT NOT NULL, idempotency_key TEXT NOT NULL, request_fingerprint TEXT NOT NULL, result_json TEXT NOT NULL, PRIMARY KEY(actor_id, idempotency_key));
 CREATE TABLE IF NOT EXISTS strategy_workbench_apply_replays (actor_id TEXT NOT NULL, idempotency_key TEXT NOT NULL, request_fingerprint TEXT NOT NULL, draft_json TEXT NOT NULL, PRIMARY KEY(actor_id, idempotency_key));
+CREATE TABLE IF NOT EXISTS strategy_workbench_f4_replays (actor_id TEXT NOT NULL, idempotency_key TEXT NOT NULL, request_fingerprint TEXT NOT NULL, result_json TEXT NOT NULL, PRIMARY KEY(actor_id, idempotency_key));
 CREATE TABLE IF NOT EXISTS strategy_workbench_preflights (actor_id TEXT NOT NULL, version_id TEXT NOT NULL, input_fingerprint TEXT NOT NULL, result_json TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY(actor_id, version_id));
 CREATE TRIGGER IF NOT EXISTS strategy_workbench_intents_no_update BEFORE UPDATE ON strategy_workbench_intents BEGIN SELECT RAISE(ABORT, 'WORKBENCH_IMMUTABLE'); END;
 CREATE TRIGGER IF NOT EXISTS strategy_workbench_recommendations_no_update BEFORE UPDATE ON strategy_workbench_recommendations BEGIN SELECT RAISE(ABORT, 'WORKBENCH_IMMUTABLE'); END;
@@ -60,6 +62,15 @@ CREATE TRIGGER IF NOT EXISTS strategy_workbench_drafts_no_update BEFORE UPDATE O
   async f4(actorId: string, draftId: string, action?: "preflight" | "backtest" | "walk-forward", idempotencyKey?: string) {
     if (!this.configurations || !this.pipelines || !this.f4Authority) throw new StrategyWorkbenchError("F4_UNAVAILABLE");
     if (!/^[a-z0-9][a-z0-9._:@-]{2,239}$/u.test(draftId)) throw new StrategyWorkbenchError("DRAFT_NOT_FOUND");
+    const requestFingerprint = action ? hash({ draftId, action }) : undefined;
+    if (action) {
+      if (!idempotencyKey || !/^[a-z0-9][a-z0-9._:@-]{7,159}$/u.test(idempotencyKey)) throw new StrategyWorkbenchError("REQUEST_CONTRACT_INVALID");
+      const replay = this.db.prepare("SELECT request_fingerprint, result_json FROM strategy_workbench_f4_replays WHERE actor_id=? AND idempotency_key=?").get(actorId, idempotencyKey) as { request_fingerprint: string; result_json: string } | undefined;
+      if (replay) {
+        if (replay.request_fingerprint !== requestFingerprint) throw new StrategyWorkbenchError("IDEMPOTENCY_CONFLICT");
+        return JSON.parse(replay.result_json) as never;
+      }
+    }
     const ref = this.db.prepare("SELECT draft_json FROM strategy_workbench_draft_references WHERE actor_id=? AND draft_id=? ORDER BY created_at DESC LIMIT 1").get(actorId, draftId) as { draft_json: string } | undefined;
     if (!ref) throw new StrategyWorkbenchError("DRAFT_NOT_FOUND");
     const draft = StrategyDraftSchema.parse(JSON.parse(ref.draft_json));
@@ -67,7 +78,6 @@ CREATE TRIGGER IF NOT EXISTS strategy_workbench_drafts_no_update BEFORE UPDATE O
     const existing = this.db.prepare("SELECT result_json FROM strategy_workbench_preflights WHERE actor_id=? AND version_id=?").get(actorId, config.versionId) as { result_json: string } | undefined;
     let preflight = existing ? JSON.parse(existing.result_json) as any : undefined;
     if (action === "preflight") {
-      if (!idempotencyKey || !/^[a-z0-9][a-z0-9._:@-]{7,159}$/u.test(idempotencyKey)) throw new StrategyWorkbenchError("REQUEST_CONTRACT_INVALID");
       const inputFingerprint = hash({ configuration: config.fingerprint, pipeline: draft.pipelineFingerprint });
       if (!preflight || preflight.inputFingerprint !== inputFingerprint) {
         const results = [this.configurations.validate(config.versionId), this.pipelines.validateDraft(draft.pipelineDraftId)];
@@ -82,12 +92,13 @@ CREATE TRIGGER IF NOT EXISTS strategy_workbench_drafts_no_update BEFORE UPDATE O
       if (preflight?.status !== "passed") throw new StrategyWorkbenchError("PREFLIGHT_REQUIRED");
       if (!scope) throw new StrategyWorkbenchError("HISTORICAL_SCOPE_UNAVAILABLE");
       binding ??= this.f4Authority.evidence.createBinding({ schemaVersion: "1.0.0", strategyConfigurationVersionId: config.versionId, ...scope, idempotencyKey: `f4-binding:${config.versionId}`.slice(0, 160) }, this.f4Authority.actor(actorId));
-      if (!idempotencyKey) throw new StrategyWorkbenchError("REQUEST_CONTRACT_INVALID");
       binding = action === "backtest" ? await this.f4Authority.evidence.runBacktest(binding.bindingId, { schemaVersion: "1.0.0", idempotencyKey }, this.f4Authority.actor(actorId)) : await this.f4Authority.evidence.runWalkForward(binding.bindingId, { schemaVersion: "1.0.0", idempotencyKey }, this.f4Authority.actor(actorId));
     }
     const stale = binding?.lifecycleStatus === "stale";
     const gates = [{ id: "draft", status: "current" }, { id: "preflight", status: stale ? "stale" : preflight?.status ?? "pending" }, { id: "backtest", status: stale ? "stale" : binding?.backtestJob ? "succeeded" : "locked" }, { id: "walk_forward", status: stale ? "stale" : binding?.walkForwardJob ? "succeeded" : "locked" }, { id: "approval_required", status: stale ? "stale" : binding?.lifecycleStatus === "evidence_ready" ? "approval_required" : "locked" }];
-    return { draft, preflight: preflight ?? { status: "pending", issues: [] }, binding, gates, nextAction: stale ? undefined : !preflight || preflight.status !== "passed" ? "preflight" : !binding?.backtestJob ? "backtest" : !binding?.walkForwardJob ? "walk-forward" : undefined, runtimeApplied: false, paperOnly: true, exchangeWriteAllowed: false };
+    const result = { draft, preflight: preflight ?? { status: "pending", issues: [] }, binding, gates, nextAction: stale ? undefined : !preflight || preflight.status !== "passed" ? "preflight" : !binding?.backtestJob ? "backtest" : !binding?.walkForwardJob ? "walk-forward" : undefined, runtimeApplied: false, paperOnly: true, exchangeWriteAllowed: false };
+    if (action) this.db.prepare("INSERT INTO strategy_workbench_f4_replays VALUES (?, ?, ?, ?)").run(actorId, idempotencyKey!, requestFingerprint!, JSON.stringify(result));
+    return result;
   }
 
   recommend(actorId: string, input: unknown) {
@@ -146,9 +157,15 @@ CREATE TRIGGER IF NOT EXISTS strategy_workbench_drafts_no_update BEFORE UPDATE O
     if (!this.pipelines || !this.configurations) throw new StrategyWorkbenchError("DRAFT_AUTHORITY_UNAVAILABLE");
     // Compile the recommendation to the pre-existing typed pipeline graph and
     // run its validator before either authoritative draft is persisted.
-    const graph = this.compileRecommendation(recommendation);
-    const prePersistenceValidation = this.validateGraph?.(graph);
+    const recommendationGraph = this.compileRecommendation(recommendation);
+    const prePersistenceValidation = this.validateGraph?.(recommendationGraph);
     if (!prePersistenceValidation?.valid) throw new StrategyWorkbenchError(`RECOMMENDATION_GRAPH_INVALID:${(prePersistenceValidation as { issues?: Array<{ code?: string }> } | undefined)?.issues?.map((issue) => issue.code).join(",") ?? "VALIDATOR_UNAVAILABLE"}`);
+    // F4 can only consume the pre-registered CSV historical graph.  Keep the
+    // Workbench topology validator above as the authority for recommendations;
+    // when the historical authority is absent, preserve the regular F3 graph.
+    const graph = this.f4Authority
+      ? CURRENT_CRYPTO_SEMANTIC_CSV_PIPELINE_GRAPH
+      : recommendationGraph;
     const message = this.replayMessage(actorId, recommendation.conversationId, recommendation.intentId);
     const revisedMaximumPosition = message ? maximumPositionPercent(message) : undefined;
     const parentReference = revisedMaximumPosition === undefined ? undefined : this.db.prepare(`SELECT r.draft_json FROM strategy_workbench_draft_references r JOIN strategy_workbench_recommendations q ON q.recommendation_id=r.recommendation_id AND q.actor_id=r.actor_id WHERE r.actor_id=? AND q.conversation_id=? ORDER BY r.created_at DESC LIMIT 1`).get(actorId, recommendation.conversationId) as { draft_json: string } | undefined;

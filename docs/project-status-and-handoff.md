@@ -1,5 +1,13 @@
 # TradeBot 当前状态与接手说明
 
+## LOOP-048 F4 registered fixture continuation（2026-08-04）
+
+- F4 仍为 `IN_PROGRESS`。已复用既有 CSV registered historical graph、Configuration/Pipeline validator 与 `StrategyEvidenceApprovalService`；没有创建新 validator、runner、artifact、evidence、approval 或 runtime authority。
+- Workbench F4 action 现以 actor/idempotency key 持久化 exact replay，并对换 Draft/Action 的复用返回 `IDEMPOTENCY_CONFLICT`。F4 authority 存在时，新 F3 Draft 使用已注册 CSV graph，避免将 CSV evidence runner 用于 Binance runtime graph。
+- Chrome 中文 1440×900、reload 和两次受控 `npm run dev:paper` restart 已执行；直接服务端 F4 GET 对新 Draft 返回 `preflight: pending` 与 `nextAction: preflight`。浏览器页面仍因既有历史 Draft 的 hydration 显示 loading 占位，故没有点击 Preflight/Backtest/Walk-Forward，也没有产生 Approval、Paper Plan、Runtime 或交易副作用。Chrome Network capability 为 `TOOL_UNAVAILABLE`；唯一 console error 为扩展 message channel closed。
+- 验证：`npm run check` PASS；`npm run test:ts` 自然 TAP 汇总 376/376 PASS、exit 0；`npm run build:web` PASS；`git diff --check` PASS。
+- 下一入口为 [`LOOP-049`](loop-prompts/loop-049-f4-ui-hydration-diagnosis-v1.md)，仅恢复当前 Draft 的 F4 visible hydration，并完成既有 fixture Evidence 和双尺寸 Chrome 验收。
+
 ## LOOP-046 F3 Draft revision lineage closeout（2026-08-04）
 
 - F4 `IN_PROGRESS`（LOOP-047）。在 F3 的真实 Workbench Draft 上加入 actor-scoped F4 状态端点和卡片；Preflight 只调用 Configuration/Pipeline validators，Backtest/Walk-Forward 只调用 `StrategyEvidenceApprovalService` 的登记 scope。没有 Approval、Paper plan、deployment、run、account、order、fill 或 exchange write。

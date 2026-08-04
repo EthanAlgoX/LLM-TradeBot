@@ -2318,7 +2318,15 @@ function bindEvents(): void {
       result: entry.recommendation ? { kind: "recommendation", intent: entry.intent, recommendation: entry.recommendation } : { kind: "clarification", intent: entry.intent, clarificationQuestions: [] },
       ...(entry.draft ? { draft: entry.draft } : {}),
     }));
-    await Promise.all(state.realWorkbenchTurns.filter((turn) => turn.draft).map(async (turn) => { turn.f4 = await agentRequest(`/api/orchestration/workbench/drafts/${encodeURIComponent(turn.draft.draftId)}/f4`); }));
+    await Promise.all(state.realWorkbenchTurns.filter((turn) => turn.draft).map(async (turn) => {
+      try {
+        turn.f4 = await agentRequest(`/api/orchestration/workbench/drafts/${encodeURIComponent(turn.draft.draftId)}/f4`);
+      } catch (error) {
+        // A legacy or stale Draft must not prevent current Drafts from
+        // hydrating their independent server-authoritative F4 projection.
+        turn.f4 = { error: error instanceof Error ? error.message : "F4_UNAVAILABLE" };
+      }
+    }));
     render();
   };
   const key = () => `agent:${crypto.randomUUID()}`;
