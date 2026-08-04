@@ -55,7 +55,7 @@ npm run dev:paper   STARTED
 | F1 Agent Center V1 | `COMPLETE` | 真实 immutable Version、服务端 Diff、Validate/Publish/Archive、Published Catalog、Clone lineage 和 `DETERMINISTIC_TEST_ADAPTER` Test Evidence；四类 Agent 同一版本流，不写 Runtime/交易事实 |
 | F2 Connections V1 | `COMPLETE` | actor-scoped immutable Connection Definition/Version、SQLite 重启恢复、Bearer API 与仅展示健康/能力/影响/Secret reference 状态的 Web；Chrome 完整验收已通过，不读取或显示 Secret。 |
 | F3 Workbench V2 | `COMPLETE` | Intent/澄清、Published Catalog 推荐、动态 DAG、Apply immutable Draft、同一 Draft v1→v2 精确 parent lineage、HttpOnly actor reload/restart recovery 和 Chrome 双语言验收均已完成；始终 Paper Only |
-| F4 Preflight / Evidence | `PLANNED` | 复用现有 Validator、Backtest、Walk-Forward、Experiment Evidence 与 stale 规则 |
+| F4 Preflight / Evidence | `IN_PROGRESS` | 已接入 actor-scoped F4 projection、注册 CSV Historical graph 与 durable idempotency；LOOP-049 正在收尾 UI hydration 和完整 Preflight → Backtest → Walk-Forward Evidence 链 |
 | F5 Simulation V2 | `PLANNED` | 四页产品层接回现有 M4；服务端强制最多三个 active Paper Deployment，展示真实 Artifact 对话 |
 | Exchange 写入 | `UNAVAILABLE` | Paper Only，`exchangeWriteAllowed=false`，没有 Binance 或其他交易所写接口 |
 | Market/Data/Agent Registry | `REAL` | Market Pack、Data Source Capability、Agent Template、Preset 均由服务端注册；客户端不能上传实现 |

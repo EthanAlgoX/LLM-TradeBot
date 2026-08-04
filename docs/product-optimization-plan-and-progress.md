@@ -747,7 +747,7 @@ LOOP-030/031 已完成真实版本合同、Repository/API、Input/Analysis v1→
 
 ### F4：预上线检查与历史验证
 
-状态：`PLANNED / NEXT`（LOOP-047）
+状态：`IN_PROGRESS`（LOOP-047～049）
 
 - [ ] Preflight 检查 Agent/Graph/Data/Model/Prompt/Schema/Tool/预算与固定安全链；
 - [ ] 验证失败返回稳定 issue code、具体节点和修复建议，绝不自动降级为可运行；
