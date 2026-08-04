@@ -32,6 +32,22 @@ test("workbench Apply compiles through the existing pipeline validator and creat
     assert.equal(runtime.service.getDraft(draft.pipelineDraftId).runtimeApplied, false);
     assert.equal(runtime.productionStrategyOrchestration.configurationDraftService.get(draft.configurationVersionId).payload.kind, "strategy");
     assert.equal(runtime.strategyWorkbenchService.apply("actor:workbench", { recommendationId: response.recommendation.recommendationId, fingerprint: response.recommendation.fingerprint, idempotencyKey: "apply:two" }).draftId, draft.draftId);
+    const revision = runtime.strategyWorkbenchService.recommend("actor:workbench", { ...complete("conversation:workbench", "turn:revision"), message: "BTC crypto short medium long horizon trend return with bounded risk; set maximum position to 5%" });
+    assert.equal(revision.kind, "recommendation");
+    if (revision.kind !== "recommendation") throw new Error("recommendation required");
+    const version2 = runtime.strategyWorkbenchService.apply("actor:workbench", { recommendationId: revision.recommendation.recommendationId, fingerprint: revision.recommendation.fingerprint, idempotencyKey: "apply:revision" });
+    assert.equal(version2.draftId, draft.draftId);
+    assert.equal(version2.versionId, `${draft.draftId}:version:2`);
+    const first = runtime.productionStrategyOrchestration.configurationDraftService.get(draft.configurationVersionId);
+    const second = runtime.productionStrategyOrchestration.configurationDraftService.get(version2.configurationVersionId);
+    assert.equal(first.payload.kind, "strategy");
+    assert.equal(second.payload.kind, "strategy");
+    if (first.payload.kind !== "strategy" || second.payload.kind !== "strategy") throw new Error("strategy payload required");
+    assert.equal(second.parentVersionId, first.versionId);
+    assert.equal(second.parentFingerprint, first.fingerprint);
+    assert.deepEqual(first.payload.thresholds, {});
+    assert.equal(second.payload.thresholds.maximumPositionPercent, 0.05);
+    assert.equal(runtime.strategyWorkbenchService.history("actor:workbench", "conversation:workbench").find((entry) => entry.intent.turnId === "turn:revision")?.draft?.versionId, version2.versionId);
     assert.throws(() => runtime.strategyWorkbenchService.apply("actor:workbench", { recommendationId: response.recommendation.recommendationId, fingerprint: "sha256:0000000000000000000000000000000000000000000000000000000000000000", idempotencyKey: "apply:two" }), /IDEMPOTENCY_CONFLICT/);
     assert.throws(() => runtime.strategyWorkbenchService.recommend("actor:workbench", { schemaVersion: "1.0.0", conversationId: "conversation:workbench", message: "different message", locale: "en", idempotencyKey: "turn:complete" }), /IDEMPOTENCY_CONFLICT/);
   } finally { await runtime.close(); }
@@ -51,6 +67,10 @@ test("workbench cursor, actor isolation, negative input and durable restart all 
     assert.equal(recommendation.kind, "recommendation");
     if (recommendation.kind !== "recommendation") throw new Error("recommendation required");
     const draft = runtime.strategyWorkbenchService.apply("actor:one", { recommendationId: recommendation.recommendation.recommendationId, fingerprint: recommendation.recommendation.fingerprint, idempotencyKey: "apply:one" });
+    const revision = runtime.strategyWorkbenchService.recommend("actor:one", { ...complete("conversation:one", "turn:revision"), message: "BTC crypto short medium long horizon trend return with bounded risk; set maximum position to 5%" });
+    if (revision.kind !== "recommendation") throw new Error("recommendation required");
+    const version2 = runtime.strategyWorkbenchService.apply("actor:one", { recommendationId: revision.recommendation.recommendationId, fingerprint: revision.recommendation.fingerprint, idempotencyKey: "apply:revision" });
+    assert.equal(version2.versionId, `${draft.draftId}:version:2`);
     assert.throws(() => runtime.strategyWorkbenchService.apply("actor:two", { recommendationId: recommendation.recommendation.recommendationId, fingerprint: recommendation.recommendation.fingerprint, idempotencyKey: "apply:cross-actor" }), /RECOMMENDATION_NOT_FOUND/);
     runtime.strategyWorkbenchService.recommend("actor:one", { ...complete("conversation:two", "turn:second"), message: "make a high return strategy" });
     const conversations = runtime.strategyWorkbenchService.listConversations("actor:one", { limit: 1 });
@@ -65,8 +85,14 @@ test("workbench cursor, actor isolation, negative input and durable restart all 
   runtime = createCurrentPipelineOrchestrationRuntime({ databasePath });
   try {
     const history = runtime.strategyWorkbenchService.history("actor:one", "conversation:one");
-    assert.equal(history.length, 2);
+    assert.equal(history.length, 3);
     assert.ok(history.some((entry) => entry.draft?.draftStatus === "NOT_VALIDATED"));
+    const restoredV1 = history.find((entry) => entry.intent.turnId === "turn:recommend")?.draft;
+    const restoredV2 = history.find((entry) => entry.intent.turnId === "turn:revision")?.draft;
+    assert.match(restoredV1?.versionId ?? "", /:version:1$/u);
+    assert.equal(restoredV2?.versionId, `${restoredV1?.draftId}:version:2`);
+    const restoredConfiguration = runtime.productionStrategyOrchestration.configurationDraftService.get(restoredV2!.configurationVersionId);
+    assert.equal(restoredConfiguration.parentVersionId, restoredV1?.configurationVersionId);
     const replay = runtime.strategyWorkbenchService.recommend("actor:one", complete("conversation:one", "turn:recommend"));
     assert.equal(replay.kind, "recommendation");
   } finally { await runtime.close(); rmSync(directory, { recursive: true, force: true }); }

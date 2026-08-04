@@ -13,6 +13,12 @@ const hash = (value: unknown) => `sha256:${createHash("sha256").update(JSON.stri
 const now = () => new Date().toISOString();
 const unsafe = /(?:<\/?[a-z]|https?:\/\/|\b(?:select|insert|delete|update)\b|\b(?:javascript|sql|secret|token|password|prompt|tool|runtime|trade|order)\b|[\\/](?:Users|etc|tmp)\b)/iu;
 const needs = (message: string, words: readonly string[]) => words.some((word) => message.toLowerCase().includes(word));
+const maximumPositionPercent = (message: string): number | undefined => {
+  const match = message.match(/(?:maximum\s+(?:position|allocation)|max\s+(?:position|allocation)|(?:最大|单笔最大)仓位)\s*(?:为|to|设为|设置为)?\s*(\d{1,2}(?:\.\d+)?)\s*%/iu);
+  if (!match) return undefined;
+  const percent = Number(match[1]);
+  return Number.isFinite(percent) && percent > 0 && percent <= 100 ? percent / 100 : undefined;
+};
 const PageRequestSchema = z.object({ cursor: z.string().min(8).max(2_000).optional(), limit: z.coerce.number().int().min(1).max(50).default(20) }).strict();
 const ApplyRequestSchema = z.object({ recommendationId: z.string().min(3).max(240).regex(/^[a-z0-9][a-z0-9._:@-]*$/u), fingerprint: z.string().regex(/^sha256:[a-f0-9]{64}$/u), idempotencyKey: z.string().min(3).max(240).regex(/^[a-z0-9][a-z0-9._:@-]*$/u) }).strict();
 type PageCursor = { actorId: string; kind: "conversations" | "turns"; scope: string; createdAt: string; id: string };
@@ -39,6 +45,7 @@ export class StrategyWorkbenchService {
     db.exec(`CREATE TABLE IF NOT EXISTS strategy_workbench_intents (intent_id TEXT PRIMARY KEY, actor_id TEXT NOT NULL, conversation_id TEXT NOT NULL, turn_id TEXT NOT NULL, intent_json TEXT NOT NULL, created_at TEXT NOT NULL, UNIQUE(actor_id, conversation_id, turn_id));
 CREATE TABLE IF NOT EXISTS strategy_workbench_recommendations (recommendation_id TEXT PRIMARY KEY, actor_id TEXT NOT NULL, conversation_id TEXT NOT NULL, intent_id TEXT NOT NULL, request_fingerprint TEXT NOT NULL, recommendation_json TEXT NOT NULL, created_at TEXT NOT NULL, UNIQUE(actor_id, request_fingerprint));
 CREATE TABLE IF NOT EXISTS strategy_workbench_drafts (draft_id TEXT PRIMARY KEY, actor_id TEXT NOT NULL, recommendation_id TEXT NOT NULL, request_fingerprint TEXT NOT NULL, draft_json TEXT NOT NULL, created_at TEXT NOT NULL, UNIQUE(actor_id, recommendation_id));
+CREATE TABLE IF NOT EXISTS strategy_workbench_draft_references (actor_id TEXT NOT NULL, recommendation_id TEXT NOT NULL, draft_id TEXT NOT NULL, version_id TEXT NOT NULL, draft_json TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY(actor_id, recommendation_id));
 CREATE TABLE IF NOT EXISTS strategy_workbench_turn_replays (actor_id TEXT NOT NULL, idempotency_key TEXT NOT NULL, request_fingerprint TEXT NOT NULL, result_json TEXT NOT NULL, PRIMARY KEY(actor_id, idempotency_key));
 CREATE TABLE IF NOT EXISTS strategy_workbench_apply_replays (actor_id TEXT NOT NULL, idempotency_key TEXT NOT NULL, request_fingerprint TEXT NOT NULL, draft_json TEXT NOT NULL, PRIMARY KEY(actor_id, idempotency_key));
 CREATE TRIGGER IF NOT EXISTS strategy_workbench_intents_no_update BEFORE UPDATE ON strategy_workbench_intents BEGIN SELECT RAISE(ABORT, 'WORKBENCH_IMMUTABLE'); END;
@@ -95,7 +102,8 @@ CREATE TRIGGER IF NOT EXISTS strategy_workbench_drafts_no_update BEFORE UPDATE O
     const row = this.db.prepare("SELECT recommendation_json FROM strategy_workbench_recommendations WHERE actor_id=? AND recommendation_id=?").get(actorId, body.recommendationId) as { recommendation_json: string } | undefined;
     if (!row) throw new StrategyWorkbenchError("RECOMMENDATION_NOT_FOUND"); const recommendation = StrategyRecommendationSchema.parse(JSON.parse(row.recommendation_json));
     if (recommendation.fingerprint !== body.fingerprint) throw new StrategyWorkbenchError("STALE_RECOMMENDATION");
-    const existing = this.db.prepare("SELECT draft_json FROM strategy_workbench_drafts WHERE actor_id=? AND recommendation_id=?").get(actorId, recommendation.recommendationId) as { draft_json: string } | undefined;
+    const existing = this.db.prepare("SELECT draft_json FROM strategy_workbench_draft_references WHERE actor_id=? AND recommendation_id=?").get(actorId, recommendation.recommendationId) as { draft_json: string } | undefined
+      ?? this.db.prepare("SELECT draft_json FROM strategy_workbench_drafts WHERE actor_id=? AND recommendation_id=?").get(actorId, recommendation.recommendationId) as { draft_json: string } | undefined;
     if (existing) { const draft = StrategyDraftSchema.parse(JSON.parse(existing.draft_json)); this.saveApplyReplay(actorId, body.idempotencyKey, requestFingerprint, draft); return draft; }
     for (const node of recommendation.nodes.filter((node) => !node.systemOwned)) { const catalog = this.agents.catalog(actorId); const found = catalog.some((item) => item.version.versionId === node.agentVersionId && item.version.fingerprint === node.agentFingerprint); if (!found) throw new StrategyWorkbenchError("CATALOG_DRIFT"); }
     if (!this.pipelines || !this.configurations) throw new StrategyWorkbenchError("DRAFT_AUTHORITY_UNAVAILABLE");
@@ -104,14 +112,27 @@ CREATE TRIGGER IF NOT EXISTS strategy_workbench_drafts_no_update BEFORE UPDATE O
     const graph = this.compileRecommendation(recommendation);
     const prePersistenceValidation = this.validateGraph?.(graph);
     if (!prePersistenceValidation?.valid) throw new StrategyWorkbenchError(`RECOMMENDATION_GRAPH_INVALID:${(prePersistenceValidation as { issues?: Array<{ code?: string }> } | undefined)?.issues?.map((issue) => issue.code).join(",") ?? "VALIDATOR_UNAVAILABLE"}`);
-    // createDraft is the existing pipeline-draft authority. Its repository
-    // stores immutable graph snapshots, so this is the only graph persistence.
-    const pipelineDraft = this.pipelines.createDraft(graph);
-    const pipelineValidation = this.pipelines.validateDraft(pipelineDraft.draftId);
-    if (!pipelineValidation.valid) throw new StrategyWorkbenchError("RECOMMENDATION_GRAPH_INVALID");
-    const configuration = this.configurations.create({ schemaVersion: "1.0.0", humanVersion: "workbench-apply-v1", payload: { kind: "strategy", marketPackId: graph.marketPackRef, pipelineDraftId: pipelineDraft.draftId, agentConfigurationDraftIds: recommendation.nodes.filter((node) => !node.systemOwned).map((node) => node.agentVersionId!).slice(0, 20), promptPolicyDraftIds: [], weights: {}, thresholds: {} } }, actorId);
-    const candidate = { draftId: configuration.draftId, versionId: configuration.versionId, fingerprint: configuration.fingerprint, recommendationId: recommendation.recommendationId, intentId: recommendation.intentId, pipelineDraftId: pipelineDraft.draftId, pipelineFingerprint: pipelineDraft.contentFingerprint, configurationDraftId: configuration.draftId, configurationVersionId: configuration.versionId, createdAt: configuration.createdAt, draftStatus: "NOT_VALIDATED" as const, runtimeApplied: false as const, paperOnly: true as const, exchangeWriteAllowed: false as const };
-    const draft = StrategyDraftSchema.parse(candidate); this.db.prepare("INSERT INTO strategy_workbench_drafts VALUES (?, ?, ?, ?, ?, ?)").run(draft.draftId, actorId, recommendation.recommendationId, hash(body), JSON.stringify(draft), draft.createdAt);
+    const message = this.replayMessage(actorId, recommendation.conversationId, recommendation.intentId);
+    const revisedMaximumPosition = message ? maximumPositionPercent(message) : undefined;
+    const parentReference = revisedMaximumPosition === undefined ? undefined : this.db.prepare(`SELECT r.draft_json FROM strategy_workbench_draft_references r JOIN strategy_workbench_recommendations q ON q.recommendation_id=r.recommendation_id AND q.actor_id=r.actor_id WHERE r.actor_id=? AND q.conversation_id=? ORDER BY r.created_at DESC LIMIT 1`).get(actorId, recommendation.conversationId) as { draft_json: string } | undefined;
+    let draft: z.infer<typeof StrategyDraftSchema>;
+    if (parentReference) {
+      const parentDraft = StrategyDraftSchema.parse(JSON.parse(parentReference.draft_json));
+      const parent = this.configurations.getLatest(parentDraft.configurationDraftId);
+      if (parent.payload.kind !== "strategy") throw new StrategyWorkbenchError("REVISION_PARENT_INVALID");
+      const configuration = this.configurations.createVersion(parent.draftId, { schemaVersion: "1.0.0", parentFingerprint: parent.fingerprint, humanVersion: "workbench-apply-v2", payload: { ...parent.payload, thresholds: { ...parent.payload.thresholds, maximumPositionPercent: revisedMaximumPosition! } } }, actorId);
+      draft = StrategyDraftSchema.parse({ ...parentDraft, versionId: configuration.versionId, fingerprint: configuration.fingerprint, recommendationId: recommendation.recommendationId, intentId: recommendation.intentId, configurationVersionId: configuration.versionId, createdAt: configuration.createdAt });
+    } else {
+      // createDraft is the existing pipeline-draft authority. Its repository
+      // stores immutable graph snapshots, so this is the only graph persistence.
+      const pipelineDraft = this.pipelines.createDraft(graph);
+      const pipelineValidation = this.pipelines.validateDraft(pipelineDraft.draftId);
+      if (!pipelineValidation.valid) throw new StrategyWorkbenchError("RECOMMENDATION_GRAPH_INVALID");
+      const configuration = this.configurations.create({ schemaVersion: "1.0.0", humanVersion: "workbench-apply-v1", payload: { kind: "strategy", marketPackId: graph.marketPackRef, pipelineDraftId: pipelineDraft.draftId, agentConfigurationDraftIds: recommendation.nodes.filter((node) => !node.systemOwned).map((node) => node.agentVersionId!).slice(0, 20), promptPolicyDraftIds: [], weights: {}, thresholds: {} } }, actorId);
+      draft = StrategyDraftSchema.parse({ draftId: configuration.draftId, versionId: configuration.versionId, fingerprint: configuration.fingerprint, recommendationId: recommendation.recommendationId, intentId: recommendation.intentId, pipelineDraftId: pipelineDraft.draftId, pipelineFingerprint: pipelineDraft.contentFingerprint, configurationDraftId: configuration.draftId, configurationVersionId: configuration.versionId, createdAt: configuration.createdAt, draftStatus: "NOT_VALIDATED" as const, runtimeApplied: false as const, paperOnly: true as const, exchangeWriteAllowed: false as const });
+      this.db.prepare("INSERT INTO strategy_workbench_drafts VALUES (?, ?, ?, ?, ?, ?)").run(draft.draftId, actorId, recommendation.recommendationId, hash(body), JSON.stringify(draft), draft.createdAt);
+    }
+    this.db.prepare("INSERT INTO strategy_workbench_draft_references VALUES (?, ?, ?, ?, ?, ?)").run(actorId, recommendation.recommendationId, draft.draftId, draft.versionId, JSON.stringify(draft), draft.createdAt);
     this.replay?.appendDraftReference(actorId, recommendation.conversationId, `workbench-apply:${recommendation.recommendationId}`, { draftId: draft.draftId, versionId: draft.versionId, fingerprint: draft.fingerprint });
     this.saveApplyReplay(actorId, body.idempotencyKey, requestFingerprint, draft);
     return draft;
@@ -119,6 +140,13 @@ CREATE TRIGGER IF NOT EXISTS strategy_workbench_drafts_no_update BEFORE UPDATE O
 
   private saveTurnReplay(actorId: string, command: z.infer<typeof StrategyWorkbenchCommandSchema>, requestFingerprint: string, result: unknown) {
     this.db.prepare("INSERT INTO strategy_workbench_turn_replays VALUES (?, ?, ?, ?)").run(actorId, command.idempotencyKey, requestFingerprint, JSON.stringify(result));
+  }
+
+  private replayMessage(actorId: string, conversationId: string, intentId: string): string | undefined {
+    const row = this.db.prepare("SELECT turn_id FROM strategy_workbench_intents WHERE actor_id=? AND conversation_id=? AND intent_id=?").get(actorId, conversationId, intentId) as { turn_id: string } | undefined;
+    if (!row || !this.replay) return undefined;
+    const record = this.replay.get({ actorId, conversationId, idempotencyKey: row.turn_id });
+    return record?.command.message;
   }
 
   private saveApplyReplay(actorId: string, idempotencyKey: string, requestFingerprint: string, draft: z.infer<typeof StrategyDraftSchema>) {
@@ -189,7 +217,8 @@ CREATE TRIGGER IF NOT EXISTS strategy_workbench_drafts_no_update BEFORE UPDATE O
           : [];
       }
       const recommendation = parsed.data;
-      const draftRow = this.db.prepare("SELECT draft_json FROM strategy_workbench_drafts WHERE actor_id=? AND recommendation_id=?").get(actorId, recommendation.recommendationId) as { draft_json: string } | undefined;
+      const draftRow = this.db.prepare("SELECT draft_json FROM strategy_workbench_draft_references WHERE actor_id=? AND recommendation_id=?").get(actorId, recommendation.recommendationId) as { draft_json: string } | undefined
+        ?? this.db.prepare("SELECT draft_json FROM strategy_workbench_drafts WHERE actor_id=? AND recommendation_id=?").get(actorId, recommendation.recommendationId) as { draft_json: string } | undefined;
       return [[recommendation.intentId, { recommendation, ...(draftRow ? { draft: StrategyDraftSchema.parse(JSON.parse(draftRow.draft_json)) } : {}) }] as const];
     }));
     return intents.map((row) => ({ intent: StrategyIntentSchema.parse(JSON.parse(row.intent_json)), ...(byIntent.get(StrategyIntentSchema.parse(JSON.parse(row.intent_json)).intentId) ?? {}) }));

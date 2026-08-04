@@ -2,10 +2,9 @@
 
 ## LOOP-045 F3 final Chrome lifecycle continuation（2026-08-03）
 
-- F3 保持 `IN_PROGRESS`。Agent-operated Chrome 在中文 1440×900 新建完整加密货币/多周期/风险调整后收益/有界风险请求，确认 Recommendation 仅引用 Published Catalog、显示分支并汇聚的 DAG，且固定 Portfolio → Risk Gate → Paper Execution 链保持 `SYSTEM LOCKED` / `NOT_APPLIED`。Apply 后创建了 immutable `configuration-draft:e581fa67ace0e7ce1f3a2d89:version:1`。
-- 阻塞已精确复现：提交完整有效的“单笔最大仓位 5%”修改并 Apply 后，得到 `configuration-draft:afbaa56ae78a13948b9a263c:version:1`，而不是前一 Draft 的 `version:2` 与准确 parent/reference；因此无法证明 earlier version unchanged 或通过 F3 closeout。中间只含修改语句的请求正确返回澄清，未被误认为有效修改。
-- Chrome reload 后再受控重启现有 `npm run dev:paper` 链，未触碰 `data/local-paper-workspace*`；同一 HttpOnly local actor 恢复 Turns、所有 Draft references、legacy `PROVENANCE_UNAVAILABLE` 且不可 Apply，以及 Input、Analysis、Decision、Reflection 四类 Published Catalog。英文 820×760 为 `scrollWidth=clientWidth=820`，Send 获得可见 2px outline；快速分类切换未呈现旧类别数据。Console 捕获两条浏览器监听器 channel-closed error；Network capability 未暴露，精确记为 `TOOL_UNAVAILABLE`。全程维持 `runtimeApplied=false`、Paper Only、`exchangeWriteAllowed=false`，未执行 Preflight、Backtest、Runtime Apply 或交易写入。
-- 唯一下一入口为 [`LOOP-046`](loop-prompts/loop-046-f3-draft-revision-lineage-continuation-v1.md)：在既有 authority 内诊断并修复同一对话的有效修改为何创建新 Draft 而非 append immutable version，然后补齐精准 parent/reference、旧版本只读不变、reload/restart 与窄屏回归。
+- F3 `COMPLETE`（LOOP-046）。工作台修改现在复用既有 Configuration Draft authority：完整有效的“最大仓位 5%”修改经 Apply 为同一 Draft 的不可变 `version:2`，带精确 `parentVersionId + parentFingerprint`；v1 继续可读且未改变。未新增 Catalog、identity、Conversation 或 Draft authority。
+- 真实 Agent Chrome 中文验证了新鲜请求的 v1→5% 修改 v2、Published provenance、分支/汇聚 DAG 与锁定 Portfolio → Risk Gate → Paper Execution 链。reload 与两次受控 `npm run dev:paper` Web/API restart 后，同一 HttpOnly actor 恢复四类 Published Catalog、Turns、legacy `PROVENANCE_UNAVAILABLE`（只读、不可 Apply）以及该 Draft 的 v1/v2 references。全程保持 `runtimeApplied=false`、Paper Only、`exchangeWriteAllowed=false`。
+- 英文 820×760：`scrollWidth=clientWidth=820`，composer 键盘焦点 2px；Network capability 为 `TOOL_UNAVAILABLE`。Console 仅有两条 Chrome 扩展 listener channel-closed error，无应用错误。`npm run check`、`npm run test:ts`（376/376）、`npm run build:web` 与 `git diff --check` 均通过。
 
 ## LOOP-044 F3 catalog recovery and test closeout（2026-08-03）
 
