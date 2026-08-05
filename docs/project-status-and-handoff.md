@@ -1,5 +1,12 @@
 # TradeBot 当前状态与接手说明
 
+## LOOP-054 F4 hydration/action-response continuation（2026-08-05）
+
+- 修复：history hydration 保留 Draft/version identity，取消按数组 index 回填；F4 action 以 exact immutable version merge，并隔离旧 epoch；history 非 2xx/parse failure 显式显示安全错误。聚焦测试覆盖 legacy 隔离与 version identity action merge。
+- 自动化：`npm run check`、`npm run build:web`、`git diff --check` PASS；`npm run test:ts` 自然结束 TAP `382/382`、exit 0。
+- Chrome：Agent 使用唯一当前 HEAD `dev:paper`。同 actor reload 恢复完整 history 和持久化 Backtest partial evidence；但刚点击 Backtest/Walk-Forward 时原页没有稳定显示最新投影，不能把 reload recovery 代替 action-response PASS。未执行 Approval、Runtime、Simulation 或交易写入。
+- F4 保持 `IN_PROGRESS`。唯一下一入口为 [`LOOP-055`](loop-prompts/loop-055-f4-action-response-recovery-continuation-v1.md)，只关闭即时 action-response、同 actor reload/restart 与新鲜 v1→v2 Chrome 验收；不得进入 F5。
+
 ## LOOP-053 F4 stale projection and recovery continuation（2026-08-05）
 
 - 新增只读 `findReadableForConfiguration` 投影：已有 immutable v1 binding 因 v2 drift 变 stale 时，历史 binding/job/artifact 仍可读；它不恢复 authorization。F4 卡片同时显示 Configuration version/fingerprint 与 v2 精确 parent version/fingerprint，fresh v2 不显示 v1 binding/jobs/ready，唯一下一动作仍由服务器返回。

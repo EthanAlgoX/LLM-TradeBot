@@ -1,5 +1,7 @@
 # TradeBot 产品优化规划与进度
 
+> 2026-08-05：LOOP-054 保持 F4 `IN_PROGRESS`。修复 history hydration 的下标关联、F4 action 的版本级合并与 history 非 2xx 可见错误；自动化为 382/382。真实 Chrome 确认同 actor reload 恢复完整 history，且 Backtest 持久化后可恢复为 partial evidence；但 Backtest/Walk-Forward action response 仍未在原页稳定即时投影，完整新鲜 v1→v2、双尺寸与重启验收未完成。LOOP-055 仅关闭该 action-response/recovery 缺口，禁止进入 F5。
+
 > 2026-08-05：LOOP-053 保持 F4 `IN_PROGRESS`。在既有 authority 内修复 stale 的只读 F4 projection：v1 Evidence binding 变 stale 后仍可展示 immutable jobs/artifacts，v2 显示精确 parent version/fingerprint 且不投影 v1 Evidence；新增回归测试。Agent Chrome 用本轮新 v1 完成 Apply 与 Preflight，Backtest 实际持久化但动作响应未即时重投影；受控 Web/API 重启后恢复为 partial evidence。随后 reload 再次丢失该 actor 的 Workbench history，故无法完成新鲜 v1 Evidence-ready、同 Draft v2、双尺寸和最终 Console 验收。`check` 与自然结束的 `test:ts` 380/380 通过；F4 不进入 F5，LOOP-054 只诊断并关闭同 actor reload/action-response hydration 后再重做 Chrome 验收。
 
 > 2026-08-05：LOOP-052 完成 F4 的可读 lineage/UI 闭环与当前 HEAD Chrome 验证：新增只读 Authority lineage（Configuration、Graph、Dataset、Profile、Candidate Set、Plan、binding version/fingerprint、两类 job/evidence），不创建第二 authority；真实 Chrome 从新 immutable v1 运行 Preflight → Backtest → Walk-Forward 并停在 `EVIDENCE READY / APPROVAL REQUIRED`。中文 1440×900 与英文 820×760 均 `scrollWidth === clientWidth`；reload 后恢复。`check`、自然结束的 `test:ts` 379/379、`build:web`、`diff --check` 均通过。Network 能力不可用；Console 未见 TradeBot warning/error，唯一 error 为 Chrome 扩展 channel-close。F4 保持 `IN_PROGRESS`，LOOP-053 只验证同 Draft v1→v2 的 immutable lineage、stale 与重启恢复。

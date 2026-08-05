@@ -1,5 +1,5 @@
 export type WorkbenchF4Turn = {
-  readonly draft?: { readonly draftId: string };
+  readonly draft?: { readonly draftId: string; readonly versionId?: string };
   f4?: unknown;
 };
 
@@ -13,4 +13,17 @@ export async function hydrateWorkbenchF4Turns<T extends WorkbenchF4Turn>(
     try { return { ...turn, f4: await loadF4(turn.draft.draftId) }; }
     catch (error) { return { ...turn, f4: { error: error instanceof Error ? error.message : "F4_UNAVAILABLE" } }; }
   }));
+}
+
+/**
+ * Apply an action result only to its immutable configuration version.  This is
+ * intentionally identity based: a history read can contain legacy entries or
+ * a different ordering after restart, neither of which may redirect F4 facts.
+ */
+export function mergeWorkbenchF4Action<T extends WorkbenchF4Turn>(
+  turns: readonly T[],
+  versionId: string,
+  f4: unknown,
+): T[] {
+  return turns.map((turn) => turn.draft?.versionId === versionId ? { ...turn, f4 } : turn);
 }

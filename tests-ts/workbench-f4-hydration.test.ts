@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { hydrateWorkbenchF4Turns } from "../apps/web/src/workbench-f4-hydration.js";
+import { hydrateWorkbenchF4Turns, mergeWorkbenchF4Action } from "../apps/web/src/workbench-f4-hydration.js";
 
 test("F4 hydration isolates a legacy draft failure and resolves current drafts", async () => {
   const hydrated = await hydrateWorkbenchF4Turns([{ id: "legacy", draft: { draftId: "legacy" } }, { id: "current", draft: { draftId: "current" } }], async (draftId) => {
@@ -8,4 +8,26 @@ test("F4 hydration isolates a legacy draft failure and resolves current drafts",
     return { nextAction: "preflight" };
   });
   assert.deepEqual(hydrated, [{ id: "legacy", draft: { draftId: "legacy" }, f4: { error: "PROVENANCE_UNAVAILABLE" } }, { id: "current", draft: { draftId: "current" }, f4: { nextAction: "preflight" } }]);
+});
+
+test("F4 action result is merged by immutable version, never by history position", () => {
+  const initial = [
+    { id: "legacy", draft: { draftId: "legacy", versionId: "config:v0" }, f4: { error: "PROVENANCE_UNAVAILABLE" } },
+    { id: "v1", draft: { draftId: "same-draft", versionId: "config:v1" }, f4: { nextAction: "backtest" } },
+    { id: "v2", draft: { draftId: "same-draft", versionId: "config:v2" }, f4: { nextAction: "preflight" } },
+  ];
+  const merged = mergeWorkbenchF4Action(initial, "config:v2", { gates: [{ id: "preflight", status: "passed" }], nextAction: "backtest" });
+  assert.deepEqual(merged.map((turn) => turn.f4), [
+    { error: "PROVENANCE_UNAVAILABLE" },
+    { nextAction: "backtest" },
+    { gates: [{ id: "preflight", status: "passed" }], nextAction: "backtest" },
+  ]);
+});
+
+test("a completed action remains authoritative when an older hydration is discarded", async () => {
+  const initial = [{ id: "v1", draft: { draftId: "same-draft", versionId: "config:v1" }, f4: { nextAction: "preflight" } }];
+  const oldHydration = hydrateWorkbenchF4Turns(initial, async () => ({ nextAction: "preflight" }));
+  const actionResult = mergeWorkbenchF4Action(initial, "config:v1", { gates: [{ id: "preflight", status: "passed" }], nextAction: "backtest" });
+  await oldHydration;
+  assert.deepEqual(actionResult[0]?.f4, { gates: [{ id: "preflight", status: "passed" }], nextAction: "backtest" });
 });
