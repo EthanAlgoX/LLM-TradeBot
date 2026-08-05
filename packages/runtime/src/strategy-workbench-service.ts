@@ -87,12 +87,17 @@ CREATE TRIGGER IF NOT EXISTS strategy_workbench_drafts_no_update BEFORE UPDATE O
       }
     }
     const scope = this.f4Authority.scopes[0];
-    let binding = this.f4Authority.evidence.findCurrentForConfiguration(config.versionId);
+    const evidenceScope = { requireExecutableScope: false } as const;
+    let binding = this.f4Authority.evidence.findCurrentForConfiguration(config.versionId, evidenceScope);
     if (action && action !== "preflight") {
       if (preflight?.status !== "passed") throw new StrategyWorkbenchError("PREFLIGHT_REQUIRED");
       if (!scope) throw new StrategyWorkbenchError("HISTORICAL_SCOPE_UNAVAILABLE");
-      binding ??= this.f4Authority.evidence.createBinding({ schemaVersion: "1.0.0", strategyConfigurationVersionId: config.versionId, ...scope, idempotencyKey: `f4-binding:${config.versionId}`.slice(0, 160) }, this.f4Authority.actor(actorId));
-      binding = action === "backtest" ? await this.f4Authority.evidence.runBacktest(binding.bindingId, { schemaVersion: "1.0.0", idempotencyKey }, this.f4Authority.actor(actorId)) : await this.f4Authority.evidence.runWalkForward(binding.bindingId, { schemaVersion: "1.0.0", idempotencyKey }, this.f4Authority.actor(actorId));
+      // The Workbench has already bound this immutable Draft to the registered
+      // CSV historical graph. It is deliberately not an executable-runtime
+      // materialization, so retain the existing evidence authority while
+      // avoiding an unrelated runtime-derived scope requirement.
+      binding ??= this.f4Authority.evidence.createBinding({ schemaVersion: "1.0.0", strategyConfigurationVersionId: config.versionId, ...scope, idempotencyKey: `f4-binding:${config.versionId}`.slice(0, 160) }, this.f4Authority.actor(actorId), { requireExecutableScope: false });
+      binding = action === "backtest" ? await this.f4Authority.evidence.runBacktest(binding.bindingId, { schemaVersion: "1.0.0", idempotencyKey }, this.f4Authority.actor(actorId), evidenceScope) : await this.f4Authority.evidence.runWalkForward(binding.bindingId, { schemaVersion: "1.0.0", idempotencyKey }, this.f4Authority.actor(actorId), evidenceScope);
     }
     const stale = binding?.lifecycleStatus === "stale";
     const gates = [{ id: "draft", status: "current" }, { id: "preflight", status: stale ? "stale" : preflight?.status ?? "pending" }, { id: "backtest", status: stale ? "stale" : binding?.backtestJob ? "succeeded" : "locked" }, { id: "walk_forward", status: stale ? "stale" : binding?.walkForwardJob ? "succeeded" : "locked" }, { id: "approval_required", status: stale ? "stale" : binding?.lifecycleStatus === "evidence_ready" ? "approval_required" : "locked" }];

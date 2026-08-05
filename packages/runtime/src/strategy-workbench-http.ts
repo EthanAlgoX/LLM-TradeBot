@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { PipelineOrchestrationAuthenticator } from "./pipeline-orchestration-auth.js";
+import { StrategyEvidenceApprovalError } from "../../core/src/strategy-evidence-approval-service.js";
 import { StrategyWorkbenchError, type StrategyWorkbenchService } from "./strategy-workbench-service.js";
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } });
 export class StrategyWorkbenchHttpHandler {
@@ -19,6 +20,6 @@ export class StrategyWorkbenchHttpHandler {
       const turns = path.match(/^\/api\/orchestration\/workbench\/conversations\/([^/]+)\/turns$/u);
       if (request.method === "GET" && turns) return json({ data: this.service.listTurns(actor.actorId, decodeURIComponent(turns[1]!), Object.fromEntries(new URL(request.url).searchParams.entries())) });
       return json({ error: { code: "ROUTE_NOT_FOUND" } }, 404);
-    } catch (error) { const code = error instanceof StrategyWorkbenchError ? error.code : error instanceof z.ZodError ? "REQUEST_CONTRACT_INVALID" : "WORKBENCH_REQUEST_FAILED"; return json({ error: { code } }, code.includes("STALE") || code.includes("DRIFT") ? 409 : code === "PUBLISHED_CATALOG_INSUFFICIENT" ? 422 : 400); }
+    } catch (error) { const safeMessageCode = error instanceof Error && /^[A-Z0-9_:-]{3,160}$/u.test(error.message) ? error.message : undefined; const code = error instanceof StrategyWorkbenchError || error instanceof StrategyEvidenceApprovalError ? error.code : error instanceof z.ZodError ? "REQUEST_CONTRACT_INVALID" : safeMessageCode ?? "WORKBENCH_REQUEST_FAILED"; return json({ error: { code } }, code.includes("STALE") || code.includes("DRIFT") ? 409 : code === "PUBLISHED_CATALOG_INSUFFICIENT" ? 422 : 400); }
   }
 }

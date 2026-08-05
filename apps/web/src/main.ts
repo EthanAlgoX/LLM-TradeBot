@@ -2433,6 +2433,10 @@ function bindEvents(): void {
       const response = await fetch(`${sessionConfiguration.apiBase}/api/orchestration/workbench/apply`, { method: "POST", credentials: "include", headers: { "content-type": "application/json" }, body: JSON.stringify({ recommendationId: button.dataset.realApply, fingerprint: button.dataset.realFingerprint, idempotencyKey: `workbench-apply:${button.dataset.realApply}` }) });
       const body = await response.json() as { data?: any; error?: { code?: string } }; if (!response.ok || !body.data) throw new Error(body.error?.code ?? "APPLY_FAILED");
       state.realWorkbenchTurns = state.realWorkbenchTurns.map((turn) => turn.result.recommendation?.recommendationId === button.dataset.realApply ? { ...turn, draft: body.data } : turn); render();
+      // A newly applied immutable version has no local F4 projection yet. Reuse
+      // the server-authoritative hydration path so the card never remains a
+      // loading placeholder and legacy failures stay independently isolated.
+      await hydrateRealWorkbench();
     } catch (error) { showToast(`应用被拒绝：${error instanceof Error ? error.message : "APPLY_FAILED"}`, `Apply rejected: ${error instanceof Error ? error.message : "APPLY_FAILED"}`); }
   }));
   document.querySelectorAll<HTMLButtonElement>("[data-f4-action]").forEach((button) => button.addEventListener("click", async () => {

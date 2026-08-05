@@ -146,7 +146,11 @@ export class StrategyEvidenceApprovalService {
     this.executableStrategyScope = options.executableStrategyScope;
   }
 
-  createBinding(rawRequest: unknown, actor: OrchestrationActor): StrategyEvidenceBinding {
+  createBinding(
+    rawRequest: unknown,
+    actor: OrchestrationActor,
+    options: { readonly requireExecutableScope?: boolean } = {},
+  ): StrategyEvidenceBinding {
     assertRole(actor, "operator");
     const request = CreateStrategyEvidenceBindingRequestSchema.parse(rawRequest);
     const replay = this.bindings.findByCreationIdempotency(actor.actorId, request.idempotencyKey);
@@ -167,8 +171,9 @@ export class StrategyEvidenceApprovalService {
       });
     }
     const historicalPlan = this.configuration.compileHistorical(configuration.versionId);
-    const executableStrategy =
-      this.executableStrategyScope?.getCurrent(configuration.versionId);
+    const executableStrategy = options.requireExecutableScope === false
+      ? undefined
+      : this.executableStrategyScope?.getCurrent(configuration.versionId);
     if (
       executableStrategy &&
       (
@@ -295,11 +300,12 @@ export class StrategyEvidenceApprovalService {
 
   findCurrentForConfiguration(
     configurationVersionId: string,
+    options: { readonly requireExecutableScope?: boolean } = {},
   ): StrategyEvidenceBinding | undefined {
     const binding = this.bindings.findLatestByConfigurationVersionId?.(
       configurationVersionId,
     );
-    return binding ? this.assertScopeCurrent(binding) : undefined;
+    return binding ? this.assertScopeCurrent(binding, options) : undefined;
   }
 
   findApprovalReadyForConfiguration(
@@ -333,10 +339,11 @@ export class StrategyEvidenceApprovalService {
     bindingId: string,
     rawRequest: unknown,
     actor: OrchestrationActor,
+    options: { readonly requireExecutableScope?: boolean } = {},
   ): Promise<StrategyEvidenceBinding> {
     assertRole(actor, "operator");
     const request = RunStrategyEvidenceJobRequestSchema.parse(rawRequest);
-    const binding = this.assertScopeCurrent(this.get(bindingId));
+    const binding = this.assertScopeCurrent(this.get(bindingId), options);
     const job = this.jobs.submitBacktest({
       schemaVersion: "1.0.0",
       planId: binding.historicalPlanRef.id,
@@ -360,10 +367,11 @@ export class StrategyEvidenceApprovalService {
     bindingId: string,
     rawRequest: unknown,
     actor: OrchestrationActor,
+    options: { readonly requireExecutableScope?: boolean } = {},
   ): Promise<StrategyEvidenceBinding> {
     assertRole(actor, "operator");
     const request = RunStrategyEvidenceJobRequestSchema.parse(rawRequest);
-    const binding = this.assertScopeCurrent(this.get(bindingId));
+    const binding = this.assertScopeCurrent(this.get(bindingId), options);
     const job = this.jobs.submitWalkForward({
       schemaVersion: "1.0.0",
       planId: binding.historicalPlanRef.id,
@@ -591,7 +599,10 @@ export class StrategyEvidenceApprovalService {
     };
   }
 
-  private assertScopeCurrent(binding: StrategyEvidenceBinding): StrategyEvidenceBinding {
+  private assertScopeCurrent(
+    binding: StrategyEvidenceBinding,
+    options: { readonly requireExecutableScope?: boolean } = {},
+  ): StrategyEvidenceBinding {
     if (binding.lifecycleStatus === "stale") {
       throw new StrategyEvidenceApprovalError("STRATEGY_CONFIGURATION_CHANGED", {
         bindingId: binding.bindingId,
@@ -613,10 +624,11 @@ export class StrategyEvidenceApprovalService {
       | ExecutableStrategyConfiguration
       | undefined;
     try {
-      executableStrategy =
-        this.executableStrategyScope?.getCurrent(
-          binding.configurationRef.versionId,
-        );
+      executableStrategy = options.requireExecutableScope === false
+        ? undefined
+        : this.executableStrategyScope?.getCurrent(
+            binding.configurationRef.versionId,
+          );
     } catch {
       this.nextVersion(binding, {
         lifecycleStatus: "stale",

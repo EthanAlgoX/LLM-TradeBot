@@ -2,14 +2,14 @@
 
 ```text
 当前状态：F3 COMPLETE / F4 IN_PROGRESS
-最近完成：LOOP-049 的 Workbench F4 初始 hydration、version-targeted binding 与 legacy error 隔离
-下一任务：LOOP-050 — F4 Evidence chain and Chrome closeout
+最近完成：LOOP-050 的新 Apply hydration 与真实 Chrome Preflight；Backtest 仍 locked
+下一任务：LOOP-051 — F4 Backtest runner closeout
 浏览器要求：必需，由 Agent 直接操作真实 Chrome；禁止人工验收
 ```
 
-执行：[`LOOP-050`](loop-prompts/loop-050-f4-evidence-chain-chrome-closeout-v1.md)
+执行：[`LOOP-051`](loop-prompts/loop-051-f4-backtest-runner-closeout-v1.md)
 
-LOOP-050 只完成现有 F4 顺序链：`Preflight → Backtest → Walk-Forward → EVIDENCE READY / APPROVAL REQUIRED`，并验证 v1/v2 immutable + stale、reload/restart、中文 1440×900、英文 820×760 和最终 Console。不得创建第二套 validator/runner/evidence/approval/runtime authority；不得调用 Approval、创建 Approved Paper Plan、申请 Simulation Slot、执行 Runtime Apply 或产生交易写入。
+LOOP-051 只完成现有 F4 顺序链中 Backtest locked 的剩余缺口，并完成 `Preflight → Backtest → Walk-Forward → EVIDENCE READY / APPROVAL REQUIRED`、v1/v2 stale、reload/restart、中文 1440×900、英文 820×760 与最终 Console。不得创建第二套 validator/runner/evidence/approval/runtime authority；不得调用 Approval、创建 Approved Paper Plan、申请 Simulation Slot、执行 Runtime Apply 或产生交易写入。
 
 在此之前不得：
 

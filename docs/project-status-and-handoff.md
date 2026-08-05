@@ -1,5 +1,12 @@
 # TradeBot 当前状态与接手说明
 
+## LOOP-050 F4 Evidence chain Chrome closeout（2026-08-05）
+
+- Agent 真实 Chrome：当前 Workbench Draft 显示服务端 F4 gate；新 Apply 后通过同一 hydrate 路径消除永久 `F4 loading…`，Preflight 显示 `passed`，且 Backtest 之前保持 locked。
+- 发现并处理 Workbench F4 不应依赖 Executable Runtime materialization；其后新 Draft 点击 Backtest 仍保持 `locked`，未产生 Backtest/Walk-Forward Artifact、Approval、Runtime、Simulation 或交易事实。F4 因此保持 `IN_PROGRESS`。
+- 已通过 `npm run check`；尚未重新完成完整 `test:ts`、`build:web`、双尺寸、v1/v2 stale、最终 Console/Network 验收。Chrome console 仅观察到扩展 message-channel error，未观察到 TradeBot warning/error；Network `TOOL_UNAVAILABLE`。
+- 下一入口为 [`LOOP-051`](loop-prompts/loop-051-f4-backtest-runner-closeout-v1.md)，只修复 Workbench Backtest locked 缺口并完成原 F4 验收；不得进入 F5 或调用 Approval/Runtime。
+
 ## LOOP-049 F4 UI hydration diagnosis（2026-08-05）
 
 - F4 保持 `IN_PROGRESS`。根因是直达 Workbench 的初始身份流程只加载 Conversation history、没有请求每个 Draft Version 的 F4 projection；单个错误 projection 还会在 `gates.map` 触发渲染异常。

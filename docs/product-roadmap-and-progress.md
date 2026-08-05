@@ -1,5 +1,7 @@
 # TradeBot 产品路线图与当前进度
 
+> 2026-08-05：LOOP-050 部分完成 F4：真实 Chrome 已通过 Workbench 新 Draft hydration 与 Preflight，并保持无 Approval/Runtime/交易副作用；Backtest 点击后仍 locked，故 F4 `IN_PROGRESS`。下一步仅 LOOP-051 继续 F4，不进入 F5。
+
 > 2026-08-05：LOOP-049 修复 F4 UI hydration：直达 Workbench 现加载每个 Draft Version 的 F4 projection，错误 Draft 独立显示且不阻塞当前 Draft，F4 API/UI 精确绑定 `versionId`。reload 和受控重启后 loading 消失，自动化 377/377；完整 Evidence UI 链、v1/v2 stale 与双尺寸 Chrome 仍由 LOOP-050 收尾，F4 保持 `IN_PROGRESS`。
 
 > 2026-08-04：F3 `COMPLETE`（LOOP-046）。同一 Workbench Configuration Draft 的有效修改现在追加 immutable v2，保留精确 `parentVersionId + parentFingerprint` 与不变可读的 v1；真实 Chrome 中文、reload、两次受控重启恢复、四类 Published Catalog 和英文 820×760 均通过。下一步 LOOP-047 进入 F4 Preflight/Backtest/Walk-Forward；仍不执行 Approval、Runtime Apply、模拟启动或交易所写入。
