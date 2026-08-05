@@ -6,6 +6,7 @@
 - Workbench 现仅渲染服务端投影的只读 Authority lineage：Configuration version/fingerprint、registered Pipeline/Graph、Dataset、Backtest Profile、Walk-Forward Candidate Set/Plan、append-only binding version/fingerprint，以及 Backtest/Walk-Forward job/evidence。聚焦测试覆盖终态、唯一下一动作与安全转义。
 - reload recovery 通过；中文 1440×900、英文 820×760 均为 `scrollWidth === clientWidth`，并保留可见 focus style。Console 未见 TradeBot warning/error；唯一 console error 为 Chrome extension message-channel close。Network capability 未提供，记为 `TOOL_UNAVAILABLE`。
 - 自动化：`npm run check`、`npm run test:ts`（自然 TAP 379/379）、`npm run build:web`、`git diff --check` 全部 PASS。F4 仍为 `IN_PROGRESS`：尚缺以本轮新鲜 v1 完成 Evidence 后，通过正常 Workbench modification/Apply 创建同 Draft v2，并验证 v1 保持可读、v2 stale/不继承、reload/服务重启不交叉的完整 Chrome 证据。
+- 唯一下一入口为 [`LOOP-053`](loop-prompts/loop-053-f4-v1-v2-stale-recovery-closeout-v1.md)。浏览器必需且只能由 Agent 操作；F4 完成前不得进入 F5。
 
 ## LOOP-051 F4 Backtest runner closeout（2026-08-05）
 

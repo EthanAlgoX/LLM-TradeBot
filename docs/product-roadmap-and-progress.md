@@ -1,6 +1,6 @@
 # TradeBot 产品路线图与当前进度
 
-> 2026-08-05：LOOP-052 完成当前 F4 可读 evidence lineage、聚焦 UI 测试与真实 Chrome 复核。新 v1 由 Agent 在 Workbench 走完 Preflight → Backtest → Walk-Forward，终态为 `EVIDENCE READY / APPROVAL REQUIRED`，无 Approval/Runtime/交易副作用。reload 恢复通过；中文 1440×900、英文 820×760 均无横向溢出；全量 TAP 自然结束 379/379。Network `TOOL_UNAVAILABLE`；Console 仅 Chrome 扩展 channel-close，不归因产品。F4 保持 `IN_PROGRESS`，仅余新鲜 v1→v2 stale/recovery 证据。
+> 2026-08-05：LOOP-052 完成当前 F4 可读 evidence lineage、聚焦 UI 测试与真实 Chrome 复核。新 v1 由 Agent 在 Workbench 走完 Preflight → Backtest → Walk-Forward，终态为 `EVIDENCE READY / APPROVAL REQUIRED`，无 Approval/Runtime/交易副作用。reload 恢复通过；中文 1440×900、英文 820×760 均无横向溢出；全量 TAP 自然结束 379/379。Network `TOOL_UNAVAILABLE`；Console 仅 Chrome 扩展 channel-close，不归因产品。F4 保持 `IN_PROGRESS`，LOOP-053 仅收尾新鲜同 Draft v1→v2 stale/recovery 证据。
 
 > 2026-08-05：LOOP-051 部分完成 F4：旧服务进程加载构建前产物造成 Backtest UI 保持 locked；以当前 HEAD 受控重启后，Agent Chrome 已完成一条 v1 的 Preflight → Backtest → Walk-Forward，并显示 `approval_required`，无 Approval/Runtime/交易副作用。F4 仍 `IN_PROGRESS`，LOOP-052 仅关闭 v1/v2 stale、lineage、尺寸、console 与全量测试缺口，不进入 F5。
 
