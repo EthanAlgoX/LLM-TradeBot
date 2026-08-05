@@ -1,5 +1,12 @@
 # TradeBot 当前状态与接手说明
 
+## LOOP-051 F4 Backtest runner closeout（2026-08-05）
+
+- Agent 真实 Chrome 复现了 Preflight `passed` / Backtest `locked`；只读诊断确认 Backtest action 使用 exact Draft `versionId`，并在当前服务重启后由既有 CSV Graph Evidence runner 成功产生 Backtest job/artifact。
+- 根因：已有受控 `dev:paper` 服务在本轮构建前启动，内存中仍加载旧产物。停止该已识别父进程、执行当前 HEAD 的唯一 `npm run dev:paper` 后，当前 immutable v1 已经由 Workbench UI 完成 `Preflight → Backtest → Walk-Forward → approval_required`。Walk-Forward 的真实 runner 完成后，UI 投影 `backtest: succeeded`、`walk_forward: succeeded`、`approval_required: approval_required`；未调用 Approval。
+- 未完成：v1 修改为同一 Draft 的 v2 stale 验收、lineage 详情展示、双尺寸/键盘焦点、最终清空 Console、全量 `test:ts` 和完整回归测试。因此 F4 仍为 `IN_PROGRESS`，不进入 F5。
+- 下一入口为 `LOOP-052`（F4 continuation），仅关闭上述缺口；继续禁止 Approval、Approved Paper Plan、Runtime、Simulation 和交易写入。
+
 ## LOOP-050 F4 Evidence chain Chrome closeout（2026-08-05）
 
 - Agent 真实 Chrome：当前 Workbench Draft 显示服务端 F4 gate；新 Apply 后通过同一 hydrate 路径消除永久 `F4 loading…`，Preflight 显示 `passed`，且 Backtest 之前保持 locked。

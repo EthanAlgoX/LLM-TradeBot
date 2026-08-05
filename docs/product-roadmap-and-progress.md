@@ -1,6 +1,6 @@
 # TradeBot 产品路线图与当前进度
 
-> 2026-08-05：LOOP-050 部分完成 F4：真实 Chrome 已通过 Workbench 新 Draft hydration 与 Preflight，并保持无 Approval/Runtime/交易副作用；Backtest 点击后仍 locked，故 F4 `IN_PROGRESS`。下一步仅 LOOP-051 继续 F4，不进入 F5。
+> 2026-08-05：LOOP-051 部分完成 F4：旧服务进程加载构建前产物造成 Backtest UI 保持 locked；以当前 HEAD 受控重启后，Agent Chrome 已完成一条 v1 的 Preflight → Backtest → Walk-Forward，并显示 `approval_required`，无 Approval/Runtime/交易副作用。F4 仍 `IN_PROGRESS`，LOOP-052 仅关闭 v1/v2 stale、lineage、尺寸、console 与全量测试缺口，不进入 F5。
 
 > 2026-08-05：LOOP-049 修复 F4 UI hydration：直达 Workbench 现加载每个 Draft Version 的 F4 projection，错误 Draft 独立显示且不阻塞当前 Draft，F4 API/UI 精确绑定 `versionId`。reload 和受控重启后 loading 消失，自动化 377/377；完整 Evidence UI 链、v1/v2 stale 与双尺寸 Chrome 仍由 LOOP-050 收尾，F4 保持 `IN_PROGRESS`。
 
