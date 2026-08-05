@@ -4532,6 +4532,54 @@ kbd,
   min-height: 700px;
 }
 
+.workbench-f4 {
+  min-width: 0;
+}
+
+.workbench-f4__projection,
+.workbench-f4__lineage,
+.workbench-f4__lineage dd,
+.workbench-f4__lineage code {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.workbench-f4__lineage {
+  margin: 12px 0;
+}
+
+.workbench-f4__lineage summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.workbench-f4__lineage dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 10px 0 0;
+}
+
+.workbench-f4__lineage dl > div {
+  padding: 9px;
+  border: 1px solid var(--line);
+}
+
+.workbench-f4__lineage dt {
+  margin-bottom: 4px;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+
+.workbench-f4__lineage dd {
+  margin: 0;
+  font-size: 0.78rem;
+}
+
+@media (max-width: 760px) {
+  .workbench-f4__lineage dl { grid-template-columns: 1fr; }
+}
+
 .advanced-orchestration-heading {
   display: flex;
   align-items: end;

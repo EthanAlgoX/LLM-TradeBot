@@ -1,5 +1,7 @@
 # TradeBot 产品优化规划与进度
 
+> 2026-08-05：LOOP-052 完成 F4 的可读 lineage/UI 闭环与当前 HEAD Chrome 验证：新增只读 Authority lineage（Configuration、Graph、Dataset、Profile、Candidate Set、Plan、binding version/fingerprint、两类 job/evidence），不创建第二 authority；真实 Chrome 从新 immutable v1 运行 Preflight → Backtest → Walk-Forward 并停在 `EVIDENCE READY / APPROVAL REQUIRED`。中文 1440×900 与英文 820×760 均 `scrollWidth === clientWidth`；reload 后恢复。`check`、自然结束的 `test:ts` 379/379、`build:web`、`diff --check` 均通过。Network 能力不可用；Console 未见 TradeBot warning/error，唯一 error 为 Chrome 扩展 channel-close。v1→v2 stale/recovery 的新鲜完整证据仍缺，F4 保持 `IN_PROGRESS`。
+
 > 2026-08-05：LOOP-051 部分完成 F4。根因是受控 `dev:paper` 仍运行构建前加载的旧服务产物；停止该受控进程并以当前 HEAD 重启后，Agent Chrome 从 Workbench 正常完成当前 immutable v1 的 Preflight、Backtest 与 Walk-Forward，并显示 `approval_required`，未调用 Approval。v1/v2 stale、完整 lineage 展示、双尺寸/最终 console 和全量自动化仍未完成，F4 保持 `IN_PROGRESS`。
 
 > 2026-08-05：LOOP-049 F4 仍为 `IN_PROGRESS`。已修复 Workbench 初始身份路径漏加载 F4 projection、legacy error 在 gate 渲染时抛错，以及 action 未精确绑定 Draft Version 的问题；reload/受控重启后 loading 消失，377/377 自动化通过。真实 Preflight/Backtest/Walk-Forward、v1/v2 stale 和双尺寸 Chrome 交由 LOOP-050，仍禁止 Approval、Runtime 与交易副作用。

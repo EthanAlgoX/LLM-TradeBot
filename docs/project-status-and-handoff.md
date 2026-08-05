@@ -1,5 +1,12 @@
 # TradeBot 当前状态与接手说明
 
+## LOOP-052 F4 remaining evidence closeout（2026-08-05）
+
+- 当前 HEAD 的唯一受控 `dev:paper` 服务已由 Agent Chrome 验证：新 immutable v1 在正常 Workbench UI 完成 `Preflight → Backtest → Walk-Forward → EVIDENCE READY / APPROVAL REQUIRED`；未调用 Approval，且没有 Paper Plan、Runtime、Simulation 或交易事实。
+- Workbench 现仅渲染服务端投影的只读 Authority lineage：Configuration version/fingerprint、registered Pipeline/Graph、Dataset、Backtest Profile、Walk-Forward Candidate Set/Plan、append-only binding version/fingerprint，以及 Backtest/Walk-Forward job/evidence。聚焦测试覆盖终态、唯一下一动作与安全转义。
+- reload recovery 通过；中文 1440×900、英文 820×760 均为 `scrollWidth === clientWidth`，并保留可见 focus style。Console 未见 TradeBot warning/error；唯一 console error 为 Chrome extension message-channel close。Network capability 未提供，记为 `TOOL_UNAVAILABLE`。
+- 自动化：`npm run check`、`npm run test:ts`（自然 TAP 379/379）、`npm run build:web`、`git diff --check` 全部 PASS。F4 仍为 `IN_PROGRESS`：尚缺以本轮新鲜 v1 完成 Evidence 后，通过正常 Workbench modification/Apply 创建同 Draft v2，并验证 v1 保持可读、v2 stale/不继承、reload/服务重启不交叉的完整 Chrome 证据。
+
 ## LOOP-051 F4 Backtest runner closeout（2026-08-05）
 
 - Agent 真实 Chrome 复现了 Preflight `passed` / Backtest `locked`；只读诊断确认 Backtest action 使用 exact Draft `versionId`，并在当前服务重启后由既有 CSV Graph Evidence runner 成功产生 Backtest job/artifact。
