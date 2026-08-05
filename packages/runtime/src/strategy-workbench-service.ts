@@ -88,7 +88,10 @@ CREATE TRIGGER IF NOT EXISTS strategy_workbench_drafts_no_update BEFORE UPDATE O
     }
     const scope = this.f4Authority.scopes[0];
     const evidenceScope = { requireExecutableScope: false } as const;
-    let binding = this.f4Authority.evidence.findCurrentForConfiguration(config.versionId, evidenceScope);
+    // Historical cards must retain their immutable evidence after a newer
+    // configuration version makes it stale.  This is a read-only projection,
+    // never an authorization to reuse the stale binding.
+    let binding = this.f4Authority.evidence.findReadableForConfiguration(config.versionId, evidenceScope);
     if (action && action !== "preflight") {
       if (preflight?.status !== "passed") throw new StrategyWorkbenchError("PREFLIGHT_REQUIRED");
       if (!scope) throw new StrategyWorkbenchError("HISTORICAL_SCOPE_UNAVAILABLE");
@@ -101,7 +104,7 @@ CREATE TRIGGER IF NOT EXISTS strategy_workbench_drafts_no_update BEFORE UPDATE O
     }
     const stale = binding?.lifecycleStatus === "stale";
     const gates = [{ id: "draft", status: "current" }, { id: "preflight", status: stale ? "stale" : preflight?.status ?? "pending" }, { id: "backtest", status: stale ? "stale" : binding?.backtestJob ? "succeeded" : "locked" }, { id: "walk_forward", status: stale ? "stale" : binding?.walkForwardJob ? "succeeded" : "locked" }, { id: "approval_required", status: stale ? "stale" : binding?.lifecycleStatus === "evidence_ready" ? "approval_required" : "locked" }];
-    const result = { draft, preflight: preflight ?? { status: "pending", issues: [] }, binding, gates, nextAction: stale ? undefined : !preflight || preflight.status !== "passed" ? "preflight" : !binding?.backtestJob ? "backtest" : !binding?.walkForwardJob ? "walk-forward" : undefined, runtimeApplied: false, paperOnly: true, exchangeWriteAllowed: false };
+    const result = { draft, configuration: { draftId: config.draftId, versionId: config.versionId, fingerprint: config.fingerprint, parentVersionId: config.parentVersionId, parentFingerprint: config.parentFingerprint }, preflight: preflight ?? { status: "pending", issues: [] }, binding, gates, nextAction: stale ? undefined : !preflight || preflight.status !== "passed" ? "preflight" : !binding?.backtestJob ? "backtest" : !binding?.walkForwardJob ? "walk-forward" : undefined, runtimeApplied: false, paperOnly: true, exchangeWriteAllowed: false };
     if (action) this.db.prepare("INSERT INTO strategy_workbench_f4_replays VALUES (?, ?, ?, ?)").run(actorId, idempotencyKey!, requestFingerprint!, JSON.stringify(result));
     return result;
   }

@@ -308,6 +308,35 @@ export class StrategyEvidenceApprovalService {
     return binding ? this.assertScopeCurrent(binding, options) : undefined;
   }
 
+  /**
+   * Read the newest immutable binding for a Workbench history projection.
+   * A stale binding is deliberately still readable: its historical evidence
+   * remains authority, while its lifecycle state prevents further use.
+   */
+  findReadableForConfiguration(
+    configurationVersionId: string,
+    options: { readonly requireExecutableScope?: boolean } = {},
+  ): StrategyEvidenceBinding | undefined {
+    const binding = this.bindings.findLatestByConfigurationVersionId?.(
+      configurationVersionId,
+    );
+    if (!binding) return undefined;
+    try {
+      return this.assertScopeCurrent(binding, options);
+    } catch (error) {
+      if (
+        error instanceof StrategyEvidenceApprovalError &&
+        (error.code === "STRATEGY_CONFIGURATION_CHANGED" ||
+          error.code === "STRATEGY_EVIDENCE_SCOPE_CHANGED")
+      ) {
+        return this.bindings.findLatestByConfigurationVersionId?.(
+          configurationVersionId,
+        );
+      }
+      throw error;
+    }
+  }
+
   findApprovalReadyForConfiguration(
     configurationVersionId: string,
   ): StrategyEvidenceBinding {

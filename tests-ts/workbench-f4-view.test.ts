@@ -17,3 +17,12 @@ test("F4 view keeps the only server-authorized next action and escapes error con
   assert.match(action, /Only next action/);
   assert.match(action, /data-f4-action="preflight"/);
 });
+
+test("F4 view exposes immutable parent lineage without projecting evidence into a fresh version", () => {
+  const html = renderWorkbenchF4Evidence({ configuration: { versionId: "config:v2", fingerprint: fp("4"), parentVersionId: "config:v1", parentFingerprint: fp("3") }, gates: [{ id: "preflight", status: "pending" }], nextAction: "preflight" }, "en-US");
+  assert.match(html, /Parent version/);
+  assert.match(html, /config:v1/);
+  assert.match(html, /Only next action/);
+  assert.doesNotMatch(html, /EVIDENCE READY/);
+  assert.doesNotMatch(html, /Backtest job/);
+});

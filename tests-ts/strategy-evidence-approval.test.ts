@@ -522,6 +522,16 @@ test("a changed strategy payload makes completed evidence stale and blocks appro
   );
   assert.equal(harness.service.get(ready.bindingId).lifecycleStatus, "stale");
   assert.equal(harness.service.get(ready.bindingId).staleReason, "configuration_changed");
+  const readable = harness.service.findReadableForConfiguration(
+    harness.strategy.versionId,
+  );
+  assert.equal(readable?.lifecycleStatus, "stale");
+  assert.equal(readable?.backtestJob?.jobId, ready.backtestJob?.jobId);
+  assert.equal(readable?.walkForwardJob?.jobId, ready.walkForwardJob?.jobId);
+  assert.equal(
+    harness.service.findReadableForConfiguration(latest.versionId),
+    undefined,
+  );
 });
 
 test("promotion-ineligible or tampered evidence and non-approver actors fail closed", async () => {

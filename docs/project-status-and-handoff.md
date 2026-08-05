@@ -1,5 +1,13 @@
 # TradeBot 当前状态与接手说明
 
+## LOOP-053 F4 stale projection and recovery continuation（2026-08-05）
+
+- 新增只读 `findReadableForConfiguration` 投影：已有 immutable v1 binding 因 v2 drift 变 stale 时，历史 binding/job/artifact 仍可读；它不恢复 authorization。F4 卡片同时显示 Configuration version/fingerprint 与 v2 精确 parent version/fingerprint，fresh v2 不显示 v1 binding/jobs/ready，唯一下一动作仍由服务器返回。
+- 自动化：`npm run check` PASS；`npm run test:ts` 自然 TAP `380/380`、exit 0。聚焦测试覆盖 stale v1 job 可读、fresh v2 无 binding，以及 UI parent/next-action 隔离。
+- Chrome：由 Agent 使用真实 Chrome 新建并 Apply 一条 v1，Preflight `passed`。Backtest UI 动作未即时刷新，但受控 Web/API restart 后恢复为 persisted partial evidence；其后 reload 未稳定恢复该同 actor 的 Workbench history。故 v1 Evidence-ready、同 Draft v2、stale、reload/restart、双尺寸、最终 Console/Network 均未完成，不能以 API 或人工替代。
+- 安全：未调用 Approval；无 Approved Paper Plan、Runtime Apply、Simulation Slot、Deployment、Run、Account、Order、Fill 或 Exchange Write。保持 `runtimeApplied=false`、Paper Only、`exchangeWriteAllowed=false`。
+- F4 保持 `IN_PROGRESS`。唯一下一入口为 [`LOOP-054`](loop-prompts/loop-054-f4-workbench-hydration-recovery-continuation-v1.md)，先关闭 exact action-response/reload actor recovery，再重新执行完整 v1→v2 Chrome 验收；不得进入 F5。
+
 ## LOOP-052 F4 remaining evidence closeout（2026-08-05）
 
 - 当前 HEAD 的唯一受控 `dev:paper` 服务已由 Agent Chrome 验证：新 immutable v1 在正常 Workbench UI 完成 `Preflight → Backtest → Walk-Forward → EVIDENCE READY / APPROVAL REQUIRED`；未调用 Approval，且没有 Paper Plan、Runtime、Simulation 或交易事实。
