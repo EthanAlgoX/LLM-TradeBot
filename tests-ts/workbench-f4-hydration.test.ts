@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { hydrateWorkbenchF4Turns, mergeWorkbenchF4Action } from "../apps/web/src/workbench-f4-hydration.js";
+import { hydrateWorkbenchF4Turns, mergeWorkbenchF4Action, rereadWorkbenchF4Action } from "../apps/web/src/workbench-f4-hydration.js";
 
 test("F4 hydration isolates a legacy draft failure and resolves current drafts", async () => {
   const hydrated = await hydrateWorkbenchF4Turns([{ id: "legacy", draft: { draftId: "legacy" } }, { id: "current", draft: { draftId: "current" } }], async (draftId) => {
@@ -30,4 +30,19 @@ test("a completed action remains authoritative when an older hydration is discar
   const actionResult = mergeWorkbenchF4Action(initial, "config:v1", { gates: [{ id: "preflight", status: "passed" }], nextAction: "backtest" });
   await oldHydration;
   assert.deepEqual(actionResult[0]?.f4, { gates: [{ id: "preflight", status: "passed" }], nextAction: "backtest" });
+});
+
+test("an F4 POST result is followed by one same-version authoritative reread", async () => {
+  const afterPost = mergeWorkbenchF4Action(
+    [{ id: "v1", draft: { draftId: "same-draft", versionId: "config:v1" }, f4: { nextAction: "backtest" } }],
+    "config:v1",
+    { nextAction: "backtest" },
+  );
+  const reads: string[] = [];
+  const reconciled = await rereadWorkbenchF4Action(afterPost, "config:v1", async (versionId) => {
+    reads.push(versionId);
+    return { gates: [{ id: "backtest", status: "succeeded" }], nextAction: "walk-forward" };
+  });
+  assert.deepEqual(reads, ["config:v1"]);
+  assert.deepEqual(reconciled[0]?.f4, { gates: [{ id: "backtest", status: "succeeded" }], nextAction: "walk-forward" });
 });

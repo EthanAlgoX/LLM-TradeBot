@@ -1,5 +1,12 @@
 # TradeBot 当前状态与接手说明
 
+## LOOP-055 F4 action-response recovery continuation（2026-08-06）
+
+- Chrome：Agent 使用真实 Chrome 与当前 HEAD `dev:paper`。新 v1 Preflight 立即更新；Backtest POST 已持久化 immutable `partial_evidence`，服务端 replay 是 `succeeded → walk-forward`，但原页 DOM 仍显示 Backtest `locked`；reload 后恢复 authority。Walk-Forward 同样未能即时投影。
+- 修复/测试：POST 后只对 exact immutable version 做一次 server-authoritative reread，新增有界 reread 回归。`check`、自然结束 TAP `383/383`、`build:web`、`diff --check` 通过。
+- 安全：无 Approval、Approved Paper Plan、Runtime Apply、Simulation、Account、Order、Fill 或 Exchange Write；保持 `runtimeApplied=false`、Paper Only、`exchangeWriteAllowed=false`。
+- F4 保持 `IN_PROGRESS`；只可继续诊断客户端 DOM/action-response 路径，不进入 F5。
+
 ## LOOP-054 F4 hydration/action-response continuation（2026-08-05）
 
 - 修复：history hydration 保留 Draft/version identity，取消按数组 index 回填；F4 action 以 exact immutable version merge，并隔离旧 epoch；history 非 2xx/parse failure 显式显示安全错误。聚焦测试覆盖 legacy 隔离与 version identity action merge。

@@ -27,3 +27,16 @@ export function mergeWorkbenchF4Action<T extends WorkbenchF4Turn>(
 ): T[] {
   return turns.map((turn) => turn.draft?.versionId === versionId ? { ...turn, f4 } : turn);
 }
+
+/**
+ * Read back exactly the version that accepted an F4 action.  The action
+ * transport result is useful for immediate feedback, but the read model is
+ * the final server authority after an immutable evidence revision is stored.
+ */
+export async function rereadWorkbenchF4Action<T extends WorkbenchF4Turn>(
+  turns: readonly T[],
+  versionId: string,
+  loadF4: (versionId: string) => Promise<unknown>,
+): Promise<T[]> {
+  return mergeWorkbenchF4Action(turns, versionId, await loadF4(versionId));
+}

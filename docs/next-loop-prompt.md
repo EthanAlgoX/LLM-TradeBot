@@ -2,14 +2,14 @@
 
 ```text
 当前状态：F3 COMPLETE / F4 IN_PROGRESS
-最近完成：LOOP-054 的 version identity hydration/merge 和 382/382 自动化；Chrome action-response 未关闭
-下一任务：LOOP-055 — F4 action response and recovery continuation
+最近完成：LOOP-055 的 exact-version POST reread 和 383/383 自动化；Chrome action-response DOM 未关闭
+下一任务：LOOP-056 — F4 action-response DOM continuation
 浏览器要求：必需，由 Agent 直接操作真实 Chrome；禁止人工验收
 ```
 
-执行：[`LOOP-055`](loop-prompts/loop-055-f4-action-response-recovery-continuation-v1.md)
+执行：[`LOOP-056`](loop-prompts/loop-056-f4-action-response-dom-continuation-v1.md)
 
-LOOP-055 只关闭 LOOP-054 未完成的 F4 缺口：在真实 Chrome 中确保 exact Draft Version 的 action response 在无需 reload 时立即显示最新 authority，并验证同 actor reload/Web/API restart 与新鲜 v1→同 Draft v2 stale 隔离。不得创建第二 authority；不得调用 Approval、创建 Approved Paper Plan、申请 Simulation Slot、执行 Runtime Apply 或产生交易写入。
+LOOP-056 只诊断并关闭 LOOP-055 已复现的客户端 DOM 更新缺口：服务端 POST/replay 与 exact-version reread 已是最新 authority，但当前卡片仍停在前一 gate，reload 才恢复。不得创建第二 authority；不得调用 Approval、创建 Approved Paper Plan、申请 Simulation Slot、执行 Runtime Apply 或产生交易写入。
 
 在此之前不得：
 

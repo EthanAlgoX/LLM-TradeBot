@@ -44,7 +44,7 @@ import {
   resolveOrchestrationSessionConfiguration,
   type OrchestrationViteEnvironment,
 } from "./orchestration-session.js";
-import { hydrateWorkbenchF4Turns, mergeWorkbenchF4Action } from "./workbench-f4-hydration.js";
+import { hydrateWorkbenchF4Turns, mergeWorkbenchF4Action, rereadWorkbenchF4Action } from "./workbench-f4-hydration.js";
 import { renderWorkbenchF4Evidence } from "./workbench-f4-view.js";
 
 type Locale = "zh-CN" | "en";
@@ -2465,11 +2465,11 @@ function bindEvents(): void {
       // Evidence runners persist an immutable binding revision.  Read that
       // same version once so a transport response that precedes projection
       // materialization cannot leave the Workbench at an intermediate gate.
-      const response = await fetch(`${sessionConfiguration.apiBase}/api/orchestration/workbench/drafts/${encodeURIComponent(versionId)}/f4`, { credentials: "include", headers: { "content-type": "application/json" } });
-      const body = await response.json().catch(() => undefined) as { data?: unknown; error?: { code?: string } } | undefined;
       if (epoch !== realWorkbenchHydrationEpoch) return;
-      if (!response.ok || !body?.data) throw new Error(body?.error?.code ?? "F4_UNAVAILABLE");
-      state.realWorkbenchTurns = mergeWorkbenchF4Action(state.realWorkbenchTurns, versionId, body.data);
+      state.realWorkbenchTurns = await rereadWorkbenchF4Action(state.realWorkbenchTurns, versionId, (sameVersionId) =>
+        agentRequest(`/api/orchestration/workbench/drafts/${encodeURIComponent(sameVersionId)}/f4`),
+      );
+      if (epoch !== realWorkbenchHydrationEpoch) return;
       render();
     }
     catch (error) { showToast(`F4 被拒绝：${error instanceof Error ? error.message : "REQUEST_FAILED"}`, `F4 rejected: ${error instanceof Error ? error.message : "REQUEST_FAILED"}`); }
