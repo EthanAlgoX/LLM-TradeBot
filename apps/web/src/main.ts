@@ -44,7 +44,7 @@ import {
   resolveOrchestrationSessionConfiguration,
   type OrchestrationViteEnvironment,
 } from "./orchestration-session.js";
-import { hydrateWorkbenchF4Turns, mergeWorkbenchF4Action, rereadWorkbenchF4Action } from "./workbench-f4-hydration.js";
+import { hydrateWorkbenchF4Turns, mergeWorkbenchF4Action, reconcileWorkbenchF4Action } from "./workbench-f4-hydration.js";
 import { renderWorkbenchF4Evidence } from "./workbench-f4-view.js";
 
 type Locale = "zh-CN" | "en";
@@ -2457,19 +2457,23 @@ function bindEvents(): void {
   document.querySelectorAll<HTMLButtonElement>("[data-f4-action]").forEach((button) => button.addEventListener("click", async () => {
     try {
       const versionId = button.dataset.f4Draft ?? "";
-      const epoch = ++realWorkbenchHydrationEpoch;
+      // An action is authoritative for its exact immutable version. In-flight
+      // history hydration is older and must not cancel this result merely by
+      // starting after the click (the LOOP-056 race).
+      ++realWorkbenchHydrationEpoch;
       const data = await agentRequest(`/api/orchestration/workbench/drafts/${encodeURIComponent(versionId)}/f4/${button.dataset.f4Action}`, { method: "POST", body: JSON.stringify({ idempotencyKey: `f4:${button.dataset.f4Action}:${Date.now()}` }) });
-      if (epoch !== realWorkbenchHydrationEpoch) return;
       state.realWorkbenchTurns = mergeWorkbenchF4Action(state.realWorkbenchTurns, versionId, data);
       render();
-      // Evidence runners persist an immutable binding revision.  Read that
-      // same version once so a transport response that precedes projection
-      // materialization cannot leave the Workbench at an intermediate gate.
-      if (epoch !== realWorkbenchHydrationEpoch) return;
-      state.realWorkbenchTurns = await rereadWorkbenchF4Action(state.realWorkbenchTurns, versionId, (sameVersionId) =>
-        agentRequest(`/api/orchestration/workbench/drafts/${encodeURIComponent(sameVersionId)}/f4`),
+      const reconciliation = await reconcileWorkbenchF4Action(
+        button.dataset.f4Action as "preflight" | "backtest" | "walk-forward",
+        () => agentRequest(`/api/orchestration/workbench/drafts/${encodeURIComponent(versionId)}/f4`),
+        () => new Promise((resolve) => window.setTimeout(resolve, 200)),
       );
-      if (epoch !== realWorkbenchHydrationEpoch) return;
+      state.realWorkbenchTurns = mergeWorkbenchF4Action(state.realWorkbenchTurns, versionId,
+        reconciliation.status === "timeout"
+          ? { ...(reconciliation.projection as object), error: "F4_RECONCILIATION_TIMEOUT" }
+          : reconciliation.projection,
+      );
       render();
     }
     catch (error) { showToast(`F4 被拒绝：${error instanceof Error ? error.message : "REQUEST_FAILED"}`, `F4 rejected: ${error instanceof Error ? error.message : "REQUEST_FAILED"}`); }

@@ -40,3 +40,47 @@ export async function rereadWorkbenchF4Action<T extends WorkbenchF4Turn>(
 ): Promise<T[]> {
   return mergeWorkbenchF4Action(turns, versionId, await loadF4(versionId));
 }
+
+export type WorkbenchF4Action = "preflight" | "backtest" | "walk-forward";
+
+type F4ActionProjection = {
+  readonly error?: unknown;
+  readonly gates?: ReadonlyArray<{ readonly id?: unknown; readonly status?: unknown }>;
+};
+
+export type WorkbenchF4Reconciliation =
+  | { readonly status: "terminal"; readonly projection: unknown; readonly attempts: number }
+  | { readonly status: "failed"; readonly projection: unknown; readonly attempts: number }
+  | { readonly status: "timeout"; readonly projection: unknown; readonly attempts: number };
+
+/**
+ * A runner may acknowledge an action before its immutable read model reaches
+ * a terminal gate. Re-read only that version, with a finite budget. This is
+ * deliberately not a background poller: callers own the action lifetime.
+ */
+export async function reconcileWorkbenchF4Action(
+  action: WorkbenchF4Action,
+  loadF4: () => Promise<unknown>,
+  wait: () => Promise<void> = async () => undefined,
+  maxAttempts = 3,
+): Promise<WorkbenchF4Reconciliation> {
+  let projection: unknown;
+  for (let attempts = 1; attempts <= maxAttempts; attempts += 1) {
+    projection = await loadF4();
+    const status = gateStatus(projection, action);
+    if (status === "succeeded") return { status: "terminal", projection, attempts };
+    if (status === "failed") return { status: "failed", projection, attempts };
+    if (attempts < maxAttempts) await wait();
+  }
+  return { status: "timeout", projection, attempts: maxAttempts };
+}
+
+function gateStatus(input: unknown, action: WorkbenchF4Action): "succeeded" | "failed" | "pending" {
+  const projection = input as F4ActionProjection;
+  if (projection?.error) return "failed";
+  const gateId = action === "walk-forward" ? "walk_forward" : action;
+  const status = projection?.gates?.find((gate) => gate.id === gateId)?.status;
+  if (status === "passed" || status === "succeeded") return "succeeded";
+  if (status === "failed") return "failed";
+  return "pending";
+}

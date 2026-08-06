@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { hydrateWorkbenchF4Turns, mergeWorkbenchF4Action, rereadWorkbenchF4Action } from "../apps/web/src/workbench-f4-hydration.js";
+import { hydrateWorkbenchF4Turns, mergeWorkbenchF4Action, reconcileWorkbenchF4Action, rereadWorkbenchF4Action } from "../apps/web/src/workbench-f4-hydration.js";
 
 test("F4 hydration isolates a legacy draft failure and resolves current drafts", async () => {
   const hydrated = await hydrateWorkbenchF4Turns([{ id: "legacy", draft: { draftId: "legacy" } }, { id: "current", draft: { draftId: "current" } }], async (draftId) => {
@@ -45,4 +45,15 @@ test("an F4 POST result is followed by one same-version authoritative reread", a
   });
   assert.deepEqual(reads, ["config:v1"]);
   assert.deepEqual(reconciled[0]?.f4, { gates: [{ id: "backtest", status: "succeeded" }], nextAction: "walk-forward" });
+});
+
+test("F4 reconciliation is bounded and distinguishes terminal, failure, and timeout", async () => {
+  const terminal = await reconcileWorkbenchF4Action("backtest", async () => ({ gates: [{ id: "backtest", status: "succeeded" }] }));
+  assert.deepEqual(terminal, { status: "terminal", projection: { gates: [{ id: "backtest", status: "succeeded" }] }, attempts: 1 });
+  const failed = await reconcileWorkbenchF4Action("walk-forward", async () => ({ gates: [{ id: "walk_forward", status: "failed" }] }));
+  assert.equal(failed.status, "failed");
+  const reads: number[] = [];
+  const timeout = await reconcileWorkbenchF4Action("backtest", async () => { reads.push(1); return { gates: [{ id: "backtest", status: "running" }] }; });
+  assert.equal(timeout.status, "timeout");
+  assert.deepEqual(reads, [1, 1, 1]);
 });

@@ -307,3 +307,8 @@ accepted_for_validation
 - unavailable/stale Shadow 不写入 validated 审计记录；所有记录保持 Runtime Not Applied。
 - 验证基线：check PASS；TypeScript tests 302/302 PASS；Web build PASS（31 modules，62ms）；diff-check PASS。
 - 当前 P0：Lesson Governance Revocation and Supersession。
+# LOOP-056 handoff (2026-08-06)
+
+- F4 remains `IN_PROGRESS`. Agent Chrome reproduced that Preflight advances in-place, while Backtest and Walk-Forward can persist evidence but leave the current card at the prior gate.
+- The Web action path now invalidates older hydration, preserves the immutable-version merge path, and uses a bounded three-read reconciliation with terminal, failure, and timeout outcomes. `test:ts` completes naturally at 384/384.
+- LOOP-057 must continue the exact DOM/event lifecycle diagnosis and repeat the full F4 Chrome matrix; it must not enter F5.

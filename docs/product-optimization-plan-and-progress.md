@@ -1,6 +1,6 @@
 # TradeBot 产品优化规划与进度
 
-> 2026-08-06：LOOP-055：F4 保持 `IN_PROGRESS`。真实 Chrome 中 Backtest/Walk-Forward POST 已持久化最新 authority，但当前 DOM 仍停在前一 gate，reload 后才恢复。前端现对 POST 后的 exact version 做一次 server-authoritative reread，新增回归测试；`check`、自然结束 `test:ts` 383/383、`build:web` 与 `diff --check` 通过。不得进入 F5。
+> 2026-08-06：LOOP-056：F4 保持 `IN_PROGRESS`。真实 Chrome 复现 Preflight 原页更新、Backtest/Walk-Forward 点击后当前卡片仍停在前一 gate；后端事实可在后续投影中出现。已将 F4 action 从 history hydration epoch 隔离，并增加同一 immutable version 的三次有界 reconciliation（terminal/failure/timeout）测试；自然结束 `test:ts` 384/384。Chrome 的 Walk-Forward 原页即时终态、v1→v2、恢复和双尺寸未完成；不得进入 F5。
 
 > 2026-08-05：LOOP-054 保持 F4 `IN_PROGRESS`。修复 history hydration 的下标关联、F4 action 的版本级合并与 history 非 2xx 可见错误；自动化为 382/382。真实 Chrome 确认同 actor reload 恢复完整 history，且 Backtest 持久化后可恢复为 partial evidence；但 Backtest/Walk-Forward action response 仍未在原页稳定即时投影，完整新鲜 v1→v2、双尺寸与重启验收未完成。LOOP-055 仅关闭该 action-response/recovery 缺口，禁止进入 F5。
 
