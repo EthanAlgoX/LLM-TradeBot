@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { hydrateWorkbenchF4Turns, mergeWorkbenchF4Action, reconcileWorkbenchF4Action, rereadWorkbenchF4Action } from "../apps/web/src/workbench-f4-hydration.js";
+import { hydrateWorkbenchF4Turns, mergeWorkbenchF4Action, mergeWorkbenchF4History, mergeWorkbenchF4Projection, reconcileWorkbenchF4Action, rereadWorkbenchF4Action } from "../apps/web/src/workbench-f4-hydration.js";
 
 test("F4 hydration isolates a legacy draft failure and resolves current drafts", async () => {
   const hydrated = await hydrateWorkbenchF4Turns([{ id: "legacy", draft: { draftId: "legacy" } }, { id: "current", draft: { draftId: "current" } }], async (draftId) => {
@@ -30,6 +30,16 @@ test("a completed action remains authoritative when an older hydration is discar
   const actionResult = mergeWorkbenchF4Action(initial, "config:v1", { gates: [{ id: "preflight", status: "passed" }], nextAction: "backtest" });
   await oldHydration;
   assert.deepEqual(actionResult[0]?.f4, { gates: [{ id: "preflight", status: "passed" }], nextAction: "backtest" });
+});
+
+test("history renders first and a delayed legacy projection cannot block or remove a healthy immutable F4 card", async () => {
+  const v1: { id: string; draft: { draftId: string; versionId: string; fingerprint: string }; f4?: unknown } = { id: "v1", draft: { draftId: "same-draft", versionId: "config:v1", fingerprint: "sha256:v1" }, f4: { nextAction: "walk-forward" } };
+  const v2: { id: string; draft: { draftId: string; versionId: string; fingerprint: string }; f4?: unknown } = { id: "v2", draft: { draftId: "same-draft", versionId: "config:v2", fingerprint: "sha256:v2" } };
+  const fromHistory = mergeWorkbenchF4History([v1], [v1, v2]);
+  assert.deepEqual(fromHistory.map((turn) => turn.f4), [{ nextAction: "walk-forward" }, undefined]);
+  const merged = mergeWorkbenchF4Projection(fromHistory, v2.draft, { nextAction: "preflight" });
+  assert.deepEqual(merged.map((turn) => turn.f4), [{ nextAction: "walk-forward" }, { nextAction: "preflight" }]);
+  assert.deepEqual(mergeWorkbenchF4Projection(merged, { ...v2.draft, fingerprint: "sha256:other" }, { error: "STALE" }), merged);
 });
 
 test("an F4 POST result is followed by one same-version authoritative reread", async () => {

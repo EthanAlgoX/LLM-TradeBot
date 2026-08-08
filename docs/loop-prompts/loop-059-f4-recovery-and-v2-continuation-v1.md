@@ -1,5 +1,7 @@
 # LOOP-059 — F4 刷新恢复与 immutable v2 收尾
 
+结果（2026-08-08）：`IN_PROGRESS`。根因是 `hydrateRealWorkbench()` 在 history 成功后以 `Promise.all` 等待所有 F4 GET；单条 in-flight runner 阻塞时不会写入 `realWorkbenchTurns`，reload render 为 0 卡。已改为 history 先渲染、F4 按 `draftId + versionId + fingerprint` 独立合并；Agent Chrome reload/restart 恢复卡片、partial Evidence 与 lineage，且不残留 running。新鲜 v1 Walk-Forward 原页仍未取得 terminal projection，故未创建 v2；下一入口仅为 LOOP-060 F4 continuation。
+
 Loop ID：`LOOP-059`
 
 里程碑：F4 Preflight / Backtest / Walk-Forward Evidence

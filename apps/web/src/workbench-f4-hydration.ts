@@ -1,7 +1,16 @@
 export type WorkbenchF4Turn = {
-  readonly draft?: { readonly draftId: string; readonly versionId?: string };
+  readonly draft?: { readonly draftId: string; readonly versionId?: string; readonly fingerprint?: string };
   f4?: unknown;
 };
+
+export type WorkbenchF4DraftIdentity = {
+  readonly draftId: string;
+  readonly versionId: string;
+  readonly fingerprint: string;
+};
+
+const sameDraftIdentity = (left: WorkbenchF4Turn["draft"], right: WorkbenchF4DraftIdentity) =>
+  left?.draftId === right.draftId && left.versionId === right.versionId && left.fingerprint === right.fingerprint;
 
 /** Hydrate drafts independently so one legacy failure cannot strand its siblings. */
 export async function hydrateWorkbenchF4Turns<T extends WorkbenchF4Turn>(
@@ -13,6 +22,31 @@ export async function hydrateWorkbenchF4Turns<T extends WorkbenchF4Turn>(
     try { return { ...turn, f4: await loadF4(turn.draft.draftId) }; }
     catch (error) { return { ...turn, f4: { error: error instanceof Error ? error.message : "F4_UNAVAILABLE" } }; }
   }));
+}
+
+/**
+ * A history response owns Turn content, but not a newer exact-version F4
+ * projection already received by this page.  Keeping that projection here
+ * prevents a late history read from removing an otherwise healthy card.
+ */
+export function mergeWorkbenchF4History<T extends WorkbenchF4Turn>(
+  existing: readonly T[],
+  history: readonly T[],
+): T[] {
+  return history.map((turn) => {
+    const prior = existing.find((candidate) => turn.draft?.versionId && candidate.draft?.versionId === turn.draft.versionId
+      && turn.draft?.draftId === candidate.draft.draftId && turn.draft?.fingerprint === candidate.draft.fingerprint);
+    return prior?.f4 === undefined ? turn : { ...turn, f4: prior.f4 };
+  });
+}
+
+/** Merge one independently loaded projection only into its immutable Draft Version. */
+export function mergeWorkbenchF4Projection<T extends WorkbenchF4Turn>(
+  turns: readonly T[],
+  identity: WorkbenchF4DraftIdentity,
+  f4: unknown,
+): T[] {
+  return turns.map((turn) => sameDraftIdentity(turn.draft, identity) ? { ...turn, f4 } : turn);
 }
 
 /**

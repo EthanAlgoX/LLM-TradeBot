@@ -1,5 +1,7 @@
 # TradeBot 产品优化规划与进度
 
+> 2026-08-08：LOOP-059 F4 保持 `IN_PROGRESS`。根因已由 Agent 真实 Chrome 确认：`hydrateRealWorkbench()` 在 history 成功后以 `Promise.all` 等待所有 exact-version F4 GET，任一历史 in-flight runner 使整体 hydration 不结算，因而 `realWorkbenchTurns` 未写入、reload render 输入为 0 张 F4 卡片。现改为先投影 history，再按 `draftId + versionId + fingerprint` 独立合并 F4 projection；同 actor reload 与受控 Web/API restart 均恢复 22 张卡片、健康 exact-version projection、目标 v1 Backtest Evidence 与无遗留 running，legacy `DRAFT_NOT_FOUND` 逐卡 fail-closed。`check`、自然结束 `test:ts` 386/386、`build:web`、`diff --check` 通过。中文 1440×900、英文 820×760 无横向滚动，英文键盘焦点可见；Console 仅扩展 channel-close，Network `TOOL_UNAVAILABLE`。但新鲜 v1 Walk-Forward 在原页仍持续 running、未获得 terminal projection，故没有创建 v2 或进入 F5；LOOP-060 只继续该 F4 收尾。
+
 > 2026-08-08：LOOP-058 F4 保持 `IN_PROGRESS`。最小 version/action-scoped UI coordinator 会在 F4 POST 开始时移除旧动作控件并呈现 `running`，仅在该 exact-version POST 返回服务器 projection 后重新投影；不创建 evidence shadow authority、轮询或 reload。新增 action→merge→render 集成测试，自动化自然结束 385/385。Agent Chrome 同页验证 Backtest 和 Walk-Forward 都在运行中呈现状态并原页推进到后续 gate/`EVIDENCE READY / APPROVAL REQUIRED`；1440×900 与 820×760 无横向滚动，Console 唯一 error 为扩展 channel-close。受现有同 actor history reload 后未恢复任何 F4 card 阻塞，尚未完成新鲜同 Draft v2 与受控 Web/API restart recovery；不得进入 F5。
 
 > 2026-08-08：LOOP-057 保持 F4 `IN_PROGRESS`。真实 Chrome 生命周期 trace 将根因限定为同步历史 runner 的 POST 未完成时 UI 仍保留旧 gate，而非已合并 authority 被覆盖；下一轮仅补 version/action-scoped running 呈现和完整回归验收。

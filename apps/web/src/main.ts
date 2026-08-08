@@ -44,7 +44,7 @@ import {
   resolveOrchestrationSessionConfiguration,
   type OrchestrationViteEnvironment,
 } from "./orchestration-session.js";
-import { hydrateWorkbenchF4Turns, mergeWorkbenchF4Action, reconcileWorkbenchF4Action } from "./workbench-f4-hydration.js";
+import { hydrateWorkbenchF4Turns, mergeWorkbenchF4Action, mergeWorkbenchF4History, mergeWorkbenchF4Projection, reconcileWorkbenchF4Action } from "./workbench-f4-hydration.js";
 import { renderWorkbenchF4Evidence, type WorkbenchF4RunningAction } from "./workbench-f4-view.js";
 
 type Locale = "zh-CN" | "en";
@@ -344,16 +344,31 @@ async function hydrateRealWorkbench(): Promise<void> {
     result: entry.recommendation ? { kind: "recommendation", intent: entry.intent, recommendation: entry.recommendation } : { kind: "clarification", intent: entry.intent, clarificationQuestions: [] },
     ...(entry.draft ? { draft: entry.draft } : {}),
   }));
-  const hydrated = await hydrateWorkbenchF4Turns(turns.map((turn) => turn.draft ? { ...turn, draft: { ...turn.draft, draftId: turn.draft.versionId } } : turn), async (draftId) => {
-    const f4Response = await fetch(`${sessionConfiguration.apiBase}/api/orchestration/workbench/drafts/${encodeURIComponent(draftId)}/f4`, { credentials: "include", headers: { "content-type": "application/json" } });
-    const f4Body = await f4Response.json() as { data?: unknown; error?: { code?: string } };
-    if (!f4Response.ok) throw new Error(f4Body.error?.code ?? "F4_UNAVAILABLE");
-    return f4Body.data;
-  });
   if (epoch !== realWorkbenchHydrationEpoch || state.view !== "orchestration") return;
-  state.realWorkbenchTurns = hydrated;
+  // History is independently useful even if a historical F4 runner is slow.
+  // Do not await every projection as one Promise.all: one pending legacy or
+  // in-flight version must not remove all healthy cards on reload.
+  state.realWorkbenchTurns = mergeWorkbenchF4History(state.realWorkbenchTurns, turns);
   state.realWorkbenchHydrationError = undefined;
   render();
+  for (const turn of turns) {
+    const draft = turn.draft;
+    if (!draft?.versionId || !draft.fingerprint) continue;
+    void hydrateWorkbenchF4Turns([turn], async () => {
+      const f4Response = await fetch(`${sessionConfiguration.apiBase}/api/orchestration/workbench/drafts/${encodeURIComponent(draft.versionId)}/f4`, { credentials: "include", headers: { "content-type": "application/json" } });
+      const f4Body = await f4Response.json() as { data?: unknown; error?: { code?: string } };
+      if (!f4Response.ok) throw new Error(f4Body.error?.code ?? "F4_UNAVAILABLE");
+      return f4Body.data;
+    }).then(([hydratedTurn]) => {
+      if (epoch !== realWorkbenchHydrationEpoch || state.view !== "orchestration" || hydratedTurn?.f4 === undefined) return;
+      state.realWorkbenchTurns = mergeWorkbenchF4Projection(state.realWorkbenchTurns, {
+        draftId: draft.draftId,
+        versionId: draft.versionId,
+        fingerprint: draft.fingerprint,
+      }, hydratedTurn.f4);
+      render();
+    });
+  }
   } catch (error) {
     if (epoch !== realWorkbenchHydrationEpoch) return;
     state.realWorkbenchHydrationError = error instanceof Error ? error.message : "WORKBENCH_HISTORY_UNAVAILABLE";

@@ -1,5 +1,13 @@
 # TradeBot 当前状态与接手说明
 
+## LOOP-059 F4 recovery and immutable-v2 continuation（2026-08-08）
+
+- 根因与修复：Agent Chrome 在同 actor reload 前后确认 history 请求/Conversation/Draft references 均可恢复；第一个失败点是 Web `hydrateRealWorkbench()` 在 history 成功后等待所有 F4 projection 的 `Promise.all`。一条未终结的 Backtest/Walk-Forward runner 使 await 永不返回，`realWorkbenchTurns` 未赋值，render 输出为 0 张 F4 卡。现先投影 history，再逐条以 immutable `draftId + versionId + fingerprint` 合并 F4；迟到/legacy 结果不删除已恢复卡片，reload 的临时 running 不会恢复为 authority。
+- Chrome：修复后 reload 与 Agent 受控 Web/API restart 都恢复同一 actor 的 22 张 F4 card；目标新鲜 v1 的 version/fingerprint、Backtest partial Evidence、lineage、Walk-Forward gate 均可读，且无 running。遗留 `DRAFT_NOT_FOUND` 显式逐卡隔离。中文 1440×900 与英文 820×760 无横向滚动，英文键盘 focus visible。Console 仅 Chrome 扩展 message-channel close，无 TradeBot error；Network `TOOL_UNAVAILABLE`。
+- 未完成：新鲜 v1 的 Backtest 原页显示 scoped running 后持久化为 succeeded；Walk-Forward 同样显示 scoped running，但本轮没有在原页获得 terminal projection。因此未创建同 Draft v2，未验证 v1 stale/read-only、v2 独立 Evidence 或两版本 terminal restart recovery。不得用 reload 或自动重跑替代；F4 继续 `IN_PROGRESS`，不得进入 F5。
+- 自动化与安全：`npm run check`、自然结束 `npm run test:ts` TAP `386/386`、`npm run build:web`、`git diff --check` 通过。未调用 Approval、Runtime、Simulation、Account/Position/Order/Fill 或 exchange write；保持 `runtimeApplied=false`、Paper Only、`exchangeWriteAllowed=false`。
+- 下一入口为 [`LOOP-060`](loop-prompts/loop-060-f4-original-page-terminal-continuation-v1.md)，只恢复 v1 原页 Walk-Forward terminal 后完成 immutable v2/reload/restart Chrome 验收。
+
 ## LOOP-055 F4 action-response recovery continuation（2026-08-06）
 
 - Chrome：Agent 使用真实 Chrome 与当前 HEAD `dev:paper`。新 v1 Preflight 立即更新；Backtest POST 已持久化 immutable `partial_evidence`，服务端 replay 是 `succeeded → walk-forward`，但原页 DOM 仍显示 Backtest `locked`；reload 后恢复 authority。Walk-Forward 同样未能即时投影。
