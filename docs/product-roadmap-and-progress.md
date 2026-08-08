@@ -1,5 +1,7 @@
 # TradeBot 产品路线图与当前进度
 
+> 2026-08-08：LOOP-057 F4 仍 `IN_PROGRESS`。Agent Chrome trace 证明 Backtest 的精确版本 POST 在旧 gate 可见期间尚未完成，故尚未发生 authority merge/render；reload 可恢复持久化成功状态。下一轮只增加受控 running 可见状态并完成 DOM 回归与 Chrome 验收，禁止进入 F5。
+
 > 2026-08-06：LOOP-055 为 `PARTIAL`。真实 Chrome 证明 Backtest POST 的服务端结果已是 `succeeded → walk-forward`，但 DOM 在无需 reload 时仍停留在旧 gate。加入 exact-version 单次 authority reread 与 383/383 自动化覆盖后仍可复现，故 F4 继续 `IN_PROGRESS`，禁止进入 F5。
 
 > 2026-08-05：LOOP-054：F4 仍 `IN_PROGRESS`。前端 history/F4 现按 immutable version identity 而非数组位置关联，旧 hydration epoch 不可覆盖 action；history 失败显式呈现。`check`、`build:web`、`diff --check` 与自然结束 `test:ts` 382/382 PASS。真实 Chrome 显示同 actor reload 的完整 history/recovery，但 F4 action 后的即时 latest projection 仍不稳定，故不得进入 F5；下一步 LOOP-055 仅重做并修复这条链。

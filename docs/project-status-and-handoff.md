@@ -507,6 +507,12 @@ npm run dev:paper
 - 下一阶段执行 [`next-loop-prompt.md`](next-loop-prompt.md) 中的 Generic Paper Runtime Migration Readiness Loop。
 # LOOP-056 handoff (2026-08-06)
 
+# LOOP-057 handoff (2026-08-08)
+
+- F4 remains `IN_PROGRESS`. Agent-operated Chrome lifecycle trace captured one exact-version Backtest handler and POST start; after 900ms no POST projection had returned, so neither merge nor render could yet advance the DOM. A later reload read the persisted Walk-Forward authority.
+- Root cause: the synchronous historical runner leaves the old action visible while executing; this is not a proved hydration overwrite. LOOP-058 must add a version/action-scoped running presentation, then finish DOM/integration and full Chrome evidence.
+- No Approval, Runtime Apply, Simulation, account, order, fill, or exchange write occurred.
+
 - F4 is `IN_PROGRESS`: Agent-operated real Chrome shows Preflight's original-page update, but Backtest and Walk-Forward can leave the current F4 card on the preceding gate. Do not claim reload as a pass.
 - Code now uses exact-version, bounded (three-read) reconciliation with explicit terminal/failure/timeout outcomes, while invalidating older hydration before an action. Full TypeScript tests: 384/384 PASS.
 - Next: LOOP-057 F4 continuation only. Do not create Approval, Paper Plan, Simulation Slot, Runtime Apply, deployment, account, order, fill, or exchange write facts.

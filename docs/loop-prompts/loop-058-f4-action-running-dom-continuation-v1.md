@@ -1,0 +1,5 @@
+# LOOP-058 — F4 action-running and DOM continuation
+
+F4 remains `IN_PROGRESS`. LOOP-057 Agent Chrome lifecycle trace established that a Backtest click binds once and starts one POST for its exact immutable version; after 900ms the POST had not completed, so no action projection, merge, reconciliation GET, or render had yet occurred. Reload later showed the persisted succeeded authority. The immediate defect is that the card leaves its old gate/button visible without an explicit running state while the synchronous historical runner is executing.
+
+Implement the smallest UI coordinator that presents a version/action-scoped running state, disables the old action control, and replaces it only with the exact server projection after POST completion. Do not create shadow authority, add polling, reload, or alter F5/Approval/Runtime boundaries. Add action-to-render integration coverage, then perform the full Agent Chrome v1/v2/recovery/layout/console validation required by LOOP-057. Commit and push to `main`; do not create a PR.

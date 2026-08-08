@@ -1,5 +1,7 @@
 # TradeBot 产品优化规划与进度
 
+> 2026-08-08：LOOP-057 保持 F4 `IN_PROGRESS`。真实 Chrome 生命周期 trace 将根因限定为同步历史 runner 的 POST 未完成时 UI 仍保留旧 gate，而非已合并 authority 被覆盖；下一轮仅补 version/action-scoped running 呈现和完整回归验收。
+
 > 2026-08-06：LOOP-056：F4 保持 `IN_PROGRESS`。真实 Chrome 复现 Preflight 原页更新、Backtest/Walk-Forward 点击后当前卡片仍停在前一 gate；后端事实可在后续投影中出现。已将 F4 action 从 history hydration epoch 隔离，并增加同一 immutable version 的三次有界 reconciliation（terminal/failure/timeout）测试；自然结束 `test:ts` 384/384。Chrome 的 Walk-Forward 原页即时终态、v1→v2、恢复和双尺寸未完成；不得进入 F5。
 
 > 2026-08-05：LOOP-054 保持 F4 `IN_PROGRESS`。修复 history hydration 的下标关联、F4 action 的版本级合并与 history 非 2xx 可见错误；自动化为 382/382。真实 Chrome 确认同 actor reload 恢复完整 history，且 Backtest 持久化后可恢复为 partial evidence；但 Backtest/Walk-Forward action response 仍未在原页稳定即时投影，完整新鲜 v1→v2、双尺寸与重启验收未完成。LOOP-055 仅关闭该 action-response/recovery 缺口，禁止进入 F5。
