@@ -9,7 +9,7 @@
 
 执行：[`LOOP-061`](loop-prompts/loop-061-f4-runner-terminal-contract-continuation-v1.md)
 
-LOOP-060 只关闭新鲜 v1 Walk-Forward 原页 terminal、同 Draft immutable v2/stale/独立 Evidence 及两版本 recovery 的 Chrome 验收缺口；保持服务端 projection 唯一 authority，禁止以 reload、轮询或新的客户端 authority 掩盖问题。
+LOOP-061 先关闭 CPU-active Walk-Forward runner 的 work budget、deadline、实际停止、lease/fencing 与 durable terminal contract，再完成新鲜 v1 原页 terminal、同 Draft immutable v2/stale/独立 Evidence 及两版本 recovery；禁止用 `Promise.race`、HTTP timeout、reload 或仍在后台运行的任务伪造通过。
 
 在此之前不得：
 
