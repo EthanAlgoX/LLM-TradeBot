@@ -1,5 +1,7 @@
 # TradeBot 产品优化规划与进度
 
+> 2026-08-08：LOOP-058 F4 保持 `IN_PROGRESS`。最小 version/action-scoped UI coordinator 会在 F4 POST 开始时移除旧动作控件并呈现 `running`，仅在该 exact-version POST 返回服务器 projection 后重新投影；不创建 evidence shadow authority、轮询或 reload。新增 action→merge→render 集成测试，自动化自然结束 385/385。Agent Chrome 同页验证 Backtest 和 Walk-Forward 都在运行中呈现状态并原页推进到后续 gate/`EVIDENCE READY / APPROVAL REQUIRED`；1440×900 与 820×760 无横向滚动，Console 唯一 error 为扩展 channel-close。受现有同 actor history reload 后未恢复任何 F4 card 阻塞，尚未完成新鲜同 Draft v2 与受控 Web/API restart recovery；不得进入 F5。
+
 > 2026-08-08：LOOP-057 保持 F4 `IN_PROGRESS`。真实 Chrome 生命周期 trace 将根因限定为同步历史 runner 的 POST 未完成时 UI 仍保留旧 gate，而非已合并 authority 被覆盖；下一轮仅补 version/action-scoped running 呈现和完整回归验收。
 
 > 2026-08-06：LOOP-056：F4 保持 `IN_PROGRESS`。真实 Chrome 复现 Preflight 原页更新、Backtest/Walk-Forward 点击后当前卡片仍停在前一 gate；后端事实可在后续投影中出现。已将 F4 action 从 history hydration epoch 隔离，并增加同一 immutable version 的三次有界 reconciliation（terminal/failure/timeout）测试；自然结束 `test:ts` 384/384。Chrome 的 Walk-Forward 原页即时终态、v1→v2、恢复和双尺寸未完成；不得进入 F5。

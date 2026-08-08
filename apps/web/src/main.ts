@@ -45,7 +45,7 @@ import {
   type OrchestrationViteEnvironment,
 } from "./orchestration-session.js";
 import { hydrateWorkbenchF4Turns, mergeWorkbenchF4Action, reconcileWorkbenchF4Action } from "./workbench-f4-hydration.js";
-import { renderWorkbenchF4Evidence } from "./workbench-f4-view.js";
+import { renderWorkbenchF4Evidence, type WorkbenchF4RunningAction } from "./workbench-f4-view.js";
 
 type Locale = "zh-CN" | "en";
 type ViewId = "overview" | "advisor" | "strategy-apps" | "strategy-app-detail" | "agent-center" | "trade-center" | "data-center" | "orchestration" | "lab" | "experiment" | "activity" | "connections";
@@ -244,6 +244,8 @@ const sessionConfiguration = resolveOrchestrationSessionConfiguration({
 const localeStorageKey = "tradebot.locale";
 let overlayReturnFocusSelector: string | null = null;
 let realWorkbenchHydrationEpoch = 0;
+// Presentation only. Server F4 projections remain the sole evidence authority.
+const realWorkbenchF4RunningActions = new Map<string, WorkbenchF4RunningAction>();
 
 function initialLocale(): Locale {
   try {
@@ -1627,7 +1629,7 @@ function renderOrchestration(): string {
       : "PROVENANCE_UNAVAILABLE";
     const assistantBody = clarification
       ? `<p>${tr("还需要以下信息：", "More information is required:")}</p><ul>${result.clarificationQuestions.map((q: string) => `<li>${escapeHtml(q)}</li>`).join("")}</ul>`
-      : `<p>${escapeHtml(recommendation.explanation)}</p><p><small>${provenanceText}</small></p>${topology}<p>runtimeApplied=false · Paper Only · exchangeWriteAllowed=false</p>${turn.draft ? `<section class="workbench-f4"><p><strong>Strategy Draft: ${escapeHtml(turn.draft.draftId)}</strong><br><small>${escapeHtml(turn.draft.versionId)} · ${escapeHtml(turn.draft.fingerprint)}</small></p>${turn.f4 ? renderWorkbenchF4Evidence(turn.f4, state.locale).replace('data-f4-draft=""', `data-f4-draft="${escapeHtml(turn.draft.versionId)}"`) : `<small>F4 loading…</small>`}</section>` : provenance ? `<button type="button" class="primary-action" data-real-apply="${escapeHtml(recommendation.recommendationId)}" data-real-fingerprint="${escapeHtml(recommendation.fingerprint)}">${tr("应用此方案", "Apply this plan")}</button>` : `<p><small>${tr("历史方案缺少当前所需的来源证明，不能应用。", "This historical recommendation lacks required provenance and cannot be applied.")}</small></p>`}`;
+      : `<p>${escapeHtml(recommendation.explanation)}</p><p><small>${provenanceText}</small></p>${topology}<p>runtimeApplied=false · Paper Only · exchangeWriteAllowed=false</p>${turn.draft ? `<section class="workbench-f4"><p><strong>Strategy Draft: ${escapeHtml(turn.draft.draftId)}</strong><br><small>${escapeHtml(turn.draft.versionId)} · ${escapeHtml(turn.draft.fingerprint)}</small></p>${turn.f4 ? renderWorkbenchF4Evidence(turn.f4, state.locale, realWorkbenchF4RunningActions.get(turn.draft.versionId)).replace('data-f4-draft=""', `data-f4-draft="${escapeHtml(turn.draft.versionId)}"`) : `<small>F4 loading…</small>`}</section>` : provenance ? `<button type="button" class="primary-action" data-real-apply="${escapeHtml(recommendation.recommendationId)}" data-real-fingerprint="${escapeHtml(recommendation.fingerprint)}">${tr("应用此方案", "Apply this plan")}</button>` : `<p><small>${tr("历史方案缺少当前所需的来源证明，不能应用。", "This historical recommendation lacks required provenance and cannot be applied.")}</small></p>`}`;
     return `<article class="workbench-message is-user"><div><header><strong>${tr("你", "You")}</strong><time>${index + 1}</time></header><p>${escapeHtml(turn.message)}</p></div><div class="workbench-message__avatar">ME</div></article><article class="workbench-message is-assistant"><div class="workbench-message__avatar">AI</div><div><header><strong>${tr("策略助手", "Strategy Advisor")}</strong><time>${clarification ? "CLARIFICATION" : "VALIDATED_RECOMMENDATION"}</time></header>${assistantBody}</div></article>`;
   }).join("");
   const recovery = state.realWorkbenchHydrationError ? `<article class="workbench-message is-assistant"><div class="workbench-message__avatar">AI</div><div><p class="paper-unavailable">${escapeHtml(state.realWorkbenchHydrationError)}</p></div></article>` : "";
@@ -2455,14 +2457,20 @@ function bindEvents(): void {
     } catch (error) { showToast(`应用被拒绝：${error instanceof Error ? error.message : "APPLY_FAILED"}`, `Apply rejected: ${error instanceof Error ? error.message : "APPLY_FAILED"}`); }
   }));
   document.querySelectorAll<HTMLButtonElement>("[data-f4-action]").forEach((button) => button.addEventListener("click", async () => {
+    const versionId = button.dataset.f4Draft ?? "";
+    const action = button.dataset.f4Action as WorkbenchF4RunningAction;
+    if (!versionId || !["preflight", "backtest", "walk-forward"].includes(action) || realWorkbenchF4RunningActions.has(versionId)) return;
+    realWorkbenchF4RunningActions.set(versionId, action);
+    render();
     try {
-      const versionId = button.dataset.f4Draft ?? "";
-      const action = button.dataset.f4Action as "preflight" | "backtest" | "walk-forward";
       // An action is authoritative for its exact immutable version. In-flight
       // history hydration is older and must not cancel this result merely by
       // starting after the click (the LOOP-056 race).
       ++realWorkbenchHydrationEpoch;
       const data = await agentRequest(`/api/orchestration/workbench/drafts/${encodeURIComponent(versionId)}/f4/${action}`, { method: "POST", body: JSON.stringify({ idempotencyKey: `f4:${action}:${Date.now()}` }) });
+      // The only thing allowed to replace the running presentation is this
+      // POST's exact immutable-version server projection.
+      if (realWorkbenchF4RunningActions.get(versionId) === action) realWorkbenchF4RunningActions.delete(versionId);
       state.realWorkbenchTurns = mergeWorkbenchF4Action(state.realWorkbenchTurns, versionId, data);
       render();
       const reconciliation = await reconcileWorkbenchF4Action(
@@ -2478,6 +2486,12 @@ function bindEvents(): void {
       render();
     }
     catch (error) { showToast(`F4 被拒绝：${error instanceof Error ? error.message : "REQUEST_FAILED"}`, `F4 rejected: ${error instanceof Error ? error.message : "REQUEST_FAILED"}`); }
+    finally {
+      if (realWorkbenchF4RunningActions.get(versionId) === action) {
+        realWorkbenchF4RunningActions.delete(versionId);
+        render();
+      }
+    }
   }));
 
   document.querySelectorAll<HTMLButtonElement>("[data-simulation-dialogue]").forEach((button) => {

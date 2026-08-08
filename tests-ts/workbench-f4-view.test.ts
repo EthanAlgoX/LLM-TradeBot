@@ -26,3 +26,16 @@ test("F4 view exposes immutable parent lineage without projecting evidence into 
   assert.doesNotMatch(html, /EVIDENCE READY/);
   assert.doesNotMatch(html, /Backtest job/);
 });
+
+test("F4 action-to-render integration replaces only the scoped old control while its POST is running", () => {
+  const before = { configuration: { versionId: "config:v1", fingerprint: fp("a") }, gates: [{ id: "preflight", status: "passed" }], nextAction: "backtest" };
+  const running = renderWorkbenchF4Evidence(before, "en-US", "backtest");
+  assert.match(running, /data-f4-running="backtest"/);
+  assert.match(running, /backtest running…/);
+  assert.doesNotMatch(running, /data-f4-action=/);
+
+  const after = renderWorkbenchF4Evidence({ ...before, gates: [...before.gates, { id: "backtest", status: "succeeded" }], nextAction: "walk-forward" }, "en-US");
+  assert.doesNotMatch(after, /data-f4-running=/);
+  assert.match(after, /data-f4-action="walk-forward"/);
+  assert.doesNotMatch(after, /data-f4-action="backtest"/);
+});

@@ -1,0 +1,5 @@
+# LOOP-059 — F4 recovery and immutable-v2 continuation
+
+F4 remains `IN_PROGRESS`. LOOP-058 fixed the proven synchronous-runner presentation defect: a version/action-scoped ephemeral running marker replaces the old action control immediately, and only the exact immutable-version POST projection replaces that marker. `check`, natural `test:ts` (385/385), `build:web`, and `diff --check` passed. Agent Chrome verified Backtest and Walk-Forward `running` states and the original-page transition to the server terminal projection, with no horizontal overflow at 1440×900 or 820×760. The only Console error was the Chrome extension channel-close.
+
+The remaining blocker is factual: after reload, this actor's page recovered no F4 cards at all, so same-Draft immutable v2 and controlled Web/API restart recovery could not be validated. Diagnose and repair only the recovery path using server authority; then complete v1/v2, stale/read-only, reload/restart, layout, and Console checks. Do not add polling, reload-based UI behavior, shadow authority, Approval, Runtime, Simulation, or any exchange write. Commit and push to `main`; do not create a PR.
