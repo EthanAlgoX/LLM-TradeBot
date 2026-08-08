@@ -1,5 +1,7 @@
 # TradeBot 产品优化规划与进度
 
+> 2026-08-08：LOOP-061 F4 保持 `IN_PROGRESS`。Graph Evidence runner 现用 server-owned cooperative deadline（45 秒）、fold/candidate/cycle checkpoints、300-cycle registered budget 和 lease/owner fencing：timeout 原子持久化为 `failed/GRAPH_JOB_EXECUTION_DEADLINE_EXCEEDED` 且没有 Artifact，迟到 owner 无法提交。Chrome 新 v1 已显示 Preflight passed 与 Backtest scoped running，未在 9 秒观察窗获得 terminal；v2/recovery 未开始。
+
 > 2026-08-08：LOOP-060 F4 保持 `IN_PROGRESS`。Agent 真实 Chrome 在当前 HEAD 原页点击 exact-version Walk-Forward 后立即显示 scoped `running`，旧控件移除；对应 Node runner 持续高 CPU 并在两分钟以上仍未返回 terminal HTTP projection，卡片仍为 `partial_evidence`。首个断点是同步 `DurableGraphEvidenceJobService.run()` 没有执行 deadline：HTTP handler 正在 await runner，故 response、exact-version merge 和 terminal DOM 均尚未发生（分类 A，且同步合同缺少 deadline）。未把其他历史 terminal、reload 或 API 读取记为通过；v2/recovery 未开始。
 
 > 2026-08-08：LOOP-059 F4 保持 `IN_PROGRESS`。根因已由 Agent 真实 Chrome 确认：`hydrateRealWorkbench()` 在 history 成功后以 `Promise.all` 等待所有 exact-version F4 GET，任一历史 in-flight runner 使整体 hydration 不结算，因而 `realWorkbenchTurns` 未写入、reload render 输入为 0 张 F4 卡片。现改为先投影 history，再按 `draftId + versionId + fingerprint` 独立合并 F4 projection；同 actor reload 与受控 Web/API restart 均恢复 22 张卡片、健康 exact-version projection、目标 v1 Backtest Evidence 与无遗留 running，legacy `DRAFT_NOT_FOUND` 逐卡 fail-closed。`check`、自然结束 `test:ts` 386/386、`build:web`、`diff --check` 通过。中文 1440×900、英文 820×760 无横向滚动，英文键盘焦点可见；Console 仅扩展 channel-close，Network `TOOL_UNAVAILABLE`。但新鲜 v1 Walk-Forward 在原页仍持续 running、未获得 terminal projection，故没有创建 v2 或进入 F5；LOOP-060 只继续该 F4 收尾。

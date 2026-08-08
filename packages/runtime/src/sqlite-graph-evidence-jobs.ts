@@ -14,6 +14,7 @@ import {
 import {
   GraphBacktestRunner,
   GraphWalkForwardRunner,
+  type GraphEvidenceExecutionContext,
   createGraphEvidenceArtifact,
   graphEvidenceFingerprint,
 } from "../../core/src/graph-backtest-evidence.js";
@@ -174,8 +175,8 @@ export class SqliteGraphEvidenceJobRepository {
       UPDATE graph_evidence_jobs
       SET status = 'succeeded', completed_at = ?, evidence_json = ?,
           lease_owner_id = NULL, lease_expires_at = NULL
-      WHERE job_id = ? AND status = 'running' AND lease_owner_id = ?
-    `).run(completedAt, JSON.stringify(parsed), jobId, ownerId);
+      WHERE job_id = ? AND status = 'running' AND lease_owner_id = ? AND lease_expires_at > ?
+    `).run(completedAt, JSON.stringify(parsed), jobId, ownerId, completedAt);
     if (Number(result.changes) !== 1) {
       throw new GraphEvidenceJobError("GRAPH_JOB_LEASE_HELD", { jobId, ownerId });
     }
@@ -187,8 +188,8 @@ export class SqliteGraphEvidenceJobRepository {
       UPDATE graph_evidence_jobs
       SET status = 'failed', completed_at = ?, failure_code = ?,
           lease_owner_id = NULL, lease_expires_at = NULL
-      WHERE job_id = ? AND status = 'running' AND lease_owner_id = ?
-    `).run(completedAt, failureCode, jobId, ownerId);
+      WHERE job_id = ? AND status = 'running' AND lease_owner_id = ? AND lease_expires_at > ?
+    `).run(completedAt, failureCode, jobId, ownerId, completedAt);
     if (Number(result.changes) !== 1) {
       throw new GraphEvidenceJobError("GRAPH_JOB_LEASE_HELD", { jobId, ownerId });
     }
@@ -219,6 +220,8 @@ export class DurableGraphEvidenceJobService {
     private readonly profileScopes: GraphEvidenceProfileScopeResolver,
     private readonly now: () => Date = () => new Date(),
     private readonly leaseMs = 60_000,
+    private readonly executionDeadlineMs = Math.floor(leaseMs * 0.75),
+    private readonly maxWalkForwardCycles = 300,
   ) {}
 
   submitBacktest(rawRequest: unknown): GraphEvidenceJob {
@@ -244,10 +247,28 @@ export class DurableGraphEvidenceJobService {
       now.toISOString(),
       new Date(now.getTime() + this.leaseMs).toISOString(),
     );
+    if (this.executionDeadlineMs >= this.leaseMs) {
+      throw new Error("GRAPH_JOB_DEADLINE_MUST_PRECEDE_LEASE");
+    }
+    const controller = new AbortController();
+    const deadlineAt = now.getTime() + this.executionDeadlineMs;
+    const timeout = setTimeout(() => controller.abort(), this.executionDeadlineMs);
+    const context: GraphEvidenceExecutionContext = {
+      signal: controller.signal,
+      deadlineAt,
+      checkpoint: () => {
+        if (controller.signal.aborted || this.now().getTime() >= deadlineAt) {
+          controller.abort();
+          throw new Error("GRAPH_JOB_EXECUTION_DEADLINE_EXCEEDED");
+        }
+      },
+    };
     try {
       if (job.kind === "backtest") {
         const request = GraphBacktestJobRequestSchema.parse(job.request) as GraphBacktestJobRequest;
-        const run = await this.backtests.run(request);
+        context.checkpoint();
+        const run = await this.backtests.run(request, context);
+        context.checkpoint();
         const scope = this.profileScopes.backtest(request.profileId);
         const evidence = createGraphEvidenceArtifact({
           kind: "graph_backtest",
@@ -258,7 +279,13 @@ export class DurableGraphEvidenceJobService {
         return this.repository.complete(jobId, ownerId, evidence, this.now().toISOString());
       }
       const request = GraphWalkForwardJobRequestSchema.parse(job.request) as GraphWalkForwardJobRequest;
-      const run = await this.walkForwards.run(request);
+      const workload = this.walkForwards.workload(request);
+      if (workload.cycles > this.maxWalkForwardCycles) {
+        throw new Error("GRAPH_WORK_BUDGET_EXCEEDED");
+      }
+      context.checkpoint();
+      const run = await this.walkForwards.run(request, context);
+      context.checkpoint();
       const scope = this.profileScopes.walkForward(request.profileCandidateSetId);
       const evidence = createGraphEvidenceArtifact({
         kind: "graph_walk_forward",
@@ -269,8 +296,14 @@ export class DurableGraphEvidenceJobService {
       return this.repository.complete(jobId, ownerId, evidence, this.now().toISOString());
     } catch (error) {
       const code = error instanceof Error ? error.message.slice(0, 160) : "GRAPH_EVIDENCE_JOB_FAILED";
-      this.repository.fail(jobId, ownerId, code, this.now().toISOString());
+      try {
+        this.repository.fail(jobId, ownerId, code, this.now().toISOString());
+      } catch (failure) {
+        if (!(failure instanceof GraphEvidenceJobError) || failure.code !== "GRAPH_JOB_LEASE_HELD") throw failure;
+      }
       throw error;
+    } finally {
+      clearTimeout(timeout);
     }
   }
 }

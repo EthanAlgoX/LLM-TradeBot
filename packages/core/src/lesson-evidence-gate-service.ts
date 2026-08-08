@@ -320,12 +320,12 @@ export class LessonEvidenceGateProjectionService {
           ? "stale" as const
           : lifecycleStatus === "evidence_unavailable"
             ? "unavailable" as const
-            : binding?.backtestJob
+            : binding?.backtestJob?.status === "succeeded"
               ? "passed" as const
               : lifecycleStatus === "binding_required"
                 ? "blocked" as const
                 : "required" as const,
-        ...(binding?.backtestJob
+        ...(binding?.backtestJob?.status === "succeeded"
           ? {
               jobId: binding.backtestJob.jobId,
               evidenceFingerprint: binding.backtestJob.evidenceFingerprint,
@@ -338,12 +338,12 @@ export class LessonEvidenceGateProjectionService {
           ? "stale" as const
           : lifecycleStatus === "evidence_unavailable"
             ? "unavailable" as const
-            : binding?.walkForwardJob
+            : binding?.walkForwardJob?.status === "succeeded"
               ? "passed" as const
-              : binding?.backtestJob
+            : binding?.backtestJob?.status === "succeeded"
                 ? "required" as const
                 : "blocked" as const,
-        ...(binding?.walkForwardJob
+        ...(binding?.walkForwardJob?.status === "succeeded"
           ? {
               jobId: binding.walkForwardJob.jobId,
               evidenceFingerprint: binding.walkForwardJob.evidenceFingerprint,

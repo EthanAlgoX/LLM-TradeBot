@@ -1,5 +1,11 @@
 # TradeBot 当前状态与接手说明
 
+## LOOP-061 F4 bounded runner terminal contract（2026-08-08）
+
+- 已实现 server-owned deadline（默认 lease 的 75%，生产 45 秒）与协作式 checkpoint，传播到 Walk-Forward fold/candidate 和 Backtest cycle 边界；超时持久化为 `failed/GRAPH_JOB_EXECUTION_DEADLINE_EXCEEDED`，不写 Artifact。完成/失败均要求未过期 lease 与同一 owner，迟到 owner 不能覆盖 terminal。
+- Work budget 由注册 schedule/plan/candidate set 计算；当前本地 scope 为 5 folds × 1 candidate、10 次 Backtest、150 cycles，未超 300-cycle 上限。聚焦回归覆盖 deadline、无 Artifact、expired-owner fencing/recovery；全量 `test:ts` 自然结束 387/387 PASS。
+- Agent Chrome 创建新 v1，Preflight 原页 `passed`，Backtest 原页显示 scoped `running` 且旧按钮消失；9 秒内未 terminal，故未达到 Evidence ready，也没有创建 v2/reload/restart。F4 仍为 `IN_PROGRESS`；唯一下一入口为 [`LOOP-062`](loop-prompts/loop-062-f4-bounded-runner-evidence-continuation-v1.md)。无 Approval、Runtime、Simulation 或交易副作用。
+
 ## LOOP-060 F4 original-page terminal diagnosis（2026-08-08）
 
 - Agent Chrome evidence: exact immutable Walk-Forward displayed `walk-forward running…` and removed the old control before its POST settled. The selected card remained `partial_evidence` after more than two minutes while the server stayed CPU-active.

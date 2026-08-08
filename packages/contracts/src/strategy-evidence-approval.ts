@@ -19,13 +19,10 @@ export const StrategyConfigurationEvidenceReferenceSchema = z
   .strict();
 
 export const StrategyEvidenceJobReferenceSchema = z
-  .object({
-    jobId: z.string().min(1).max(240),
-    status: z.literal("succeeded"),
-    evidenceRef: z.string().min(1).max(500),
-    evidenceFingerprint: FingerprintSchema,
-  })
-  .strict();
+  .union([
+    z.object({ jobId: z.string().min(1).max(240), status: z.literal("succeeded"), evidenceRef: z.string().min(1).max(500), evidenceFingerprint: FingerprintSchema }).strict(),
+    z.object({ jobId: z.string().min(1).max(240), status: z.literal("failed"), failureCode: z.string().min(1).max(160) }).strict(),
+  ]);
 
 export const StrategyEvidenceApprovalRecordSchema = z
   .object({

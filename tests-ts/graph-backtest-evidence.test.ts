@@ -602,6 +602,49 @@ test("SQLite Graph Evidence Jobs are strict, idempotent, leased, recoverable and
   reopened.close();
 });
 
+test("durable graph jobs fail closed at the server deadline and fence expired owners", async () => {
+  const setup = setupEvidence(3);
+  const resolvePlan = () => ({
+    schemaVersion: "1.0.0" as const, planId: planId(currentPresetId), version: "1.0.0", fingerprint: fp("7"), lifecycleStatus: "registered" as const, createdAt,
+    presetRef: { id: currentPresetId, version: "1.0.0", fingerprint: fp("8") }, compiledGraphRef: { id: "graph.current", version: "1.0.0", fingerprint: fp("6") }, executionMode: "paper_capable" as const,
+    marketPackRef, requiredCapabilityKinds: ["bar" as const], nodes: [], runtimeApplied: false as const,
+  });
+  const db = new DatabaseSync(":memory:");
+  const repository = new SqliteGraphEvidenceJobRepository(db);
+  let nowMs = Date.parse("2026-02-01T00:00:00.000Z");
+  const now = () => new Date(nowMs += 10);
+  const service = new DurableGraphEvidenceJobService(
+    repository,
+    setup.backtests,
+    new GraphWalkForwardRunner(setup.datasets, setup.profileRegistry, setup.walkPlans, setup.backtests, resolvePlan),
+    { backtest: (profileId) => setup.profileRegistry.require(profileId), walkForward: (candidateSetId) => setup.profileRegistry.requireCandidateSet(candidateSetId) },
+    now,
+    1_000,
+    5,
+  );
+  const submitted = service.submitBacktest({ ...backtestRequest(setup.dataset), idempotencyKey: "deadline-job-0001" });
+  await assert.rejects(
+    service.run(submitted.jobId, "worker:deadline"),
+    (error: unknown) => error instanceof Error && error.message === "GRAPH_JOB_EXECUTION_DEADLINE_EXCEEDED",
+  );
+  const timedOut = repository.get(submitted.jobId);
+  assert.equal(timedOut.status, "failed");
+  assert.equal(timedOut.failureCode, "GRAPH_JOB_EXECUTION_DEADLINE_EXCEEDED");
+  assert.equal(timedOut.evidence, undefined);
+
+  const fenced = service.submitBacktest({ ...backtestRequest(setup.dataset), idempotencyKey: "fenced-job-0001" });
+  const acquiredAt = new Date(nowMs).toISOString();
+  repository.acquire(fenced.jobId, "worker:old", acquiredAt, new Date(nowMs + 1).toISOString());
+  nowMs += 2;
+  assert.throws(
+    () => repository.fail(fenced.jobId, "worker:old", "LATE_RESULT", new Date(nowMs).toISOString()),
+    (error: unknown) => error instanceof GraphEvidenceJobError && error.code === "GRAPH_JOB_LEASE_HELD",
+  );
+  assert.equal(repository.recoverExpired(new Date(nowMs).toISOString()), 1);
+  assert.equal(repository.get(fenced.jobId).status, "orphaned");
+  db.close();
+});
+
 function zodErrorLike(error: unknown): boolean {
   return error instanceof Error && error.name === "ZodError";
 }

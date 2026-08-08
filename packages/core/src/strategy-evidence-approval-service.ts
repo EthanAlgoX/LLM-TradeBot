@@ -382,13 +382,19 @@ export class StrategyEvidenceApprovalService {
       endAt: binding.endAt,
       idempotencyKey: request.idempotencyKey,
     });
-    if (binding.backtestJob?.jobId === job.jobId) {
+    if (binding.backtestJob?.jobId === job.jobId && binding.backtestJob.status === job.status) {
       return binding;
     }
-    const completed =
-      job.status === "succeeded"
+    let completed: GraphEvidenceJob;
+    try {
+      completed = job.status === "succeeded" || job.status === "failed"
         ? job
         : await this.jobs.run(job.jobId, `strategy-evidence:${actor.actorId}`);
+    } catch {
+      const terminal = this.jobs.get(job.jobId);
+      if (terminal.status !== "failed" || terminal.failureCode !== "GRAPH_JOB_EXECUTION_DEADLINE_EXCEEDED") throw new StrategyEvidenceApprovalError("STRATEGY_EVIDENCE_JOB_FAILED", { jobId: job.jobId });
+      completed = terminal;
+    }
     return this.recordJob(binding, completed, "backtest", actor.actorId);
   }
 
@@ -411,13 +417,19 @@ export class StrategyEvidenceApprovalService {
       endAt: binding.endAt,
       idempotencyKey: request.idempotencyKey,
     });
-    if (binding.walkForwardJob?.jobId === job.jobId) {
+    if (binding.walkForwardJob?.jobId === job.jobId && binding.walkForwardJob.status === job.status) {
       return binding;
     }
-    const completed =
-      job.status === "succeeded"
+    let completed: GraphEvidenceJob;
+    try {
+      completed = job.status === "succeeded" || job.status === "failed"
         ? job
         : await this.jobs.run(job.jobId, `strategy-evidence:${actor.actorId}`);
+    } catch {
+      const terminal = this.jobs.get(job.jobId);
+      if (terminal.status !== "failed" || terminal.failureCode !== "GRAPH_JOB_EXECUTION_DEADLINE_EXCEEDED") throw new StrategyEvidenceApprovalError("STRATEGY_EVIDENCE_JOB_FAILED", { jobId: job.jobId });
+      completed = terminal;
+    }
     return this.recordJob(binding, completed, "walk_forward", actor.actorId);
   }
 
@@ -550,22 +562,21 @@ export class StrategyEvidenceApprovalService {
     kind: "backtest" | "walk_forward",
     actorId: string,
   ): StrategyEvidenceBinding {
-    const evidence = this.requireCurrentEvidence(binding, job, kind);
-    const jobRef = {
-      jobId: job.jobId,
-      status: "succeeded" as const,
-      evidenceRef: evidence.evidenceRef,
-      evidenceFingerprint: graphEvidenceFingerprint(evidence),
-    };
+    const jobRef = job.status === "succeeded"
+      ? (() => {
+          const evidence = this.requireCurrentEvidence(binding, job, kind);
+          return { jobId: job.jobId, status: "succeeded" as const, evidenceRef: evidence.evidenceRef, evidenceFingerprint: graphEvidenceFingerprint(evidence) };
+        })()
+      : { jobId: job.jobId, status: "failed" as const, failureCode: job.failureCode ?? "GRAPH_EVIDENCE_JOB_FAILED" };
     const patch =
       kind === "backtest"
         ? { backtestJob: jobRef }
         : { walkForwardJob: jobRef };
     const hasPair =
-      kind === "backtest" ? Boolean(binding.walkForwardJob) : Boolean(binding.backtestJob);
+      kind === "backtest" ? binding.walkForwardJob?.status === "succeeded" : binding.backtestJob?.status === "succeeded";
     const updated = this.nextVersion(binding, {
       ...patch,
-      lifecycleStatus: hasPair ? "evidence_ready" : "partial_evidence",
+      lifecycleStatus: hasPair && job.status === "succeeded" ? "evidence_ready" : "partial_evidence",
     });
     if (hasPair) {
       const latestConfiguration = this.configuration.getLatest(

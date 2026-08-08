@@ -136,10 +136,12 @@ export class LessonHumanApprovalService {
       currentEvidence.bindingId !== evidenceRef.bindingId ||
       currentEvidence.versionId !== evidenceRef.versionId ||
       currentEvidence.fingerprint !== evidenceRef.fingerprint ||
-      currentEvidence.backtestJob?.jobId !== evidenceGate.backtest.jobId ||
+      currentEvidence.backtestJob?.status !== "succeeded" ||
+      currentEvidence.backtestJob.jobId !== evidenceGate.backtest.jobId ||
       currentEvidence.backtestJob?.evidenceFingerprint !==
         evidenceGate.backtest.evidenceFingerprint ||
-      currentEvidence.walkForwardJob?.jobId !== evidenceGate.walkForward.jobId ||
+      currentEvidence.walkForwardJob?.status !== "succeeded" ||
+      currentEvidence.walkForwardJob.jobId !== evidenceGate.walkForward.jobId ||
       currentEvidence.walkForwardJob?.evidenceFingerprint !==
         evidenceGate.walkForward.evidenceFingerprint
     ) {

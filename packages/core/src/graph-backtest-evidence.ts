@@ -94,12 +94,25 @@ export class GraphEvidenceError extends Error {
       | "CYCLE_OUTCOME_MODE_MISMATCH"
       | "WALK_FORWARD_INSUFFICIENT_DATA"
       | "WALK_FORWARD_OBJECTIVE_INCOMPATIBLE"
+      | "GRAPH_JOB_EXECUTION_DEADLINE_EXCEEDED"
+      | "GRAPH_WORK_BUDGET_EXCEEDED"
       | "IDEMPOTENCY_CONFLICT",
     readonly fields: Readonly<Record<string, string>> = {},
   ) {
     super(code);
     this.name = "GraphEvidenceError";
   }
+}
+
+/** Server-owned execution control; callers must close it after the runner settles. */
+export interface GraphEvidenceExecutionContext {
+  readonly signal: AbortSignal;
+  readonly deadlineAt: number;
+  checkpoint(): void;
+}
+
+function checkpoint(context?: GraphEvidenceExecutionContext): void {
+  context?.checkpoint();
 }
 
 function verifyDefinitionFingerprint<T extends { fingerprint: string }>(definition: T): boolean {
@@ -321,7 +334,7 @@ export class GraphBacktestRunner {
     private readonly now: () => Date = () => new Date(),
   ) {}
 
-  async run(rawRequest: unknown): Promise<GraphBacktestRun> {
+  async run(rawRequest: unknown, context?: GraphEvidenceExecutionContext): Promise<GraphBacktestRun> {
     const request = GraphBacktestJobRequestSchema.parse(rawRequest);
     const requestFingerprint = graphEvidenceFingerprint(request);
     const cacheKey = `${request.planId}:${request.idempotencyKey}`;
@@ -338,6 +351,7 @@ export class GraphBacktestRunner {
     const profile = this.profiles.require(request.profileId);
     const session = await this.sessions.create({ sessionId, planId: request.planId, dataset, profile });
     try {
+      checkpoint(context);
       if (session.plan.planId !== request.planId) {
         throw new GraphEvidenceError("GRAPH_SESSION_PLAN_MISMATCH", { expected: request.planId, actual: session.plan.planId });
       }
@@ -345,11 +359,14 @@ export class GraphBacktestRunner {
       const cycles = [];
       const outcomes: GraphCycleOutcome[] = [];
       for (const [index, asOf] of schedule.entries()) {
+        checkpoint(context);
         const result = await session.execute(asOf, `${request.idempotencyKey}:cycle:${index}`);
+        checkpoint(context);
         if (result.run.status === "failed") {
           throw new GraphEvidenceError("GRAPH_CYCLE_FAILED", { asOf, graphRunId: result.run.runId });
         }
         const outcome = await session.captureCycleOutcome(asOf, result);
+        checkpoint(context);
         if (
           (session.plan.executionMode === "research_only" && outcome.mode !== "research") ||
           (session.plan.executionMode === "paper_capable" && outcome.mode !== "trading")
@@ -438,13 +455,29 @@ export class GraphWalkForwardRunner {
     private readonly now: () => Date = () => new Date(),
   ) {}
 
-  async run(rawRequest: unknown): Promise<GraphWalkForwardRun> {
+  workload(rawRequest: unknown): { folds: number; candidates: number; backtestInvocations: number; cycles: number } {
+    const request = GraphWalkForwardJobRequestSchema.parse(rawRequest);
+    const schedule = this.datasets.schedule(request.datasetId, request.startAt, request.endAt);
+    const candidateSet = this.profiles.requireCandidateSet(request.profileCandidateSetId);
+    const walkPlan = this.plans.require(request.walkForwardPlanId);
+    let folds = 0;
+    for (let start = 0; start + walkPlan.trainingCycles + walkPlan.validationCycles <= schedule.length; start += walkPlan.stepCycles) folds += 1;
+    return {
+      folds,
+      candidates: candidateSet.profileIds.length,
+      backtestInvocations: folds * (candidateSet.profileIds.length + 1),
+      cycles: folds * (candidateSet.profileIds.length * walkPlan.trainingCycles + walkPlan.validationCycles),
+    };
+  }
+
+  async run(rawRequest: unknown, context?: GraphEvidenceExecutionContext): Promise<GraphWalkForwardRun> {
     const request = GraphWalkForwardJobRequestSchema.parse(rawRequest);
     const dataset = this.datasets.require(request.datasetId);
     const schedule = this.datasets.schedule(request.datasetId, request.startAt, request.endAt);
     const candidateSet = this.profiles.requireCandidateSet(request.profileCandidateSetId);
     const walkPlan = this.plans.require(request.walkForwardPlanId);
     const graphPlan = this.resolvePlan(request.planId);
+    checkpoint(context);
     const folds = [];
     let foldIndex = 0;
     for (
@@ -452,6 +485,7 @@ export class GraphWalkForwardRunner {
       trainingStart + walkPlan.trainingCycles + walkPlan.validationCycles <= schedule.length;
       trainingStart += walkPlan.stepCycles
     ) {
+      checkpoint(context);
       const training = schedule.slice(trainingStart, trainingStart + walkPlan.trainingCycles);
       const validation = schedule.slice(
         trainingStart + walkPlan.trainingCycles,
@@ -459,6 +493,7 @@ export class GraphWalkForwardRunner {
       );
       const candidates = [];
       for (const profileId of candidateSet.profileIds) {
+        checkpoint(context);
         const profile = this.profiles.require(profileId, graphPlan.presetRef.id);
         const trainingRun = await this.backtests.run({
           schemaVersion: "1.0.0",
@@ -473,7 +508,8 @@ export class GraphWalkForwardRunner {
             foldIndex,
             profileId,
           ),
-        });
+        }, context);
+        checkpoint(context);
         candidates.push({
           profileRef: definitionRef(profile),
           trainingRunRef: { id: trainingRun.runId, version: trainingRun.version, fingerprint: trainingRun.fingerprint },
@@ -486,6 +522,7 @@ export class GraphWalkForwardRunner {
       );
       const selected = candidates[0];
       if (!selected) throw new GraphEvidenceError("WALK_FORWARD_INSUFFICIENT_DATA");
+      checkpoint(context);
       const validationRun = await this.backtests.run({
         schemaVersion: "1.0.0",
         planId: request.planId,
@@ -499,7 +536,8 @@ export class GraphWalkForwardRunner {
           foldIndex,
           selected.profileRef.id,
         ),
-      });
+      }, context);
+      checkpoint(context);
       const foldWithoutFingerprint = {
         foldId: walkForwardDerivedId(
           "fold",
