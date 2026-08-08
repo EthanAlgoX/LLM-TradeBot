@@ -123,9 +123,12 @@ function createExecutors(ports: CurrentCryptoHistoricalExecutionPorts): Register
     role: "selector",
     inputArtifactTypes: [],
     outputArtifactTypes: [semanticType("selected_symbol")],
-    execute: async ({ asOf, executionLineageFingerprint }) => {
+    execute: async ({ asOf, executionLineageFingerprint, executionContext }) => {
+      executionContext?.checkpoint();
       const candidates = await ports.candidateSymbols(asOf);
+      executionContext?.checkpoint();
       const symbol = await ports.selectSymbol(candidates, asOf);
+      executionContext?.checkpoint();
       return [draft(semanticType("selected_symbol"), { symbol, candidateCount: candidates.length }, asOf, [], executionLineageFingerprint)];
     },
   };
@@ -135,7 +138,8 @@ function createExecutors(ports: CurrentCryptoHistoricalExecutionPorts): Register
     role: "data_sync",
     inputArtifactTypes: [semanticType("selected_symbol")],
     outputArtifactTypes: ["market_observation"],
-    execute: async ({ plan, node, inputs, asOf, executionLineageFingerprint }) => {
+    execute: async ({ plan, node, inputs, asOf, executionLineageFingerprint, executionContext }) => {
+      executionContext?.checkpoint();
       const selected = payloads(inputs, semanticType("selected_symbol"), SelectedSymbolSchema)[0];
       const symbol = selected?.symbol ?? (await ports.selectSymbol(await ports.candidateSymbols(asOf), asOf));
       const registeredPreset =
@@ -169,6 +173,7 @@ function createExecutors(ports: CurrentCryptoHistoricalExecutionPorts): Register
           };
         }) as SemanticObservationWindowReference[];
       const observations = await ports.loadObservations(symbol, windows, asOf);
+      executionContext?.checkpoint();
       return observations.map((observation) => {
         const mapped = draft("market_observation", observation, asOf, inputs, executionLineageFingerprint);
         return {
@@ -186,7 +191,8 @@ function createExecutors(ports: CurrentCryptoHistoricalExecutionPorts): Register
     role: "data_quality",
     inputArtifactTypes: ["market_observation"],
     outputArtifactTypes: [semanticType("data_quality")],
-    execute: async ({ inputs, asOf, executionLineageFingerprint }) => {
+    execute: async ({ inputs, asOf, executionLineageFingerprint, executionContext }) => {
+      executionContext?.checkpoint();
       const observations = payloads(inputs, "market_observation", MarketObservationArtifactSchema);
       return [draft(semanticType("data_quality"), { status: "pass", observationArtifactIds: observations.map((item) => item.id), issueCodes: [] }, asOf, inputs, executionLineageFingerprint)];
     },
@@ -197,11 +203,13 @@ function createExecutors(ports: CurrentCryptoHistoricalExecutionPorts): Register
     role: "window_analysis",
     inputArtifactTypes: ["market_observation", semanticType("data_quality")],
     outputArtifactTypes: ["agent_semantic_assessment"],
-    execute: async ({ node, inputs, asOf, executionLineageFingerprint }) => {
+    execute: async ({ node, inputs, asOf, executionLineageFingerprint, executionContext }) => {
+      executionContext?.checkpoint();
       const observations = payloads(inputs, "market_observation", MarketObservationArtifactSchema);
       const observation = observations.find((item) => node.observationWindowIds.includes(item.observationWindowRef.id));
       if (!observation) throw new Error("observation_window_missing");
       const assessment = await ports.analyzeObservation(observation);
+      executionContext?.checkpoint();
       return [draft("agent_semantic_assessment", assessment, asOf, inputs, executionLineageFingerprint)];
     },
   });
@@ -211,9 +219,11 @@ function createExecutors(ports: CurrentCryptoHistoricalExecutionPorts): Register
     role: side === "bull" ? "bull_research" : "bear_research",
     inputArtifactTypes: ["agent_semantic_assessment"],
     outputArtifactTypes: ["agent_semantic_assessment"],
-    execute: async ({ inputs, asOf, executionLineageFingerprint }) => {
+    execute: async ({ inputs, asOf, executionLineageFingerprint, executionContext }) => {
+      executionContext?.checkpoint();
       const assessments = payloads(inputs, "agent_semantic_assessment", AgentSemanticAssessmentSchema);
       const result = await ports.buildDirectionalCase(side, assessments, asOf);
+      executionContext?.checkpoint();
       return [draft("agent_semantic_assessment", result, asOf, inputs, executionLineageFingerprint)];
     },
   });
@@ -223,9 +233,11 @@ function createExecutors(ports: CurrentCryptoHistoricalExecutionPorts): Register
     role: "position_monitor",
     inputArtifactTypes: ["market_observation"],
     outputArtifactTypes: ["agent_semantic_assessment"],
-    execute: async ({ inputs, asOf, executionLineageFingerprint }) => {
+    execute: async ({ inputs, asOf, executionLineageFingerprint, executionContext }) => {
+      executionContext?.checkpoint();
       const observations = payloads(inputs, "market_observation", MarketObservationArtifactSchema);
       const result = await ports.monitorCurrentPosition(observations, asOf);
+      executionContext?.checkpoint();
       return [draft("agent_semantic_assessment", result, asOf, inputs, executionLineageFingerprint)];
     },
   };
@@ -235,11 +247,14 @@ function createExecutors(ports: CurrentCryptoHistoricalExecutionPorts): Register
     role: "decision",
     inputArtifactTypes: ["agent_semantic_assessment"],
     outputArtifactTypes: ["decision_semantic_context", "semantic_decision"],
-    execute: async ({ inputs, priorArtifacts, asOf, executionLineageFingerprint }) => {
+    execute: async ({ inputs, priorArtifacts, asOf, executionLineageFingerprint, executionContext }) => {
+      executionContext?.checkpoint();
       const observations = payloads(priorArtifacts, "market_observation", MarketObservationArtifactSchema);
       const assessments = payloads(priorArtifacts, "agent_semantic_assessment", AgentSemanticAssessmentSchema);
       const approvedLessons = await ports.approvedLessons(asOf);
+      executionContext?.checkpoint();
       const result = await ports.decide({ observations, assessments, approvedLessons, asOf });
+      executionContext?.checkpoint();
       return [
         draft("decision_semantic_context", result.context, asOf, inputs, executionLineageFingerprint),
         draft("semantic_decision", result.decision, asOf, inputs, executionLineageFingerprint),
@@ -252,10 +267,13 @@ function createExecutors(ports: CurrentCryptoHistoricalExecutionPorts): Register
     role: "portfolio",
     inputArtifactTypes: ["semantic_decision"],
     outputArtifactTypes: [semanticType("portfolio_action")],
-    execute: async ({ inputs, asOf, executionLineageFingerprint }) => {
+    execute: async ({ inputs, asOf, executionLineageFingerprint, executionContext }) => {
+      executionContext?.checkpoint();
       const decision = payloads(inputs, "semantic_decision", SemanticDecisionArtifactSchema)[0];
       if (!decision) throw new Error("semantic_decision_missing");
-      return [draft(semanticType("portfolio_action"), await ports.applyPortfolio(decision), asOf, inputs, executionLineageFingerprint)];
+      const action = await ports.applyPortfolio(decision);
+      executionContext?.checkpoint();
+      return [draft(semanticType("portfolio_action"), action, asOf, inputs, executionLineageFingerprint)];
     },
   };
 
@@ -264,10 +282,13 @@ function createExecutors(ports: CurrentCryptoHistoricalExecutionPorts): Register
     role: "risk",
     inputArtifactTypes: [semanticType("portfolio_action")],
     outputArtifactTypes: [semanticType("risk_decision")],
-    execute: async ({ inputs, asOf, executionLineageFingerprint }) => {
+    execute: async ({ inputs, asOf, executionLineageFingerprint, executionContext }) => {
+      executionContext?.checkpoint();
       const action = payloads(inputs, semanticType("portfolio_action"), PortfolioActionSchema)[0];
       if (!action) throw new Error("portfolio_action_missing");
-      return [draft(semanticType("risk_decision"), await ports.evaluateRisk(action), asOf, inputs, executionLineageFingerprint)];
+      const risk = await ports.evaluateRisk(action);
+      executionContext?.checkpoint();
+      return [draft(semanticType("risk_decision"), risk, asOf, inputs, executionLineageFingerprint)];
     },
   };
 
@@ -276,10 +297,13 @@ function createExecutors(ports: CurrentCryptoHistoricalExecutionPorts): Register
     role: "execution",
     inputArtifactTypes: [semanticType("risk_decision")],
     outputArtifactTypes: [semanticType("execution_result")],
-    execute: async ({ inputs, asOf, executionLineageFingerprint }) => {
+    execute: async ({ inputs, asOf, executionLineageFingerprint, executionContext }) => {
+      executionContext?.checkpoint();
       const riskDecision = payloads(inputs, semanticType("risk_decision"), RiskDecisionSchema)[0];
       if (!riskDecision) throw new Error("risk_decision_missing");
-      return [draft(semanticType("execution_result"), await ports.simulateExecution(riskDecision), asOf, inputs, executionLineageFingerprint)];
+      const result = await ports.simulateExecution(riskDecision);
+      executionContext?.checkpoint();
+      return [draft(semanticType("execution_result"), result, asOf, inputs, executionLineageFingerprint)];
     },
   };
 
@@ -288,11 +312,13 @@ function createExecutors(ports: CurrentCryptoHistoricalExecutionPorts): Register
     role: "reflection",
     inputArtifactTypes: [semanticType("execution_result"), "semantic_decision"],
     outputArtifactTypes: ["reflection_lesson_candidate"],
-    execute: async ({ inputs, priorArtifacts, asOf, executionLineageFingerprint }) => {
+    execute: async ({ inputs, priorArtifacts, asOf, executionLineageFingerprint, executionContext }) => {
+      executionContext?.checkpoint();
       const executionResult = payloads(inputs, semanticType("execution_result"), ExecutionResultSchema)[0];
       const semanticDecision = payloads([...inputs, ...priorArtifacts], "semantic_decision", SemanticDecisionArtifactSchema)[0];
       if (!executionResult || !semanticDecision) throw new Error("reflection_inputs_missing");
       const candidate = await ports.reflect({ decision: semanticDecision, execution: executionResult });
+      executionContext?.checkpoint();
       return candidate ? [draft("reflection_lesson_candidate", candidate, asOf, inputs, executionLineageFingerprint)] : [];
     },
   };
@@ -302,9 +328,12 @@ function createExecutors(ports: CurrentCryptoHistoricalExecutionPorts): Register
     role: "research_synthesis",
     inputArtifactTypes: ["agent_semantic_assessment"],
     outputArtifactTypes: ["agent_semantic_assessment"],
-    execute: async ({ inputs, asOf, executionLineageFingerprint }) => {
+    execute: async ({ inputs, asOf, executionLineageFingerprint, executionContext }) => {
+      executionContext?.checkpoint();
       const assessments = payloads(inputs, "agent_semantic_assessment", AgentSemanticAssessmentSchema);
-      return [draft("agent_semantic_assessment", await ports.synthesizeResearch(assessments, asOf), asOf, inputs, executionLineageFingerprint)];
+      const result = await ports.synthesizeResearch(assessments, asOf);
+      executionContext?.checkpoint();
+      return [draft("agent_semantic_assessment", result, asOf, inputs, executionLineageFingerprint)];
     },
   };
 

@@ -116,6 +116,14 @@ export interface HistoricalNodeExecutionContext {
   executionLineageFingerprint: string;
   inputs: readonly TypedHistoricalGraphArtifact[];
   priorArtifacts: readonly TypedHistoricalGraphArtifact[];
+  executionContext?: HistoricalGraphExecutionContext;
+}
+
+/** Optional server-owned cancellation control for bounded historical execution. */
+export interface HistoricalGraphExecutionContext {
+  readonly signal: AbortSignal;
+  readonly deadlineAt: number;
+  checkpoint(): void;
 }
 
 export interface RegisteredHistoricalNodeExecutor {
@@ -392,7 +400,10 @@ export class HistoricalGraphExecutor {
     this.monotonicNow = options.monotonicNow ?? (() => Date.now());
   }
 
-  async execute(rawRequest: unknown): Promise<HistoricalGraphExecutionResult> {
+  async execute(
+    rawRequest: unknown,
+    context?: HistoricalGraphExecutionContext,
+  ): Promise<HistoricalGraphExecutionResult> {
     const request = HistoricalGraphExecutionRequestSchema.parse(rawRequest);
     const plan = this.options.planRegistry.require(request.planId);
     for (const capability of plan.requiredCapabilityKinds) {
@@ -414,7 +425,9 @@ export class HistoricalGraphExecutor {
       }
       return HistoricalGraphExecutionResultSchema.parse(cached.result);
     }
-    const result = await this.executePlan(plan, request);
+    context?.checkpoint();
+    const result = await this.executePlan(plan, request, context);
+    context?.checkpoint();
     this.results.set(cacheKey, { asOf: request.asOf, result });
     return HistoricalGraphExecutionResultSchema.parse(result);
   }
@@ -422,6 +435,7 @@ export class HistoricalGraphExecutor {
   private async executePlan(
     plan: HistoricalGraphExecutionPlan,
     request: HistoricalGraphExecutionRequest,
+    context?: HistoricalGraphExecutionContext,
   ): Promise<HistoricalGraphExecutionResult> {
     const startedAt = this.now().toISOString();
     const runId = `historical-run:${fingerprint({
@@ -439,6 +453,7 @@ export class HistoricalGraphExecutor {
     const recoveredRequiredEdgeIds = new Set<string>();
 
     for (const node of plan.nodes) {
+      context?.checkpoint();
       const nodeStartedAt = this.now().toISOString();
       const monotonicStart = this.monotonicNow();
       const executor = this.options.executorRegistry.require(node.executorId);
@@ -496,9 +511,12 @@ export class HistoricalGraphExecutor {
             executionLineageFingerprint,
             inputs,
             priorArtifacts: [...artifacts],
+            executionContext: context,
           });
+          context?.checkpoint();
           const nodeOutputs: TypedHistoricalGraphArtifact[] = [];
           for (const [outputIndex, draft] of drafts.entries()) {
+            context?.checkpoint();
             if (
               !node.outputArtifactTypes.includes(draft.artifactType) ||
               !executor.outputArtifactTypes.includes(draft.artifactType)

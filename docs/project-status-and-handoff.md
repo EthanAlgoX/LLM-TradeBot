@@ -528,6 +528,12 @@ npm run dev:paper
 - 下一阶段执行 [`next-loop-prompt.md`](next-loop-prompt.md) 中的 Generic Paper Runtime Migration Readiness Loop。
 # LOOP-056 handoff (2026-08-06)
 
+# LOOP-062 F4 bounded runner evidence continuation (2026-08-08)
+
+- Agent Chrome observed a fresh v1 Backtest beyond 50 seconds while its original page stayed `backtest running…`; static UI remained readable while the API runner consumed one core.
+- The context was lost before `GraphBacktestSession.execute()`, and production session construction reparsed the already registered CSV. The repair propagates context through historical executor/node boundaries and reuses the registration-verified immutable CSV snapshot.
+- After controlled restart, fresh v1 reached durable `failed` at 48.3 seconds without Evidence. This closes the hanging-terminal defect but fails the positive Evidence gate; F4 remains `IN_PROGRESS`, and v2/F5 were not attempted. `check` and natural `test:ts` 387/387 PASS; runtime remains Paper Only with no Approval, Runtime, Simulation, or trading side effect.
+
 # LOOP-057 handoff (2026-08-08)
 
 - F4 remains `IN_PROGRESS`. Agent-operated Chrome lifecycle trace captured one exact-version Backtest handler and POST start; after 900ms no POST projection had returned, so neither merge nor render could yet advance the DOM. A later reload read the persisted Walk-Forward authority.

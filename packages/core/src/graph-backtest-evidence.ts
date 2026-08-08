@@ -263,7 +263,11 @@ export class RegisteredGraphWalkForwardPlanRegistry {
 
 export interface GraphBacktestSession {
   plan: HistoricalGraphExecutionPlan;
-  execute(asOf: string, idempotencyKey: string): Promise<HistoricalGraphExecutionResult>;
+  execute(
+    asOf: string,
+    idempotencyKey: string,
+    context?: GraphEvidenceExecutionContext,
+  ): Promise<HistoricalGraphExecutionResult>;
   captureCycleOutcome(
     asOf: string,
     result: HistoricalGraphExecutionResult,
@@ -360,7 +364,7 @@ export class GraphBacktestRunner {
       const outcomes: GraphCycleOutcome[] = [];
       for (const [index, asOf] of schedule.entries()) {
         checkpoint(context);
-        const result = await session.execute(asOf, `${request.idempotencyKey}:cycle:${index}`);
+        const result = await session.execute(asOf, `${request.idempotencyKey}:cycle:${index}`, context);
         checkpoint(context);
         if (result.run.status === "failed") {
           throw new GraphEvidenceError("GRAPH_CYCLE_FAILED", { asOf, graphRunId: result.run.runId });

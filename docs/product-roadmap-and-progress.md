@@ -317,6 +317,12 @@ accepted_for_validation
 - unavailable/stale Shadow 不写入 validated 审计记录；所有记录保持 Runtime Not Applied。
 - 验证基线：check PASS；TypeScript tests 302/302 PASS；Web build PASS（31 modules，62ms）；diff-check PASS。
 - 当前 P0：Lesson Governance Revocation and Supersession。
+# LOOP-062 handoff (2026-08-08)
+
+- F4 remains `IN_PROGRESS`. Agent Chrome completed the required current-HEAD observation: a fresh v1 Backtest remained running past the 50-second contract window. The first lost context boundary was `GraphBacktestSession.execute()`; production session construction also reparsed the registered CSV synchronously.
+- The minimal fix propagates the same server-owned context through the historical executor and registered node boundaries, and reuses the immutable CSV snapshot parsed and fingerprinted at registration. After a controlled restart, a fresh Backtest reached a durable failed terminal at 48.3 seconds rather than remaining running. It did not produce Evidence, so the positive chain, v2, and F5 remain blocked.
+- `npm run check` and natural `npm run test:ts` passed at 387/387. LOOP-063 must continue only F4 positive-workload performance and full Chrome closeout; it must not create a second authority or enter F5.
+
 # LOOP-056 handoff (2026-08-06)
 
 - F4 remains `IN_PROGRESS`. Agent Chrome reproduced that Preflight advances in-place, while Backtest and Walk-Forward can persist evidence but leave the current card at the prior gate.

@@ -1,4 +1,5 @@
 import {
+  type GraphEvidenceExecutionContext,
   type GraphBacktestSession,
   type GraphBacktestSessionFactory,
 } from "../../core/src/graph-backtest-evidence.js";
@@ -72,8 +73,11 @@ export function createRegisteredGraphBacktestSessionFactory(
         })();
       return Object.freeze({
         plan,
-        execute: (asOf: string, idempotencyKey: string) =>
-          composition.executor.execute({ planId: plan.planId, idempotencyKey, asOf }),
+        execute: (
+          asOf: string,
+          idempotencyKey: string,
+          context?: GraphEvidenceExecutionContext,
+        ) => composition.executor.execute({ planId: plan.planId, idempotencyKey, asOf }, context),
         captureCycleOutcome: resources.captureCycleOutcome,
         close: async () => {
           await resources.close?.();

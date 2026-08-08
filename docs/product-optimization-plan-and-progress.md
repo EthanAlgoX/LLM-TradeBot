@@ -1,5 +1,7 @@
 # TradeBot 产品优化规划与进度
 
+> 2026-08-08：LOOP-062 F4 保持 `IN_PROGRESS`。真实 Chrome 的新鲜 v1 Backtest 在原页完整观察中超过 50 秒仍为 running，根因是 `GraphBacktestSession.execute()` 未接收 execution context，且生产 session 在 deadline 窗口内同步重解析已注册 CSV。最小修复将同一 context 传至 historical graph/node 边界，并复用注册时已校验的 immutable CSV snapshot。修复后新鲜 Backtest 在 48.3 秒稳定 `failed`，不再悬挂；但仍未在正向窗口成功，故不可创建 v2、不可进入 F5。`check` 和自然结束 `test:ts` 387/387 通过。
+
 > 2026-08-08：LOOP-061 F4 保持 `IN_PROGRESS`。Graph Evidence runner 现用 server-owned cooperative deadline（45 秒）、fold/candidate/cycle checkpoints、300-cycle registered budget 和 lease/owner fencing：timeout 原子持久化为 `failed/GRAPH_JOB_EXECUTION_DEADLINE_EXCEEDED` 且没有 Artifact，迟到 owner 无法提交。Chrome 新 v1 已显示 Preflight passed 与 Backtest scoped running，未在 9 秒观察窗获得 terminal；v2/recovery 未开始。
 
 > 2026-08-08：LOOP-060 F4 保持 `IN_PROGRESS`。Agent 真实 Chrome 在当前 HEAD 原页点击 exact-version Walk-Forward 后立即显示 scoped `running`，旧控件移除；对应 Node runner 持续高 CPU 并在两分钟以上仍未返回 terminal HTTP projection，卡片仍为 `partial_evidence`。首个断点是同步 `DurableGraphEvidenceJobService.run()` 没有执行 deadline：HTTP handler 正在 await runner，故 response、exact-version merge 和 terminal DOM 均尚未发生（分类 A，且同步合同缺少 deadline）。未把其他历史 terminal、reload 或 API 读取记为通过；v2/recovery 未开始。

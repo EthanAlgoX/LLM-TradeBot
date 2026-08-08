@@ -423,6 +423,7 @@ function createSessionProvider(input: {
   datasetId: string;
   symbols: readonly string[];
   profile: StrategyProfile;
+  source: CsvHistoricalCandleSource;
 }): RegisteredGraphBacktestSessionProvider {
   return {
     create: async ({ sessionId, planId, dataset, profile }) => {
@@ -445,7 +446,10 @@ function createSessionProvider(input: {
       if (currentFingerprint !== input.registeredFingerprint) {
         throw new Error("CSV_GRAPH_EVIDENCE_CONTENT_FINGERPRINT_MISMATCH");
       }
-      const source = await CsvHistoricalCandleSource.fromFile(input.csvPath);
+      // The registered snapshot has already been parsed and fingerprinted during
+      // registration. Reuse it per session rather than synchronously reparsing
+      // the same immutable CSV inside the bounded execution window.
+      const source = input.source;
       let selectedSymbol = input.symbols[0]!;
       let currentPrice = 0;
       let cash = Number(
@@ -1074,6 +1078,7 @@ export async function createCsvProductionGraphEvidenceRegistration(
           datasetId: dataset.id,
           symbols,
           profile,
+          source,
         }),
         {
           authorizedCapabilityKinds: ["bar"],

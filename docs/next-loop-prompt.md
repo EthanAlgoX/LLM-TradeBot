@@ -2,14 +2,14 @@
 
 ```text
 当前状态：F3 COMPLETE / F4 IN_PROGRESS
-最近完成：LOOP-061 建立协作式 deadline、budget、lease fencing 与 deadline terminal；Chrome 新 v1 Backtest 仍未在观察窗 terminal。
-下一任务：LOOP-062 — F4 bounded-runner evidence continuation
+最近完成：LOOP-062 将 execution context 传播至生产历史节点并复用注册 CSV snapshot；Chrome Backtest 已稳定 deadline terminal，但正向 Evidence 仍失败。
+下一任务：LOOP-063 — F4 positive production evidence continuation
 浏览器要求：必需，由 Agent 直接操作真实 Chrome；禁止人工验收
 ```
 
-执行：[`LOOP-062`](loop-prompts/loop-062-f4-bounded-runner-evidence-continuation-v1.md)
+执行：[`LOOP-063`](loop-prompts/loop-063-f4-positive-production-evidence-continuation-v1.md)
 
-LOOP-062 先按完整 45 秒 deadline + 5 秒持久化余量验证当前 production Backtest/Walk-Forward；9 秒未 terminal 不能单独判失败。只有超过合同窗口仍 running，才修复 execution context 在 `GraphBacktestSession.execute()` 内部的传播与停止边界；随后完成 v1/v2、stale、reload/restart 和双尺寸 Chrome 验收。
+LOOP-063 只诊断为何已正确停止的 production Backtest 不能在 45 秒 deadline 内正向完成；必须保留同一 durable Job/Artifact authority、deadline、lease fencing 和 registered workload，不得缩小数据、范围或预算以伪造成功。只有正向 v1 后才继续 v2/recovery Chrome 矩阵。
 
 在此之前不得：
 
