@@ -2457,15 +2457,16 @@ function bindEvents(): void {
   document.querySelectorAll<HTMLButtonElement>("[data-f4-action]").forEach((button) => button.addEventListener("click", async () => {
     try {
       const versionId = button.dataset.f4Draft ?? "";
+      const action = button.dataset.f4Action as "preflight" | "backtest" | "walk-forward";
       // An action is authoritative for its exact immutable version. In-flight
       // history hydration is older and must not cancel this result merely by
       // starting after the click (the LOOP-056 race).
       ++realWorkbenchHydrationEpoch;
-      const data = await agentRequest(`/api/orchestration/workbench/drafts/${encodeURIComponent(versionId)}/f4/${button.dataset.f4Action}`, { method: "POST", body: JSON.stringify({ idempotencyKey: `f4:${button.dataset.f4Action}:${Date.now()}` }) });
+      const data = await agentRequest(`/api/orchestration/workbench/drafts/${encodeURIComponent(versionId)}/f4/${action}`, { method: "POST", body: JSON.stringify({ idempotencyKey: `f4:${action}:${Date.now()}` }) });
       state.realWorkbenchTurns = mergeWorkbenchF4Action(state.realWorkbenchTurns, versionId, data);
       render();
       const reconciliation = await reconcileWorkbenchF4Action(
-        button.dataset.f4Action as "preflight" | "backtest" | "walk-forward",
+        action,
         () => agentRequest(`/api/orchestration/workbench/drafts/${encodeURIComponent(versionId)}/f4`),
         () => new Promise((resolve) => window.setTimeout(resolve, 200)),
       );
