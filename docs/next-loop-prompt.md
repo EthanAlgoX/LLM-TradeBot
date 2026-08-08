@@ -9,7 +9,7 @@
 
 执行：[`LOOP-062`](loop-prompts/loop-062-f4-bounded-runner-evidence-continuation-v1.md)
 
-LOOP-062 只完成新的 v1 原页 Backtest/Walk-Forward terminal、failure UI、同 Draft v2/stale/reload/restart 和双尺寸 Chrome 验收；禁止用 HTTP timeout、reload 或仍在后台运行的任务伪造通过。
+LOOP-062 先按完整 45 秒 deadline + 5 秒持久化余量验证当前 production Backtest/Walk-Forward；9 秒未 terminal 不能单独判失败。只有超过合同窗口仍 running，才修复 execution context 在 `GraphBacktestSession.execute()` 内部的传播与停止边界；随后完成 v1/v2、stale、reload/restart 和双尺寸 Chrome 验收。
 
 在此之前不得：
 
