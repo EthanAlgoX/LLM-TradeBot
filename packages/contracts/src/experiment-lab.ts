@@ -38,6 +38,7 @@ export const ExperimentConstraintsSchema = z
     minimumTradeCount: z.number().int().min(0).max(1_000_000).optional(),
     walkForwardPositive: z.boolean().optional(),
     runtimeFailureCountEqZero: z.literal(true).optional(),
+    deflatedSharpeGte: z.number().min(0).max(1).optional(),
   })
   .strict();
 
@@ -189,6 +190,7 @@ export const ExperimentConstraintResultSchema = z
       "minimumTradeCount",
       "walkForwardPositive",
       "runtimeFailureCountEqZero",
+      "deflatedSharpeGte",
     ]),
     status: z.enum(["PASS", "FAIL", "UNAVAILABLE"]),
     actual: z.union([z.number().finite(), z.boolean()]).optional(),

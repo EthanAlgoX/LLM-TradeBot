@@ -46,6 +46,7 @@ export * from "./sqlite-semantic-pipeline-executions.js";
 export * from "./registered-configurable-semantic-pipeline-execution.js";
 export * from "./historical-semantic-evaluation-http.js";
 export * from "./experiment-lab.js";
+export * from "./deflated-sharpe.js";
 export * from "./multi-paper-runtime.js";
 export * from "./multi-paper-runtime-http.js";
 export * from "./shadow-promotion.js";
