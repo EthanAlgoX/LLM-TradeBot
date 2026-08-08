@@ -1,5 +1,12 @@
 # TradeBot 当前状态与接手说明
 
+## LOOP-060 F4 original-page terminal diagnosis（2026-08-08）
+
+- Agent Chrome evidence: exact immutable Walk-Forward displayed `walk-forward running…` and removed the old control before its POST settled. The selected card remained `partial_evidence` after more than two minutes while the server stayed CPU-active.
+- First break: `StrategyWorkbenchHttpHandler` awaits `StrategyWorkbenchService.f4`, which awaits `StrategyEvidenceApprovalService.runWalkForward`, which awaits `DurableGraphEvidenceJobService.run`. It supplies a lease but no execution deadline or terminal timeout. Therefore HTTP terminal response, exact-version merge, and terminal DOM cannot occur while the runner remains active.
+- F4 remains `IN_PROGRESS`. No Approval, Runtime, Simulation, Account, Order, Fill, or exchange write was used. Do not substitute reload, another historical terminal, or direct API reads for original-page completion.
+- Next entry: [`LOOP-061`](loop-prompts/loop-061-f4-runner-terminal-contract-continuation-v1.md).
+
 ## LOOP-059 F4 recovery and immutable-v2 continuation（2026-08-08）
 
 - 根因与修复：Agent Chrome 在同 actor reload 前后确认 history 请求/Conversation/Draft references 均可恢复；第一个失败点是 Web `hydrateRealWorkbench()` 在 history 成功后等待所有 F4 projection 的 `Promise.all`。一条未终结的 Backtest/Walk-Forward runner 使 await 永不返回，`realWorkbenchTurns` 未赋值，render 输出为 0 张 F4 卡。现先投影 history，再逐条以 immutable `draftId + versionId + fingerprint` 合并 F4；迟到/legacy 结果不删除已恢复卡片，reload 的临时 running 不会恢复为 authority。

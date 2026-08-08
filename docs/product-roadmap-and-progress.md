@@ -1,5 +1,7 @@
 # TradeBot 产品路线图与当前进度
 
+> 2026-08-08：LOOP-060 F4 仍 `IN_PROGRESS`。真实 Chrome 原页确认 Walk-Forward 点击只发起一次且先展示 exact-version scoped running；服务端同步 runner 两分钟以上仍占用 CPU，POST 未 resolve，因而 HTTP terminal、client merge 与 terminal DOM 尚未发生。根因在 `DurableGraphEvidenceJobService.run()` 的无执行 deadline 同步合同，不是 hydration 覆盖；下一轮必须补 durable timeout/terminal projection 或合同化异步 completion，再重新从新鲜 v1 验收。不得进入 F5。
+
 > 2026-08-08：LOOP-059 F4 仍 `IN_PROGRESS`。真实 Chrome 将 reload 丢卡根因定位到 `hydrateRealWorkbench()`：同 actor history 已返回后，`Promise.all` 等待全部 F4 GET；一条未完成 runner 阻塞聚合，`realWorkbenchTurns` 从未写入，render 输入为 0 卡片。历史现在立即渲染，逐条 F4 仅按 `draftId + versionId + fingerprint` 合并；reload/restart 均恢复 22 张卡片、目标 v1 partial Evidence、lineage 和无 running，legacy `DRAFT_NOT_FOUND` 独立可见。自然结束 TAP `386/386`、check、build 与 diff-check 均通过；双尺寸/focus 通过。新鲜 v1 Walk-Forward 原页仍未返回 terminal projection，v2/stale/独立 Evidence 尚未开始；不得进入 F5，LOOP-060 只继续 F4。
 
 > 2026-08-08：LOOP-058 F4 仍 `IN_PROGRESS`。Backtest/Walk-Forward 在 Agent Chrome 中已显示 version/action-scoped `running` 状态，旧控件在 POST 期间不再可见；POST 后同页推进至服务器的 exact-version next action/terminal projection。`check`、自然结束 `test:ts` 385/385、`build:web` 与 `diff --check` 通过。双尺寸无横向滚动；Console 唯一 error 是扩展 channel-close。reload 后该 actor 未恢复任何 F4 card，v2 与受控 restart 也未完成，故下一轮只继续 F4 恢复/immutable-v2 验收，禁止进入 F5。
