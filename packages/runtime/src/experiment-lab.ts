@@ -24,6 +24,7 @@ import {
   type RegisteredGraphHistoricalDatasetRegistry,
   type RegisteredGraphWalkForwardPlanRegistry,
 } from "../../core/src/graph-backtest-evidence.js";
+import { deflatedSharpeFromEquity } from "./deflated-sharpe.js";
 import type { DurableGraphEvidenceJobService } from "./sqlite-graph-evidence-jobs.js";
 import type { PipelineOrchestrationAuthenticator } from "./pipeline-orchestration-auth.js";
 
@@ -658,6 +659,30 @@ function evaluateConstraints(
       expected: 0,
       status: failures === 0 ? "PASS" : "FAIL",
     });
+  }
+  if (configured.deflatedSharpeGte !== undefined) {
+    // Every participant is a trial: the bar rises with the number of
+    // variants this experiment compared, so the gate cannot be beaten by
+    // iterating drafts until one gets lucky.
+    const verdict = deflatedSharpeFromEquity(
+      backtest.equityPoints.map((point) => point.equity),
+      experiment.participants.length,
+    );
+    if (verdict === null) {
+      results.push({
+        key: "deflatedSharpeGte",
+        expected: configured.deflatedSharpeGte,
+        status: "UNAVAILABLE",
+        issueCode: "EXPERIMENT_DEFLATED_SHARPE_SERIES_INSUFFICIENT",
+      });
+    } else {
+      results.push({
+        key: "deflatedSharpeGte",
+        actual: verdict.dsr,
+        expected: configured.deflatedSharpeGte,
+        status: verdict.dsr >= configured.deflatedSharpeGte ? "PASS" : "FAIL",
+      });
+    }
   }
   return results;
 }
