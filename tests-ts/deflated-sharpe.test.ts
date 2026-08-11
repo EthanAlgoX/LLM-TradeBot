@@ -81,3 +81,31 @@ test("constraints schema accepts and bounds deflatedSharpeGte", () => {
     !ExperimentConstraintsSchema.safeParse({ deflatedSharpeGte: -0.1 }).success,
   );
 });
+
+test("a series with no dispersion is rejected at any value and length", () => {
+  // `sd === 0` is exact and a constant series does not reach it: its standard
+  // deviation is floating-point residue rather than a true zero (6.5e-19 for a flat
+  // 0.1% series), so the Sharpe divided out to ~1e15 and the result came back with a
+  // dsr of 1 -- certainty of a real edge, from the one input that carries no
+  // information about one. The residue depends on both the value and the length, so
+  // the existing three-element case passed while longer ones still leaked.
+  for (const value of [1e-7, 1e-4, 0.001, 0.01, 1, 100]) {
+    for (const n of [3, 10, 250, 5000]) {
+      assert.equal(
+        deflatedSharpeFromReturns(Array(n).fill(value), 4),
+        null,
+        `leaked at value=${value}, n=${n}`,
+      );
+    }
+  }
+
+  // The floor is relative to the scale of the data, so a real but very quiet series
+  // still gets a number.
+  let seed = 1;
+  const quiet = Array.from({ length: 250 }, () => {
+    seed = (seed * 1103515245 + 12345) % 2147483648;
+    return (seed / 2147483648 - 0.5) * 2e-8;
+  });
+  const out = deflatedSharpeFromReturns(quiet, 4);
+  assert.ok(out !== null && out.dsr >= 0 && out.dsr <= 1);
+});

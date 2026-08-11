@@ -123,7 +123,16 @@ export function deflatedSharpeFromReturns(
   const mu = returns.reduce((s, r) => s + r, 0) / n;
   const m2 = returns.reduce((s, r) => s + (r - mu) ** 2, 0) / n;
   const sd = Math.sqrt(m2);
-  if (sd === 0) return null;
+  // `sd === 0` is exact and a constant series does not reach it: its standard
+  // deviation is floating-point residue rather than a true zero (6.5e-19 for a flat
+  // 0.1% series), so the Sharpe divides out to ~1e15 and this returned a dsr of 1 --
+  // certainty of a real edge, from the one input that carries no information about
+  // one. The residue grows with the number of terms summed, so the floor scales with
+  // n: measured at most 1.96 eps x scale over constant series spanning values
+  // 1e-7..1e3 and lengths 3..10000, while a real series with sigma=1e-12 sits more
+  // than ten orders of magnitude above n eps x scale.
+  const magnitude = returns.reduce((s, r) => Math.max(s, Math.abs(r)), 0);
+  if (!(sd > n * Number.EPSILON * magnitude)) return null;
   const m3 = returns.reduce((s, r) => s + (r - mu) ** 3, 0) / n;
   const m4 = returns.reduce((s, r) => s + (r - mu) ** 4, 0) / n;
   const skew = m3 / sd ** 3;
