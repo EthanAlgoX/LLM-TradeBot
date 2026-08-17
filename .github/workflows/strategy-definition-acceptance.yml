@@ -1,0 +1,37 @@
+name: Strategy definition acceptance
+
+on:
+  workflow_dispatch:
+
+jobs:
+  acceptance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: apps/dsa-web/package-lock.json
+      - name: Install Python test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt -r .github/requirements-ci.txt
+      - name: Install web dependencies and Chromium
+        working-directory: apps/dsa-web
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+      - name: Run formal acceptance
+        run: python scripts/verify_strategy_definition_acceptance.py --full
+      - name: Upload acceptance artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: strategy-definition-acceptance
+          path: .artifacts/strategy-definition-acceptance/
+          if-no-files-found: warn

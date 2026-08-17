@@ -1,0 +1,253 @@
+import type React from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { Database, KeyRound, RotateCcw, Save, ServerCog, Sparkles } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { useAuth, useSystemConfig } from '../hooks';
+import { useUiLanguage } from '../contexts/UiLanguageContext';
+import { ApiErrorAlert, AppPage, Button, InlineAlert, PageHeader } from '../components/common';
+import {
+  AuthSettingsCard,
+  ChangePasswordCard,
+  GenerationBackendStatusPanel,
+  LLMChannelEditor,
+  SettingsAlert,
+  SettingsField,
+  SettingsLoading,
+  SettingsSectionCard,
+} from '../components/settings';
+import { cn } from '../utils/cn';
+
+type PlatformSettingsTab = 'model' | 'system';
+
+const PLATFORM_SYSTEM_KEYS = new Set([
+  'HTTP_PROXY',
+  'LOG_LEVEL',
+  'LOG_DIR',
+  'WEBUI_ENABLED',
+  'WEBUI_AUTO_BUILD',
+  'WEBUI_HOST',
+  'WEBUI_PORT',
+  'TRUST_X_FORWARDED_FOR',
+  'MAX_WORKERS',
+  'DEBUG',
+]);
+
+const TAB_ITEMS: Array<{
+  id: PlatformSettingsTab;
+  icon: React.ComponentType<{ className?: string }>;
+  titleZh: string;
+  titleEn: string;
+  descriptionZh: string;
+  descriptionEn: string;
+}> = [
+  {
+    id: 'model',
+    icon: Sparkles,
+    titleZh: '模型与运行时',
+    titleEn: 'Models & runtime',
+    descriptionZh: '策略调用的模型通道、路由与可用性',
+    descriptionEn: 'Model channels, routing, and runtime health',
+  },
+  {
+    id: 'system',
+    icon: ServerCog,
+    titleZh: '安全与部署',
+    titleEn: 'Security & deployment',
+    descriptionZh: '认证、网络、日志与 Web 服务参数',
+    descriptionEn: 'Authentication, network, logs, and web service',
+  },
+];
+
+const PlatformSettingsPage: React.FC = () => {
+  const { language } = useUiLanguage();
+  const { passwordChangeable } = useAuth();
+  const [activeTab, setActiveTab] = useState<PlatformSettingsTab>('model');
+  const {
+    configVersion,
+    maskToken,
+    llmModelProviders,
+    itemsByCategory,
+    issueByKey,
+    hasDirty,
+    dirtyCount,
+    toast,
+    clearToast,
+    isLoading,
+    isSaving,
+    loadError,
+    saveError,
+    retryAction,
+    load,
+    retry,
+    save,
+    resetDraft,
+    setDraftValue,
+    refreshAfterExternalSave,
+  } = useSystemConfig();
+
+  const isZh = language === 'zh';
+  const modelItems = itemsByCategory.ai_model ?? [];
+  const systemItems = useMemo(
+    () => (itemsByCategory.system ?? []).filter((item) => PLATFORM_SYSTEM_KEYS.has(item.key)),
+    [itemsByCategory.system],
+  );
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  return (
+    <AppPage>
+      <div className="space-y-5">
+        <PageHeader
+          eyebrow={isZh ? '平台治理' : 'Platform governance'}
+          title={isZh ? '平台设置' : 'Platform settings'}
+          description={isZh
+            ? '这里只管理会真实影响策略验证与运行的平台能力。股票池、旧 Agent、旧回测和每日分析调度不再混入当前设置。'
+            : 'Only settings that affect strategy validation and runs are shown here. Legacy stock lists, agents, backtests, and daily schedules are excluded.'}
+          actions={activeTab === 'system' ? (
+            <div className="flex items-center gap-2">
+              <Button type="button" variant="secondary" onClick={resetDraft} disabled={isLoading || isSaving || !hasDirty}>
+                <RotateCcw className="h-4 w-4" aria-hidden="true" />
+                {isZh ? '撤销修改' : 'Reset'}
+              </Button>
+              <Button type="button" variant="primary" onClick={() => void save()} disabled={isLoading || isSaving || !hasDirty} isLoading={isSaving}>
+                <Save className="h-4 w-4" aria-hidden="true" />
+                {dirtyCount ? (isZh ? `保存 ${dirtyCount} 项` : `Save ${dirtyCount}`) : (isZh ? '保存' : 'Save')}
+              </Button>
+            </div>
+          ) : undefined}
+        />
+
+        <InlineAlert
+          variant="info"
+          title={isZh ? '数据连接在数据中心管理' : 'Data connections live in Data Center'}
+          message={isZh
+            ? 'K 线、新闻和其他策略数据源统一在数据中心配置；策略中心会按市场和依赖自动匹配可用来源。'
+            : 'Configure market, news, and other strategy data sources in Data Center. Strategy Center resolves compatible sources from market and dependency declarations.'}
+          action={(
+            <Link className="btn-secondary inline-flex items-center gap-2" to="/data-sources">
+              <Database className="h-4 w-4" aria-hidden="true" />
+              {isZh ? '打开数据中心' : 'Open Data Center'}
+            </Link>
+          )}
+        />
+
+        {loadError ? (
+          <ApiErrorAlert
+            error={loadError}
+            actionLabel={isZh ? '重新读取' : 'Reload'}
+            onAction={() => void (retryAction === 'load' ? retry() : load())}
+          />
+        ) : null}
+        {saveError ? (
+          <ApiErrorAlert
+            error={saveError}
+            actionLabel={retryAction === 'save' ? (isZh ? '重新保存' : 'Retry save') : undefined}
+            onAction={retryAction === 'save' ? () => void retry() : undefined}
+          />
+        ) : null}
+
+        <div className="grid gap-5 lg:grid-cols-[240px_minmax(0,1fr)]">
+          <nav aria-label={isZh ? '平台设置分类' : 'Platform settings categories'} className="space-y-2 lg:sticky lg:top-5 lg:self-start">
+            {TAB_ITEMS.map((item) => {
+              const Icon = item.icon;
+              const selected = activeTab === item.id;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  aria-current={selected ? 'page' : undefined}
+                  onClick={() => setActiveTab(item.id)}
+                  className={cn(
+                    'w-full rounded-lg border px-3 py-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan focus-visible:ring-offset-2',
+                    selected
+                      ? 'border-cyan/35 bg-cyan/10 text-foreground'
+                      : 'border-transparent text-secondary-text hover:border-border hover:bg-hover hover:text-foreground',
+                  )}
+                >
+                  <span className="flex items-center gap-2 text-sm font-semibold">
+                    <Icon className={cn('h-4 w-4', selected ? 'text-cyan' : 'text-muted-text')} aria-hidden="true" />
+                    {isZh ? item.titleZh : item.titleEn}
+                  </span>
+                  <span className="mt-1 block pl-6 text-xs leading-5 text-muted-text">
+                    {isZh ? item.descriptionZh : item.descriptionEn}
+                  </span>
+                </button>
+              );
+            })}
+          </nav>
+
+          <section aria-live="polite" className="min-w-0 space-y-4">
+            {isLoading ? (
+              <div>
+                <p className="mb-3 text-sm text-secondary-text">
+                  {isZh ? '正在读取模型通道和平台状态…' : 'Loading model channels and platform status…'}
+                </p>
+                <SettingsLoading />
+              </div>
+            ) : activeTab === 'model' ? (
+              <SettingsSectionCard
+                title={isZh ? '策略模型运行时' : 'Strategy model runtime'}
+                description={isZh
+                  ? '这些通道会被策略研究、验证和运行链路真实调用。可先检查后端状态，再编辑和测试模型通道。'
+                  : 'These channels are used by strategy research, validation, and runs. Check runtime health before editing or testing channels.'}
+              >
+                <GenerationBackendStatusPanel
+                  items={modelItems.map((item) => ({ key: item.key, value: item.value }))}
+                  maskToken={maskToken}
+                  disabled={isSaving}
+                />
+                <LLMChannelEditor
+                  items={modelItems}
+                  configVersion={configVersion}
+                  maskToken={maskToken}
+                  modelProviderPrefixes={llmModelProviders}
+                  onSaved={async (updatedItems) => {
+                    await refreshAfterExternalSave(updatedItems.map((item) => item.key));
+                  }}
+                  disabled={isSaving}
+                />
+              </SettingsSectionCard>
+            ) : (
+              <>
+                <AuthSettingsCard />
+                {passwordChangeable ? <ChangePasswordCard /> : null}
+                <SettingsSectionCard
+                  title={isZh ? '部署与诊断' : 'Deployment & diagnostics'}
+                  description={isZh
+                    ? '仅保留当前 Web 策略平台真实使用的网络、日志、并发与调试参数。'
+                    : 'Only network, logging, concurrency, and debugging settings used by this strategy platform are shown.'}
+                  actions={<KeyRound className="h-4 w-4 text-muted-text" aria-hidden="true" />}
+                >
+                  <div className="divide-y divide-border overflow-hidden rounded-lg border border-border bg-card">
+                    {systemItems.map((item) => (
+                      <SettingsField
+                        key={item.key}
+                        item={item}
+                        value={item.value}
+                        disabled={isSaving}
+                        onChange={setDraftValue}
+                        issues={issueByKey[item.key] ?? []}
+                      />
+                    ))}
+                  </div>
+                </SettingsSectionCard>
+              </>
+            )}
+          </section>
+        </div>
+
+        {toast ? (
+          <div className="fixed bottom-5 right-5 z-50 w-[340px] max-w-[calc(100vw-24px)]" onAnimationEnd={clearToast}>
+            {toast.type === 'success'
+              ? <SettingsAlert title={isZh ? '设置已更新' : 'Settings updated'} message={toast.message} variant="success" presentation="toast" />
+              : <ApiErrorAlert error={toast.error} />}
+          </div>
+        ) : null}
+      </div>
+    </AppPage>
+  );
+};
+
+export default PlatformSettingsPage;

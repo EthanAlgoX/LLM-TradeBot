@@ -1,29 +1,28 @@
-[build-system]
-requires = ["setuptools>=68", "wheel"]
-build-backend = "setuptools.build_meta"
+[tool.black]
+line-length = 120
+target-version = ['py310', 'py311', 'py312']
+include = '\.pyi?$'
+exclude = '''
+/(
+    \.git
+    | \.hg
+    | \.mypy_cache
+    | \.tox
+    | \.venv
+    | venv
+    | _build
+    | buck-out
+    | build
+    | dist
+    | __pycache__
+)/
+'''
 
-[project]
-name = "tradebot"
-version = "0.1.0"
-description = "Multi-agent crypto trading system scaffold"
-readme = "README.md"
-requires-python = ">=3.10"
-authors = [{ name = "TradeBot Team" }]
-dependencies = []
+[tool.isort]
+profile = "black"
+line_length = 120
+skip = [".git", "__pycache__", ".env", "venv", ".venv"]
 
-[project.optional-dependencies]
-dev = ["pytest>=8.0"]
-
-[project.scripts]
-tradebot = "cli:main"
-
-[tool.setuptools]
-package-dir = {"" = "src"}
-py-modules = ["backtest", "cli", "config", "contracts", "events", "orchestrator", "state", "storage"]
-
-[tool.setuptools.packages.find]
-where = ["src"]
-
-[tool.pytest.ini_options]
-pythonpath = ["src"]
-testpaths = ["tests"]
+[tool.bandit]
+exclude_dirs = ["tests", "test_*.py"]
+skips = ["B101"]  # assert 语句在测试中是允许的

@@ -1,406 +1,299 @@
 <div align="center">
 
-**English** | [简体中文](README.zh-CN.md)
+# 📈 股票智能分析系统
 
-# LLM-TradeBot
+[![GitHub stars](https://img.shields.io/github/stars/ZhuLinsen/daily_stock_analysis?style=social)](https://github.com/ZhuLinsen/daily_stock_analysis/stargazers)
+[![CI](https://github.com/ZhuLinsen/daily_stock_analysis/actions/workflows/ci.yml/badge.svg)](https://github.com/ZhuLinsen/daily_stock_analysis/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![GitHub Actions](https://img.shields.io/badge/GitHub%20Actions-Ready-2088FF?logo=github-actions&logoColor=white)](https://github.com/features/actions)
+[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker&logoColor=white)](https://hub.docker.com/r/zhulinsen/daily_stock_analysis)
 
-### Build your own multi-Agent trading system like Lego, using natural language
+<p align="center">
+  <img src="https://trendshift.io/api/badge/trendshift/repositories/18527/daily?language=Python" alt="#1 Python Repository Of The Day | Trendshift" width="250" height="55"/>&nbsp;<a href="https://hellogithub.com/repository/ZhuLinsen/daily_stock_analysis" target="_blank"><img src="https://api.hellogithub.com/v1/widgets/recommend.svg?rid=6daa16e405ce46ed97b4a57706aeb29f&claim_uid=pfiJMqhR9uvDGlT&theme=neutral" alt="Featured｜HelloGitHub" width="230" /></a>
+</p>
 
-**Describe the idea. Connect the Agents. Validate the strategy. Run it safely on Paper.**
+> 🤖 基于 AI 大模型的 A股/港股/美股/日股/韩股/台股自选股智能分析系统，每日自动分析并推送「决策仪表盘」到企业微信/飞书/Telegram/Discord/Slack/邮箱
 
-![TypeScript](https://img.shields.io/badge/TypeScript-Strict-3178C6?style=flat-square)
-![Runtime](https://img.shields.io/badge/Runtime-Paper%20Only-B7D979?style=flat-square)
-![Exchange Write](https://img.shields.io/badge/Exchange%20Write-Disabled-E1847C?style=flat-square)
-![Tests](https://img.shields.io/badge/TypeScript%20Tests-320%2F320-94C9AA?style=flat-square)
+[**产品预览**](#-产品预览) · [**功能特性**](#-功能特性) · [**快速开始**](#-快速开始) · [**推送效果**](#-推送效果) · [**文档中心**](docs/INDEX.md) · [**完整指南**](docs/full-guide.md)
+
+简体中文 | [English](docs/README_EN.md) | [繁體中文](docs/README_CHT.md)
 
 </div>
 
----
-
-## What is TradeBot?
-
-TradeBot is a **Human-in-the-loop Multi-Agent trading system orchestration platform**.
-
-You do not need to start from an empty graph or manually wire a wall of configuration. Describe what you want in the Orchestration Agent:
-
-- which data should enter the system;
-- which sub-Agents are needed;
-- what each Agent should analyze;
-- how the Agents should connect;
-- how the workflow should decide, execute, and reflect.
-
-TradeBot compiles that request into a Workflow Draft with typed inputs and outputs, immutable versions, fingerprints, validation, and controlled release gates.
-
-> **In one sentence: TradeBot lets users combine data, analysis, decision, and reflection Agents like Lego through natural language, producing a trading workflow that can be validated, backtested, audited, and safely promoted.**
-
-~~~mermaid
-flowchart LR
-    U["Describe a trading idea"] --> C["Orchestration Agent"]
-    C --> I["Input Agent blocks"]
-    C --> A["Analysis Agent blocks"]
-    C --> D["Decision & Reflection blocks"]
-    I --> W["Workflow Draft"]
-    A --> W
-    D --> W
-    W --> V["Validation & Backtest"]
-    V --> P["Human Approval"]
-    P --> R["Controlled Paper Runtime"]
-
-    style U fill:#13171b,stroke:#8db9c8,color:#edf1f2
-    style C fill:#15190f,stroke:#b7d979,color:#edf1f2
-    style W fill:#13171b,stroke:#dbb76f,color:#edf1f2
-    style R fill:#13171b,stroke:#94c9aa,color:#edf1f2
-~~~
-
-## Three Agent building-block families
-
-The system uses three Agent families. Every Agent has explicit inputs, outputs, configuration behavior, permissions, versions, and downstream connections.
-
-~~~mermaid
-flowchart LR
-    subgraph INPUT["1. Input Agents"]
-        K["Market bars"]
-        F["Fundamental / Macro"]
-        N["Financial news"]
-        S["Social sources"]
-        Q["Normalization & Quality"]
-        K --> Q
-        F --> Q
-        N --> Q
-        S --> Q
-    end
-
-    subgraph ANALYSIS["2. Analysis Agents"]
-        T["Short horizon"]
-        M["Medium horizon"]
-        L["Long horizon"]
-        E["Event / Sentiment"]
-        X["Context synthesis"]
-        T --> X
-        M --> X
-        L --> X
-        E --> X
-    end
-
-    subgraph DECISION["3. Decision & Reflection Agents"]
-        D["Decision"]
-        PF["Portfolio"]
-        R["Risk Gate"]
-        EX["Paper Execution"]
-        PM["Position Monitor"]
-        RV["Trade Review"]
-        RF["Reflection"]
-        D --> PF --> R --> EX
-        PM --> D
-        EX --> RV --> RF
-    end
-
-    Q --> T
-    Q --> M
-    Q --> L
-    Q --> E
-    X --> D
-~~~
-
-### 1. Input Agents
-
-Input Agents connect, inspect, and normalize external information.
-
-Potential inputs include:
-
-- A-share, Hong Kong, US, or crypto market bars;
-- financial statements, valuation data, and macro indicators;
-- financial news, filings, announcements, and research;
-- X/Twitter, Reddit, and other social sources;
-- Paper positions, orders, fills, and historical outcomes.
-
-Markets are not separate TradeBot products. They are compositions of Market Packs, Data Sources, Connectors, Schemas, Observation Windows, calendars, and capability rules.
-
-Input Agents produce standardized Typed Artifacts:
-
-| Artifact | Purpose |
-| --- | --- |
-| `BarSeriesArtifact` | Bars and market time series |
-| `FundamentalArtifact` | Financial, valuation, and macro facts |
-| `NewsEventArtifact` | News, filings, and events |
-| `SocialEventArtifact` | Social information and sentiment events |
-| `AccountSnapshotArtifact` | Paper account, position, and order state |
-
-### 2. Analysis Agents
-
-Analysis Agents are the closest thing to a general-purpose Lego block:
-
-~~~text
-Input Artifact
-+ System Prompt / strategy parameters
-+ Output Schema
-+ downstream Agents
-~~~
-
-They can represent horizon analysis, news interpretation, fundamental analysis, bull/bear research, event detection, and context synthesis.
-
-Supported workflow patterns include:
-
-- sequential stages;
-- parallel Agent branches;
-- multi-source synthesis;
-- conditional routing;
-- Typed Artifact lineage.
-
-Prompts and strategy parameters must be versioned. A change creates a new Draft Version; it never mutates the running Trading Agent directly.
-
-### 3. Decision & Reflection Agents
-
-This family contains Decision, Portfolio, Risk, Execution, Position Monitor, Trade Review, and Reflection.
-
-It includes a non-removable safety foundation:
-
-~~~mermaid
-flowchart LR
-    A["Analysis semantics"] --> D["Decision"]
-    P["Current position"] --> D
-    D --> PF["Portfolio"]
-    PF --> R{"Risk Gate"}
-    R -->|Approved| E["Paper Execution"]
-    R -->|Rejected| B["Blocked"]
-    E --> RV["Trade Review"]
-    RV --> RF["Reflection"]
-    RF --> LC["Lesson Candidate"]
-    LC --> G["Evidence + Backtest + Approval"]
-
-    style R fill:#19150e,stroke:#dbb76f,color:#edf1f2
-    style B fill:#191112,stroke:#e1847c,color:#edf1f2
-    style E fill:#101713,stroke:#94c9aa,color:#edf1f2
-~~~
-
-- `Decision → Portfolio → Risk → Execution` is the only action-capable chain.
-- Risk Gate retains independent veto authority.
-- LLMs and Copilot cannot place orders directly.
-- Reflection can create only a Lesson Candidate.
-- Lessons never rewrite the running strategy automatically.
-
-## From one request to a Paper release
-
-~~~mermaid
-flowchart LR
-    A["Describe the need"] --> B["Generate Workflow Draft"]
-    B --> C["Confirm connections & strategy"]
-    C --> D["Contract / Graph Validation"]
-    D --> E["Backtest"]
-    E --> F["Walk-Forward"]
-    F --> G["Human Approval"]
-    G --> H["Approved Paper Plan"]
-    H --> I["Controlled Paper Runtime"]
-
-    D -.Failed.-> B
-    E -.Insufficient evidence.-> C
-    F -.Out-of-sample failure.-> C
-~~~
-
-A conversation operation returns structured facts, not just chat text:
-
-- Draft ID, version, and fingerprint;
-- selected Market Pack, Data Sources, and Preset;
-- the three Agent families and their connections;
-- field-level Prompt/strategy Diff;
-- Observation Windows and data lineage;
-- stable Validation Issue codes;
-- Backtest, Walk-Forward, and Approval gate state;
-- `runtimeApplied=false`.
-
-## Why not unrestricted drag-and-drop?
-
-Lego-like orchestration does not mean arbitrary or unsafe connections.
-
-Every Agent block must declare:
-
-| Contract | Responsibility |
-| --- | --- |
-| Input Schema | Which Artifacts the Agent can consume |
-| Output Schema | Which structured results it produces |
-| Configuration Kind | Input source, Prompt/strategy, or controlled policy |
-| Permissions | Observe, analyze, propose, veto, or execute on Paper |
-| Version + Fingerprint | Reproducible Draft, evidence, and Runtime identity |
-| Failure Policy | Missing-input, timeout, fallback, and degradation behavior |
-| Downstream Edges | Which Agents may consume the output |
-
-Incompatible schemas, unsupported source capabilities, missing risk boundaries, and fingerprint drift fail closed.
-
-For example:
-
-> A source has only `1d` data, but a Trigger Agent requests `5m`.
-
-TradeBot rejects the compilable Draft because daily data cannot be reverse-generated into minute bars.
-
-## Web workspaces
-
-| Workspace | Primary job |
-| --- | --- |
-| **Trading Agent** | Inspect the current Paper Runtime, Agent semantics, positions, risk, and execution |
-| **Orchestration Agent** | Generate three-family Agent Workflows through conversation and advance validation |
-| **Audit Log** | Trace Selector, Decision, Risk, Execution, Trade Review, and Reflection evidence |
-| **Connections & Permissions** | Configure data, LLMs, Paper/read-only accounts, Secrets, and boundaries |
-
-The UI explicitly distinguishes:
-
-| State | Meaning |
-| --- | --- |
-| `REAL` | Connected to a real backend or persisted fact source |
-| `MOCK` | Interface sample only; never a Runtime fact |
-| `DRAFT` | Candidate configuration or Graph, not released |
-| `VALIDATED` | Contract and Graph validation passed |
-| `APPROVED_NOT_APPLIED` | Approved without changing the Runtime |
-| `ACTIVE PAPER RUNTIME` | The currently controlled Paper process |
-| `RECENT TERMINAL RUN` | Historical output from a completed process |
-| `UNAVAILABLE` | Required production capability does not exist |
-| `STALE` | A parent, capability, configuration, or evidence fingerprint changed |
-
-## Quick start
-
-### Requirements
-
-- Node.js 20+
-- npm
-
-### Install
-
-~~~bash
-npm install
-~~~
-
-### Start the recommended local Paper workspace
-
-~~~bash
-npm run dev:paper
-~~~
-
-Open:
-
-| Service | Address |
-| --- | --- |
-| Web | http://127.0.0.1:5174/ |
-| API | http://127.0.0.1:8787 |
-
-The recommended workspace requires no secrets. It uses an explicitly labelled fixture market, an ephemeral local Operator token, ignored SQLite files, and no exchange-write capability.
-
-### Other development commands
-
-~~~bash
-# Web only
-npm run dev:web
-
-# Orchestration API after a TypeScript build
-npm run dev:orchestration
-
-# Public live market reads where configured
-npm run dev:paper:live
-
-# Historical CLI / backtest entrypoint
-npm run backtest:ts
-~~~
-
-## Implemented today
-
-- strict Zod contracts and unknown-field rejection;
-- server-controlled Market, Data Source, Capability, Preset, and Agent Template registries;
-- a conversation-first Intent Compiler and registered Copilot Tool Registry;
-- server-derived Input, Analysis, and Decision & Reflection Agent families;
-- immutable SQLite Configuration and Pipeline Draft versions;
-- fingerprint, parent conflict, idempotency, and stale-evidence handling;
-- Pipeline Graph Validator and registered historical Graph execution;
-- Backtest, Walk-Forward, Strategy Evidence, and Human Approval;
-- Approved Paper Plan and controlled Crypto Paper Runtime;
-- Runtime Evidence, Causal Review, and Comparative Trade Review;
-- Reflection, Lesson Candidate, Evidence Gates, and Shadow Replay;
-- bilingual Web UI connected to the real Conversation Orchestration API.
-
-## Not implemented yet
-
-The following must not be interpreted as production-ready:
-
-- a generic Graph Paper Runtime;
-- real production connectors for A-share, Hong Kong, and US markets;
-- production news, X/Twitter, or Reddit adapters;
-- arbitrary Prompt changes applied directly to running Agents;
-- automatic use of Approved Lessons in the active Decision Context;
-- exchange-write adapters or live trading.
-
-Unavailable capabilities are explicit and fail closed. They are never synthesized by an LLM or client payload.
-
-## Safety boundaries
-
-> **The current system is Paper only. `exchangeWriteAllowed=false`.**
-
-- Selector remains `topN=1`; symbols are only a candidate universe.
-- Existing positions continue through Position Monitor.
-- Copilot creates Drafts and cannot mutate the running Pipeline.
-- Copilot exposes no Start, Pause, Safe Stop, Runtime Apply, or order tool.
-- Prompt, LLM, Reflection, and client payloads cannot bypass Risk.
-- The only immediately effective human control is pause-new-openings / close-only.
-- No exchange-write adapter exists.
-
-## Reproducible validation
-
-~~~bash
-npm run check
-npm run test:ts
-npm run build:web
-git diff --check
-~~~
-
-Current baseline:
-
-| Check | Result |
-| --- | --- |
-| TypeScript check | PASS |
-| TypeScript tests | **320/320 PASS** |
-| Web build | PASS |
-| Diff check | PASS |
-
-## Repository map
-
-| Path | Responsibility |
-| --- | --- |
-| `packages/contracts` | Zod contracts, IDs, versions, fingerprints, and lifecycle |
-| `packages/core` | Intent Compiler, Draft, Graph, Evidence, Approval, and review services |
-| `packages/agents` | Agent implementations consuming and producing Typed Artifacts |
-| `packages/adapters` | Data-source, execution, LLM, and SQLite adapters |
-| `packages/runtime` | HTTP, authentication, composition roots, repositories, and Paper Runtime |
-| `apps/web` | Trading Agent, Orchestration Agent, Audit Log, and Connections |
-| `apps/cli` | Historical execution and CLI entrypoints |
-| `tests-ts` | Contract, security, persistence, orchestration, Runtime, and Web-state tests |
-| `docs` | Product architecture, delivery status, handoff, and Loop prompts |
-
-## Configuration and secrets
-
-Copy `.env.example` to `.env` only when an optional provider is needed.
-
-- DeepSeek is the only LLM adapter currently wired into the TypeScript Runtime and still requires explicit authorization.
-- Binance credentials are used only for signed read-only reconciliation.
-- Binance public market data never enables an exchange-write path.
-- Never commit `.env`, API keys, authorization headers, account credentials, or vault exports.
-
-## Documentation
-
-- [Product baseline](PRODUCT.md)
-- [Documentation index](docs/README.md)
-- [Architecture and delivery plan](docs/architecture-and-delivery-plan.md)
-- [Roadmap and current progress](docs/product-roadmap-and-progress.md)
-- [Project status and handoff](docs/project-status-and-handoff.md)
-- [Production orchestration workspace](docs/production-orchestration-workspace.md)
-- [Local Paper workspace](docs/local-paper-workspace.md)
-- [Next development loop](docs/next-loop-prompt.md)
-
-## Repository policy
-
-Local browser artifacts, screenshots, generated output, SQLite databases, secrets, and Runtime data are not source files and must not be committed. Preserve append-only Evidence, Approval, Lineage, and Audit records. Never represent a Draft, terminal run, or approved-but-not-applied Artifact as the Active Paper Runtime.
-
----
-
+## 💖 赞助商 (Sponsors)
 <div align="center">
-
-**Build the workflow like Lego. Validate it like software. Operate it like a trading system.**
-
-[简体中文](README.zh-CN.md)
-
+  <p align="center">
+    <a href="https://open.anspire.cn/dsa?share_code=QFBC0FYC" target="_blank"><img src="./docs/assets/anspire.png" alt="Anspire Open 一站式模型和搜索服务" width="300" height="141" style="width: 300px; height: 141px; object-fit: contain;"></a>
+    <a href="https://serpapi.com/baidu-search-api?utm_source=github_daily_stock_analysis" target="_blank"><img src="./docs/assets/serpapi_banner_zh.png" alt="轻松抓取搜索引擎上的实时金融新闻数据 - SerpApi" width="300" height="141" style="width: 300px; height: 141px; object-fit: contain;"></a>
+  </p>
 </div>
+
+
+## 🖥️ 产品预览
+
+<p align="center">
+  <img src="docs/assets/readme_workspace_tour_20260510.gif" alt="DSA Web 工作台演示" width="720">
+</p>
+
+## ✨ 功能特性
+
+| 能力 | 覆盖内容 |
+|------|------|
+| AI 决策报告 | 核心结论、评分、趋势、买卖点位、风险警报、催化因素、操作检查清单 |
+| 多市场数据聚合 | 覆盖 A股、港股、美股、日股、韩股、台股和 ETF，支持行情、K 线、技术指标、新闻、公告、基本面与报告辅助数据；不同市场的数据源和能力边界见 [市场支持边界](docs/market-support.md) |
+| Web / 桌面工作台 | 手动分析、任务进度、历史报告、完整 Markdown、回测、持仓、配置管理、浅色 / 深色主题 |
+| Agent 策略问股 | 多轮追问，支持均线、缠论、波浪、趋势、热点、事件、成长、预期等 15 种内置策略，覆盖 Web/Bot/API |
+| 智能导入与补全 | 图片、CSV/Excel、剪贴板导入；股票代码/名称/拼音/别名补全 |
+| 自动化与推送 | GitHub Actions、Docker、本地定时任务、FastAPI 服务和企业微信/飞书/Telegram/Discord/Slack/邮件推送 |
+
+> 功能细节、字段契约、基本面 P0 超时语义、交易纪律、数据源优先级、Web/API 行为请看 [完整配置与部署指南](docs/full-guide.md)。
+
+### 技术栈与数据来源
+
+| 类型 | 支持 |
+|------|------|
+| AI 模型 | [Anspire](https://open.anspire.cn/dsa?share_code=QFBC0FYC)、[AIHubMix](https://aihubmix.com/?aff=CfMq)、Gemini、OpenAI 兼容、DeepSeek、通义千问、Claude、Ollama 本地模型等 |
+| 行情数据 | [TickFlow](https://tickflow.org/auth/register?ref=WDSGSPS5XC)、AkShare、Tushare、Pytdx、Baostock、YFinance、Longbridge |
+| 新闻搜索 | [Anspire](https://open.anspire.cn/dsa/?share_code=QFBC0FYC)、[SerpAPI](https://serpapi.com/baidu-search-api?utm_source=github_daily_stock_analysis)、[Tavily](https://tavily.com/)、[Bocha](https://open.bocha.cn/)、[Brave](https://brave.com/search/api/)、[MiniMax](https://platform.minimaxi.com/)、SearXNG |
+| 社交舆情 | [Stock Sentiment API](https://api.adanos.org/docs)（Reddit / X / Polymarket，仅美股，可选） |
+
+> 项目默认内置 AkShare、Baostock、YFinance 等免费行情源，可零配置运行；免费源受上游限流、接口变动和网络波动影响，稳定性不保证。长期定时、批量分析或更稳定行情建议配置 TickFlow、Tushare、Longbridge 等 token 型数据源，适用市场、Actions 映射和 fallback 规则见 [数据源配置](docs/full-guide.md#数据源配置)。
+
+## 🚀 快速开始
+
+### 方式一：[GitHub Actions（推荐）](https://www.bilibili.com/video/BV11FEb66EXG/)
+
+> 5 分钟完成部署，零成本，无需服务器。
+
+
+#### 1. Fork 本仓库
+
+点击右上角 `Fork` 按钮（顺便点个 Star⭐ 支持一下）
+
+#### 2. 配置 Secrets
+
+`Settings` → `Secrets and variables` → `Actions` → `New repository secret`
+
+**AI 模型配置（至少配置一个）**
+
+默认先选一个模型服务商并填写 API Key；需要多模型、图片识别、本地模型或高级路由时，再参考 [LLM 配置指南](docs/LLM_CONFIG_GUIDE.md)。
+
+| Secret 名称 | 说明 | 必填 |
+|------------|------|:----:|
+| `ANSPIRE_API_KEYS` | [Anspire](https://open.anspire.cn/dsa?share_code=QFBC0FYC) API Key，一Key同时启用全球热门大模型和联网搜索，本项目新用户提供30元等额的免费额度（GLM5.2、GPT等模型特惠中） | **推荐** |
+| `AIHUBMIX_KEY` | [AIHubMix](https://aihubmix.com/?aff=CfMq) API Key，一Key切换使用全系模型，无需科学上网，本项目可享 10% 优惠 | **推荐** |
+| `GEMINI_API_KEY` | Google Gemini API Key | 可选 |
+| `ANTHROPIC_API_KEY` | Anthropic Claude API Key | 可选 |
+| `OPENAI_API_KEY` | OpenAI 兼容 API Key（支持 DeepSeek、通义千问等） | 可选 |
+| `OPENAI_BASE_URL` / `OPENAI_MODEL` | 使用 OpenAI 兼容服务时填写 | 可选 |
+
+> Ollama 更适合本地 / Docker 部署，GitHub Actions 推荐使用云端 API。
+
+**通知渠道配置（至少配置一个）**
+
+| Secret 名称 | 说明 |
+|------------|------|
+| `WECHAT_WEBHOOK_URL` | 企业微信机器人 |
+| `FEISHU_WEBHOOK_URL` | 飞书机器人 |
+| `TELEGRAM_BOT_TOKEN` + `TELEGRAM_CHAT_ID` | Telegram |
+| `DISCORD_WEBHOOK_URL` | Discord Webhook |
+| `SLACK_BOT_TOKEN` + `SLACK_CHANNEL_ID` | Slack Bot |
+| `EMAIL_SENDER` + `EMAIL_PASSWORD` | 邮件推送 |
+
+更多渠道、签名校验、分组邮件、Markdown 转图片等配置见 [通知渠道详细配置](docs/full-guide.md#通知渠道详细配置)。
+
+**自选股配置（必填）**
+
+| Secret 名称 | 说明 | 必填 |
+|------------|------|:----:|
+| `STOCK_LIST` | 自选股代码，如 `600519,hk00700,AAPL,7203.T,005930.KS,2330.TW` | ✅ |
+
+**新闻源配置（推荐）**
+
+新闻源会显著影响舆情、公告、事件和催化因素质量，建议至少配置一个搜索服务。
+
+| Secret 名称 | 说明 | 必填 |
+|------------|------|:----:|
+| `ANSPIRE_API_KEYS` | [Anspire AI Search](https://open.anspire.cn/dsa?share_code=QFBC0FYC)：汇聚全球舆情信息，适配A股、美股、港股等新闻和舆情检索；同一Key可复用大模型服务，本项目新用户提供免费30元等额的免费点数 | **推荐** |
+| `SERPAPI_API_KEYS` | [SerpAPI](https://serpapi.com/baidu-search-api?utm_source=github_daily_stock_analysis)：搜索引擎结果补强，适合实时金融新闻 | **推荐** |
+| `TAVILY_API_KEYS` | [Tavily](https://tavily.com/)：通用新闻搜索 API | 可选 |
+| `BOCHA_API_KEYS` | [博查搜索](https://open.bocha.cn/)：中文搜索优化，支持 AI 摘要 | 可选 |
+| `BRAVE_API_KEYS` | [Brave Search](https://brave.com/search/api/)：隐私优先，美股资讯补强 | 可选 |
+| `MINIMAX_API_KEYS` | [MiniMax](https://platform.minimaxi.com/)：结构化搜索结果 | 可选 |
+| `SEARXNG_BASE_URLS` | SearXNG 自建实例：无配额兜底，适合私有部署 | 可选 |
+
+更多搜索源、社交舆情和降级规则见 [搜索服务配置](docs/full-guide.md#搜索服务配置)。
+
+**行情数据源配置（可选）**
+
+> 默认使用 AkShare、Baostock、YFinance 等免费数据源，日志中"未配置"的提示不影响运行。
+> 如需更稳定的行情，可按市场配置以下 Secret：
+
+| Secret 名称 | 适用市场 | 说明 |
+|------------|:--------:|------|
+| `TUSHARE_TOKEN` | A 股 | 提升历史行情稳定性 |
+| `LONGBRIDGE_OAUTH_CLIENT_ID` + `LONGBRIDGE_OAUTH_TOKEN_CACHE_B64` | 港股/美股 | 补齐量比、换手率、PE 等字段 |
+
+> 详见 [数据源配置](docs/full-guide.md#数据源配置)。
+
+#### 3. 启用 Actions
+
+`Actions` 标签 → `I understand my workflows, go ahead and enable them`
+
+#### 4. 手动测试
+
+`Actions` → `每日股票分析` → `Run workflow` → `Run workflow`
+
+#### 完成
+
+默认每个**工作日 18:00（北京时间）**自动执行，也可手动触发。默认非交易日（含 A/H/US 节假日）不执行；强制运行、交易日检查、断点续传等规则见 [完整指南](docs/full-guide.md#定时任务配置)。
+
+### 方式二：[客户端配置教程](https://www.bilibili.com/video/BV11FEb66Eyr/) / 本地运行 / Docker 部署
+
+```bash
+# 克隆项目
+git clone https://github.com/ZhuLinsen/daily_stock_analysis.git && cd daily_stock_analysis
+
+# 安装依赖
+pip install -r requirements.txt
+
+# 配置环境变量
+cp .env.example .env && vim .env
+
+# 运行分析
+python main.py
+```
+
+常用命令：
+
+```bash
+python main.py --debug
+python main.py --dry-run
+python main.py --stocks 600519,hk00700,AAPL,2330.TW
+python main.py --market-review
+python main.py --schedule
+python main.py --serve-only
+```
+
+> Docker 部署、定时任务、云服务器访问请参考 [完整指南](docs/full-guide.md)；桌面客户端打包请参考 [桌面端打包说明](docs/desktop-package.md)。
+
+## 📱 推送效果
+
+### 决策仪表盘
+```
+🎯 2026-02-08 决策仪表盘
+共分析3只股票 | 🟢买入:0 🟡观望:2 🔴卖出:1
+
+📊 分析结果摘要
+⚪ 中钨高新(000657): 观望 | 评分 65 | 看多
+⚪ 永鼎股份(600105): 观望 | 评分 48 | 震荡
+🟡 新莱应材(300260): 卖出 | 评分 35 | 看空
+
+⚪ 中钨高新 (000657)
+📰 重要信息速览
+💭 舆情情绪: 市场关注其AI属性与业绩高增长，情绪偏积极，但需消化短期获利盘和主力流出压力。
+📊 业绩预期: 基于舆情信息，公司2025年前三季度业绩同比大幅增长，基本面强劲，为股价提供支撑。
+
+🚨 风险警报:
+
+风险点1：2月5日主力资金大幅净卖出3.63亿元，需警惕短期抛压。
+风险点2：筹码集中度高达35.15%，表明筹码分散，拉升阻力可能较大。
+风险点3：舆情中提及公司历史违规记录及重组相关风险提示，需保持关注。
+✨ 利好催化:
+
+利好1：公司被市场定位为AI服务器HDI核心供应商，受益于AI产业发展。
+利好2：2025年前三季度扣非净利润同比暴涨407.52%，业绩表现强劲。
+📢 最新动态: 【最新消息】舆情显示公司是AI PCB微钻领域龙头，深度绑定全球头部PCB/载板厂。2月5日主力资金净卖出3.63亿元，需关注后续资金流向。
+
+---
+生成时间: 18:00
+```
+
+### 大盘复盘
+```
+🎯 2026-01-10 大盘复盘
+
+📊 主要指数
+- 上证指数: 3250.12 (🟢+0.85%)
+- 深证成指: 10521.36 (🟢+1.02%)
+- 创业板指: 2156.78 (🟢+1.35%)
+
+📈 市场概况
+上涨: 3920 | 下跌: 1349 | 涨停: 155 | 跌停: 3
+
+🔥 板块表现
+领涨: 互联网服务、文化传媒、小金属
+领跌: 保险、航空机场、光伏设备
+```
+
+## ⚙️ 配置说明
+
+完整环境变量、模型渠道、通知渠道、数据源优先级、交易纪律、基本面 P0 语义和部署说明请参考 [完整配置指南](docs/full-guide.md)。
+
+## 🖥️ Web 界面
+
+Web 工作台提供配置管理、任务监控、手动分析、历史报告、完整 Markdown 报告、Agent 问股、回测、持仓管理、智能导入和浅色 / 深色主题。启动方式：
+
+```bash
+python main.py --webui
+python main.py --webui-only
+```
+
+访问 `http://127.0.0.1:8000` 即可使用。认证、智能导入、搜索补全、历史报告复制、云服务器访问等细节见 [本地 WebUI 管理界面](docs/full-guide.md#本地-webui-管理界面)。
+
+## 🤖 Agent 策略问股
+
+配置任意可用 AI API Key 后，Web `/chat` 页面即可使用策略问股；如需显式关闭可设置 `AGENT_MODE=false`。
+
+- 支持均线金叉、缠论、波浪理论、多头趋势、热点题材、事件驱动、成长质量、预期重估等内置策略
+- 支持实时行情、K 线、技术指标、新闻和风险信息调用
+- 支持多轮追问、会话导出、发送到通知渠道和后台执行
+- 支持自定义策略文件与多 Agent 编排（实验性）
+
+> Agent 具体参数、`skill` 命名兼容、多 Agent 模式和预算护栏见 [完整指南](docs/full-guide.md#本地-webui-管理界面) 与 [LLM 配置指南](docs/LLM_CONFIG_GUIDE.md)。
+
+## 🧩 相关项目 (Related Projects)
+
+> DSA 聚焦日常分析报告；选股实现参考 AlphaSift，AlphaEvo 用于策略验证与进化。
+
+| 项目 | 定位 |
+|------|------|
+| [AlphaSift](https://github.com/ZhuLinsen/alphasift) | DSA 选股实现的参考项目 |
+| [AlphaEvo](https://github.com/ZhuLinsen/alphaevo) | 策略回测与自我进化，用于验证策略规则，并通过迭代探索策略参数与组合 |
+
+## 📬 联系与合作
+
+<table>
+  <tr>
+    <td width="92" valign="top"><strong>合作邮箱</strong></td>
+    <td valign="top">
+      <a href="mailto:zhuls345@gmail.com">zhuls345@gmail.com</a><br>
+      项目咨询、部署支持与功能扩展
+    </td>
+    <td align="center" rowspan="3" valign="middle" width="148">
+      <a href="http://xhslink.com/m/tU520DWCKT" target="_blank"><img src="./docs/assets/xiaohongshu_tick.jpg" width="112" alt="小红书二维码"></a><br>
+      <sub>扫码关注小红书</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="92" valign="top"><strong>小红书</strong></td>
+    <td valign="top"><a href="http://xhslink.com/m/tU520DWCKT">欢迎关注小红书</a></td>
+  </tr>
+  <tr>
+    <td width="92" valign="top"><strong>问题反馈</strong></td>
+    <td valign="top"><a href="https://github.com/ZhuLinsen/daily_stock_analysis/issues">提交 Issue</a></td>
+  </tr>
+</table>
+
+## 📄 License
+
+[MIT License](LICENSE) © 2026 ZhuLinsen
+
+欢迎在二次开发或引用时注明本仓库来源，感谢支持项目持续维护。
+
+## ⚠️ 免责声明
+
+本项目仅供学习和研究使用，不构成任何投资建议。股市有风险，投资需谨慎。作者不对使用本项目产生的任何损失负责。
+
+---

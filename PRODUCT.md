@@ -1,138 +1,56 @@
-# TradeBot Product Baseline
+# Product
 
-> 状态：产品方向已确认，Crypto Paper 与受控编排/审阅垂直切片已运行
-> 最后更新：2026-08-03
-> 文档导航：`docs/README.md`
-> 详细架构与交付状态：`docs/architecture-and-delivery-plan.md`
-> 新窗口接手摘要：`docs/project-status-and-handoff.md`
+<!-- impeccable:product-schema 1 -->
 
-## 产品定义
+## Platform
 
-TradeBot 是一个输入可配置、Agent 可编排、可回测、可审计、可受控进化的 Human-in-the-loop Multi-Agent 交易系统。A 股、港股、美股或币圈不是彼此独立的产品模块，而是由用户选择的 Market Pack、Data Source、Schema、Observation Window 和执行规则组合。
+web
 
-它不是普通看盘工具，也不是让聊天机器人直接下单的产品。交易 Agent 是系统主角；右侧 Copilot 是受约束的编排和解释入口，负责把人的自然语言意图转换为结构化配置草案、Pipeline 变更草案与验证任务。
+## Users
 
-## 核心差异
+面向希望接入、验证和持续观察股票研究策略的个人投资者与投研用户。用户可能通过 Claude Code、Codex 或自己的工程项目实现策略，但不应被要求先理解网站内部的 Agent、工具和工作流模型。
 
-1. **多 Agent 协作**：把复杂交易任务拆成职责单一、输入最小化的子 Agent，通过 typed Artifact 协作。
-2. **灵活的观察窗口拆解**：默认支持多周期分析，但不固定 `5m/15m/1h`，允许任意数量、任意粒度、单周期或完全事件驱动。
-3. **输入与市场解耦**：用户通过注册配置接入行情、事件、财报或其他结构化事实；Market Pack 只承载数据语义、日历、费用和模拟执行约束，不把具体市场写死在 Agent 流程中。
-4. **可配置的数据与 Agent**：数据源、Connector、Agent Template、Agent 实例和 Pipeline Graph 均版本化、可验证、可替换。
-5. **决策与独立风控**：Decision Agent 汇总压缩后的结构化证据；Risk Gate 拥有独立否决权；LLM 不能直接创建可执行订单。
-6. **可验证的持续进化**：Reflection 只能产生 Lesson Candidate。经验必须经过证据校验、回测、Walk-Forward 和人工审批，才能成为有效经验或新策略版本。
+## Product Purpose
 
-## 默认模板
+LLM TradeBot 是一个以策略有效性验证为中心的运行平台。平台接收具有稳定输入输出契约的完整策略，管理不可变版本，并把正式版本交给单股研究、选股扫描、历史回测或持续研究运行。策略内部可以使用确定性规则、工具、LLM、多 Agent 或它们的混合实现；网站对普通用户只展示输入、输出、参数、版本、证据与运行状态。
 
-默认模板采用语义职责，而不是固定 K 线周期：
+## Positioning
 
-```text
-Universe / Selector
-  -> Data Sync + Data Quality
-  -> one or more Horizon / Event Agents
-  -> optional Context / Cross-Horizon Reconciler
-  -> Decision
-  -> Portfolio
-  -> Risk Gate
-  -> Execution / Position Monitor
-  -> Review + Reflection
-```
+策略实现外部化，策略配置、验证与运行平台化。用户先选择现有或上传的固定策略内核，再独立配置市场、数据、周期、参数和风险边界；平台负责检查、版本冻结、回测、持续运行、日志和结果留存，而不是要求用户在网页里重新拼装底层能力。
 
-`Regime`、`Setup`、`Trigger` 是推荐职责，不是强制节点。根据数据源能力，合法配置可以是：
+## Operating Context
 
-- `1h + 15m + 5m`；
-- `1M + 1W + 1D`；
-- 任意两个观察窗口；
-- 只有一个日线 Agent；
-- 没有 K 线、完全由新闻或事件驱动的 Pipeline。
+用户在桌面或移动浏览器中使用策略首页、策略中心、验证中心、运行中心、数据中心、单股研究和选股扫描。一级导航按“策略运营 / 数据与应用 / 治理与系统”分组；核心运行链是“策略中心 → 验证中心 → 运行中心”，数据中心作为平台依赖与连接状态入口，不是每个策略都必须手工经过的首个步骤。桌面端负责配置与审阅，移动端以状态查看和结果阅读为主。原能力中心路由仅作为历史兼容跳转保留，不再出现在主导航或普通策略配置链路。
 
-## 数据源原则
+## Capabilities and Constraints
 
-- 先登记和探测数据源能力，再创建依赖它的 Agent。
-- 统一区分 Data Source、Connector 和 Data Processing Agent。
-- 数据源必须声明数据类型、可用粒度、历史覆盖、时区、时间戳语义、交易日历、实时性、完整度及允许的聚合方式。
-- 允许从可信的细粒度数据聚合更粗粒度数据，并保留 lineage；禁止用日线伪造分钟数据。
-- K 线使用 interval；新闻、财报、宏观和订单簿使用更通用的 Observation Window。
-- 必需数据缺失时禁止新开仓；可选输入缺失时只能按显式策略降级并写入审计记录。
+- 策略对外只选择一个产出目标：`research_report`、`candidate_screening` 或 `trading_decision`，分别公开 `ResearchReport`、`CandidateList` 或 `DecisionProposal`。
+- 策略中心通过真实 API 幂等初始化三个可删除的正式策略内核；它们与后续上传的内核使用同一套输入输出边界，不区分“系统策略”与“我的策略”。内核本身不能直接回测或运行，必须先创建独立运行配置：
+  - `单股研究策略`：参考 Daily Stock 的成熟单股研究链，在运行时接收一只股票并输出 `ResearchReport`。
+  - `多因子选股策略`：参考 Daily Stock 的市场快照、硬筛、因子评分、可选 LLM 重排和失败回退，输出 `CandidateList`。
+  - `研究决策基线`：参考 Daily Stock 的 A 股 `dual_low` 候选来源和研究输入，再通过现有研究决策内核输出 `DecisionProposal`。它是可回测的研究基线，不是已经验证的交易闭环，不下单。
+- 三个初始内核都来自真实数据库 `StrategyVersion`，不是前端 Fixture；从内核创建配置会生成新的 Strategy/StrategyVersion 草稿并保存 `kernelVersionId`，不会修改或复制写入源内核。初始化不会产生报告、候选、收益、订单或交易数据，归档后不会自动重建。
+- 初始内核的数据依赖以真实成熟执行链的失败/降级行为为准：单股研究的历史日线、新闻和基本面均可缺失后降级；多因子选股只有全市场快照必需，历史日线增强、新闻和基本面可选；研究决策基线要求可形成候选的市场数据，新闻和基本面可选。A 股初始链路不声明未实际消费的独立情绪数据源。
+- 三个初始内核各自提供一套普通的 A 股正式运行配置，和用户创建的策略统一展示、可复制和删除，不设置“Daily 默认策略”分组；其中研究决策配置会从本地真实日线库冻结一组具备最低历史覆盖的 A 股，并使用 OHLCV 可复现的低波动质量规则，使其可直接发起观察性正式回放。没有足够本地行情时仍保持未就绪，不会编造股票或结果。它们的发布状态只表示定义冻结，仍需独立验证。
+- 每个策略的正式版本必须保存面向用户的策略说明；策略中心和版本工作台直接读取版本 `objective` 展示，不用前端静态文案冒充。生成的新策略包必须同时交付独立的 `STRATEGY.md`，说明输入、处理步骤、参数、输出解读、降级行为、风险边界与建议验证方法。
+- 正式默认版本可以复制为新的独立策略草稿。复制会保留市场、数据、参数、输出契约和内部实现快照，同时生成独立的策略、版本、节点 ID 与版本历史。
+- 策略配置页把“策略内核引用 + 运行配置 = 完整策略”作为主模型，只公开输出契约、研究范围、市场匹配的数据源、运行参数和平台级风险边界。底层兼容工作流与节点模型仍用于现有后端执行和历史版本读取，但不再要求普通用户选择或编辑。
+- 单股研究和选股扫描从真实策略列表选择匹配且内核可调用的正式版本，并在 URL 保留和校验 `strategyId/versionId`。两页通过统一 Python 内核入口调用 Daily 成熟执行链并绑定结果归属；旧架构下没有策略包的历史版本不会冒充可调用版本。
+- 验证中心当前只为 `DecisionProposal` 策略接入 OHLCV 历史交易回放；同一策略的不同版本各自完成可信正式回放后，可在相同区间、资金、成本、成交与调仓口径下比较真实指标差异。指定股票诊断、旧版未校验记录、跨策略结果和口径不一致实验不会参与版本对比。研究报告与选股结果验证引擎仍待接入。当前研究运行中心同样只接受交易决策策略，且不是模拟或真实交易。
+- 自定义策略包协议已经通过页面和 `docs/strategy-package-spec.md` 说明；生成指南从真实数据中心 API 动态注入来源，要求同时生成实现、Schema、测试、策略说明和一致的数据依赖。ZIP 包可真实上传、静态检查、归档并保存为可复用内核；用户再创建独立 StrategyVersion 配置市场、股票范围、数据源、周期、运行频率、参数和风险边界。上传代码只在 `python -I` 受限子进程中执行，使用标准库白名单、危险语法检查、清洁环境、超时和资源/输出限制；它不是通用容器沙箱，也不允许直接网络、平台文件或密钥访问。当前自动数据授予只覆盖平台本地 OHLCV，其他必需依赖不可用时会结构化失败，不会造数。
+- 旧能力中心、Agent 模板和工作流 API 暂时保留为后端兼容实现，避免破坏已有正式版本；它们不再代表产品面向普通用户的主信息架构。
+- 所有未接入的运行结果、仓位、收益、订单和交易数据不得以示例 KPI 冒充真实结果。
 
-## Copilot 权限边界
+## Evidence on Hand
 
-Copilot 可以：
+- 前端：`apps/dsa-web/` 已采用机构级策略控制台设计系统，并提供真实运营摘要、策略中心、生成指南、研究工具、验证和运行入口。
+- 后端：已有真实 Strategy / StrategyVersion 草稿、检查、不可变发布、复制、差异、删除、历史验证和研究运行 API。
+- Daily 兼容能力：单股研究与选股扫描已经连接成熟执行器；研究决策基线使用现有真实筛选和策略图研究运行，但不等于完整交易闭环。
 
-- 查询当前交易、持仓、风险、策略版本、Trace、Artifact 和历史消息；
-- 解释某次 Agent 决策；
-- 创建 Data Source、Agent、Pipeline、Human Market Thesis 或 Strategy Change 的草案；
-- 校验 Agent 配置和 Pipeline 连线；
-- 发起回测、Walk-Forward、版本比较和审批请求。
+## Product Principles
 
-Copilot 不可以：
-
-- 动态生成并执行任意后端代码；
-- 读取或输出 API Key、环境变量、完整 Prompt 或 Secret；
-- 直接修改运行中的 Pipeline；
-- 绕过数据能力、Schema、风险或发布门禁；
-- 直接下单；
-- 把 Reflection 的文本自动写入运行策略。
-
-所有策略变更必须遵循：
-
-```text
-Draft -> Contract Validation -> Backtest -> Walk-Forward
-      -> Human Approval -> Paper Running
-```
-
-“暂停新开仓 / 仅允许平仓”是唯一可立即生效的人工风险控制。
-
-## 回测与发布
-
-每次可复现的回测必须绑定：
-
-```text
-Market Pack Version
-+ Data Snapshot Version
-+ Pipeline Graph Version
-+ Strategy Profile Version
-+ Execution Model Version
-= Reproducible Backtest Run
-```
-
-回测必须使用与 Paper/未来 Live 相同的 Agent 合同和决策 Pipeline，并由 Market Pack 提供市场特有的撮合、费用、结算和交易限制。候选版本至少经过基线对照、消融测试、Walk-Forward 和人工审批。
-
-## 持续进化
-
-TradeBot 使用快慢双循环：
-
-- **快循环**：数据 -> Agent -> Decision -> Risk -> Execution。只能读取已批准配置和经验，不能自行改写。
-- **慢循环**：Trace -> Reflection -> Lesson Candidate -> 证据验证/反事实回放 -> 回测/Walk-Forward -> 人工审批 -> Validated Lesson 或 Strategy Candidate。
-
-交易记忆分为：
-
-1. 不可变的 Episode Memory；
-2. 尚未验证的 Reflection / Lesson Candidate；
-3. 有适用市场、Regime、样本、置信度和有效期的 Validated Lesson；
-4. 经过完整发布门禁的新 Strategy/Pipeline 版本。
-
-## Web 产品结构
-
-Web 首期只保留四个普通用户页面：
-
-1. **模拟交易**：作为默认首页，最多同时比较三个模拟策略的收益、回撤、最近决策和运行状态；页面底部按模拟策略展示多轮子 Agent 对话，并明确每条输出的轮次、生成时间、上游回复与下游去向；不提供 Live 或交易所写入入口。
-2. **编排工作台**：页面以完整对话为主，不设置固定流程画布。用户用自然语言描述或修改目标后，每次助手回复都从 Agent 中心推荐一张新的动态多 Agent 拓扑；“应用方案”只生成可审阅策略，并进入预上线检查、回测和模拟槽位门禁，不直接启动 Runtime。
-3. **Agent 中心**：分别管理 Input、Analysis、Decision、Reflection 四类 Agent。每个不可变 Agent Version 可绑定数据或上游 Artifact、Model Connection、用户可编辑 Prompt、输入/输出 Schema、工具权限和预算，作为编排工作台唯一可引用的能力目录。
-4. **连接配置**：合并数据源与模型 API 配置，只显示连接状态和安全边界；Secret 仅保存在后端。
-
-Strategy App 列表折叠进编排工作台，策略比较折叠进模拟交易。Data Center、Experiment、Audit、复杂 Runtime 控制和内部运维工具不再占用一级导航；后端事实、验证与审计能力继续保留，但只在相应详情或开发者入口中渐进展示。
-
-Agent Prompt 必须分层：平台安全规则和权限不可编辑；用户只编辑 Agent 行为层。Input Agent 的 Connector、原始数据清洗、时间对齐与 Schema 校验保持确定性，LLM Prompt 只解释已经标准化的事实。任何 Data、Model、Prompt、Schema 或上游变化均创建新 Agent Version，不能热更新已发布或运行版本。
-
-界面需要支持完整中英文切换。中文模式尽量使用中文；市场代码、标的代码、产品名和通用交易缩写可以保留英文。
-
-## 当前现实
-
-- 当前 TypeScript Runtime 仍是固定依赖注入的加密货币 Paper Pipeline。
-- 当前行情合同仍固定为 `5m/15m/1h`，Data Source kind 仍主要是 CSV 与 Binance Futures Public。
-- 当前已经有 Selector、DataSync、Analysis、Decision、Risk、Paper Execution、Position Monitor、Reflection、Trace、Artifact Ledger、回测和 Walk-Forward 基础。
-- 当前 Web 无 Runtime HTTP API，页面展示和配置交互仍主要使用 mock data。
-- DeepSeek 是当前唯一实际接入 TypeScript Runtime 的 LLM Adapter；其他 Provider 仅有前端配置合同。
-- 不接入实盘写接口；任何未来 Live 能力必须单独设计和验证。
-
-上述“可编排、多市场、能力自适应数据源、受控进化”均为已经确认的下一阶段目标，不能误写成当前已实现能力。
+- 策略对用户是接口黑盒，对运行治理是可观察灰盒：内部实现自由，对外契约、日志、证据和版本必须可追踪。
+- 同一个正式策略版本应被研究、回测和持续运行消费，避免为不同环境维护互相漂移的策略定义。
+- 初始策略必须来自真实可执行链路，并准确说明成熟度；“参考成熟项目”不等于“已经通过交易回测”。
+- 发布只表示定义冻结，不等于验证有效；研究决策不等于订单；模拟与真实交易严格区分。
+- 新能力延续现有主题、组件和工作台交互语言，不建立第二套视觉系统。

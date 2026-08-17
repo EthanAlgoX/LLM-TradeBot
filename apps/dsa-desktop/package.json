@@ -1,0 +1,63 @@
+{
+  "name": "daily-stock-analysis-desktop",
+  "version": "3.21.0",
+  "private": true,
+  "main": "main.js",
+  "scripts": {
+    "dev": "electron .",
+    "build": "electron-builder",
+    "test": "node --test tests/*.test.js"
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.3"
+  },
+  "devDependencies": {
+    "electron": "^31.4.0",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.daily-stock-analysis.desktop",
+    "productName": "Daily Stock Analysis",
+    "directories": {
+      "output": "dist"
+    },
+    "afterPack": "scripts/afterPackMacos.js",
+    "files": [
+      "main.js",
+      "preload.js",
+      "renderer/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "../../.env.example",
+        "to": ".env.example"
+      },
+      {
+        "from": "../../dist/backend/stock_analysis",
+        "to": "backend/stock_analysis"
+      }
+    ],
+    "win": {
+      "target": "nsis",
+      "artifactName": "daily-stock-analysis-windows-installer-v${version}.${ext}",
+      "publish": [
+        {
+          "provider": "github",
+          "owner": "ZhuLinsen",
+          "repo": "daily_stock_analysis"
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "allowElevation": false,
+      "include": "installer.nsh"
+    },
+    "mac": {
+      "identity": null,
+      "hardenedRuntime": false,
+      "target": "dmg"
+    }
+  }
+}

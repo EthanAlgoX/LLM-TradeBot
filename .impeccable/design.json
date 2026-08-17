@@ -1,281 +1,82 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-07-26T02:43:49+08:00",
-  "title": "Design System: TradeBoard",
+  "generatedAt": "2026-08-16T00:00:00+08:00",
+  "title": "Design System: LLM TradeBot",
   "extensions": {
     "colorMeta": {
-      "graphite-abyss": {
-        "role": "neutral",
-        "displayName": "Graphite Abyss",
-        "tonalRamp": ["#090b0d", "#15191d", "#272d32", "#3b444b", "#5d6870", "#919ca3", "#c5cdd1", "#edf1f2"]
-      },
-      "graphite-surface": {
-        "role": "neutral",
-        "displayName": "Graphite Surface",
-        "tonalRamp": ["#090b0d", "#0e1114", "#20262b", "#394149", "#5c666e", "#8f9aa1", "#c3cbd0", "#edf1f2"]
-      },
-      "graphite-raised": {
-        "role": "neutral",
-        "displayName": "Graphite Raised",
-        "tonalRamp": ["#0a0c0e", "#13171b", "#272d32", "#414a52", "#657078", "#98a2a9", "#cbd2d6", "#f0f3f4"]
-      },
-      "graphite-active": {
-        "role": "neutral",
-        "displayName": "Graphite Active",
-        "tonalRamp": ["#0b0d0f", "#181d22", "#2d343a", "#485159", "#6b767e", "#9ca6ac", "#ced4d8", "#f2f4f5"]
-      },
-      "graphite-line": {
-        "role": "neutral",
-        "displayName": "Graphite Line",
-        "tonalRamp": ["#0b0e10", "#181d21", "#272d32", "#414950", "#626d74", "#949ea4", "#c7ced2", "#eff2f3"]
-      },
-      "graphite-line-strong": {
-        "role": "neutral",
-        "displayName": "Strong Graphite Line",
-        "tonalRamp": ["#0e1113", "#242a2f", "#3b444b", "#555f67", "#747f87", "#a1aab0", "#cfd5d8", "#f2f4f5"]
-      },
-      "evidence-white": {
-        "role": "neutral",
-        "displayName": "Evidence White",
-        "tonalRamp": ["#15191b", "#2b3236", "#4a555a", "#6c787e", "#939da2", "#bbc3c7", "#dce1e3", "#edf1f2"]
-      },
-      "evidence-soft": {
-        "role": "neutral",
-        "displayName": "Evidence Soft",
-        "tonalRamp": ["#141719", "#293034", "#465055", "#677278", "#8b969c", "#adb7bc", "#c5cdd1", "#eff2f3"]
-      },
-      "telemetry-muted": {
-        "role": "neutral",
-        "displayName": "Telemetry Muted",
-        "tonalRamp": ["#121517", "#252b2f", "#3e474c", "#5b666d", "#78848c", "#9da7ad", "#c5ccd0", "#eff2f3"]
-      },
-      "live-chartreuse": {
-        "role": "primary",
-        "displayName": "Live Chartreuse",
-        "tonalRamp": ["#192109", "#2f3d14", "#475b20", "#627b31", "#819d45", "#9fbd5c", "#b7d979", "#edf7d8"]
-      },
-      "live-ink": {
-        "role": "primary",
-        "displayName": "Live Ink",
-        "tonalRamp": ["#11170a", "#242d16", "#3b4824", "#566436", "#74824c", "#99a36b", "#c2c99b", "#eef0db"]
-      },
-      "verified-green": {
-        "role": "secondary",
-        "displayName": "Verified Green",
-        "tonalRamp": ["#102019", "#1f3c2e", "#315945", "#487960", "#659b7d", "#94c9aa", "#bfe2ce", "#edf8f2"]
-      },
-      "gate-amber": {
-        "role": "secondary",
-        "displayName": "Gate Amber",
-        "tonalRamp": ["#251b0d", "#483419", "#6b5027", "#8e6c39", "#b28b50", "#dbb76f", "#ecd39f", "#fbf2de"]
-      },
-      "risk-coral": {
-        "role": "secondary",
-        "displayName": "Risk Coral",
-        "tonalRamp": ["#2a1110", "#51221f", "#783532", "#a24b46", "#c9655f", "#e1847c", "#efb0ab", "#fbe7e5"]
-      },
-      "context-blue": {
-        "role": "secondary",
-        "displayName": "Context Blue",
-        "tonalRamp": ["#0e2027", "#1b3c48", "#2b5969", "#40788a", "#5f98aa", "#8db9c8", "#bcdae4", "#edf6f8"]
-      }
+      "primary": { "role": "primary", "displayName": "Control Cobalt", "canonical": "hsl(231 86% 61%)", "tonalRamp": ["hsl(231 45% 15%)", "hsl(231 55% 25%)", "hsl(231 66% 36%)", "hsl(231 76% 48%)", "hsl(231 86% 61%)", "hsl(231 90% 72%)", "hsl(231 92% 84%)", "hsl(231 94% 95%)"] },
+      "canvas-light": { "role": "neutral", "displayName": "Cool Porcelain", "canonical": "hsl(220 27% 97%)", "tonalRamp": ["hsl(220 18% 15%)", "hsl(220 18% 28%)", "hsl(220 18% 42%)", "hsl(220 18% 57%)", "hsl(220 20% 72%)", "hsl(220 22% 84%)", "hsl(220 25% 92%)", "hsl(220 27% 97%)"] },
+      "canvas-dark": { "role": "neutral", "displayName": "Carbon Canvas", "canonical": "hsl(225 31% 7%)", "tonalRamp": ["hsl(225 31% 7%)", "hsl(225 28% 13%)", "hsl(225 24% 22%)", "hsl(225 20% 34%)", "hsl(225 16% 48%)", "hsl(225 14% 64%)", "hsl(225 16% 80%)", "hsl(225 20% 95%)"] }
     },
     "typographyMeta": {
-      "display": {
-        "displayName": "Agent Display",
-        "purpose": "Atlas Trading Agent and top-level view identity."
-      },
-      "headline": {
-        "displayName": "Module Headline",
-        "purpose": "Selection, chain, position, candidate, and audit modules."
-      },
-      "title": {
-        "displayName": "Evidence Title",
-        "purpose": "Capability nodes and structured evidence objects."
-      },
-      "body": {
-        "displayName": "Bilingual Body",
-        "purpose": "Readable Chinese and English operating explanation."
-      },
-      "label": {
-        "displayName": "Mono Evidence",
-        "purpose": "Rank, score, trace, state, latency, version, and provenance."
-      },
-      "metric": {
-        "displayName": "Audit Metric",
-        "purpose": "Selection counts, PnL, and decisive numeric evidence."
-      }
+      "headline": { "displayName": "Workspace Headline", "purpose": "Page and major workspace titles." },
+      "body": { "displayName": "Operational Body", "purpose": "Dense explanations and controls." },
+      "data": { "displayName": "Evidence Data", "purpose": "Counts, versions, timestamps, identifiers and measurements only." }
     },
     "shadows": [
-      {
-        "name": "selected-path",
-        "value": "inset 3px 0 var(--accent)",
-        "purpose": "Marks the only admitted candidate."
-      },
-      {
-        "name": "live-signal-halo",
-        "value": "0 0 0 4px rgb(183 217 121 / 0.1)",
-        "purpose": "Reinforces the running state without decorative glow."
-      },
-      {
-        "name": "panel-separation",
-        "value": "-18px 0 48px rgb(0 0 0 / 0.28)",
-        "purpose": "Separates protected right-side drawers from the operating surface."
-      },
-      {
-        "name": "toast-lift",
-        "value": "0 18px 42px rgb(0 0 0 / 0.32)",
-        "purpose": "Transient system feedback only."
-      }
+      { "name": "surface-rest", "value": "0 1px 2px hsl(225 24% 16% / 0.05), 0 8px 24px hsl(225 20% 18% / 0.045)", "purpose": "Low structural separation for opaque workspace surfaces." },
+      { "name": "surface-active", "value": "0 2px 4px hsl(225 24% 16% / 0.06), 0 12px 30px hsl(225 20% 18% / 0.07)", "purpose": "Interactive hover and raised overlays only." }
     ],
     "motion": [
-      {
-        "name": "ease-operational",
-        "value": "cubic-bezier(0.16, 1, 0.3, 1)",
-        "purpose": "Low-amplitude state, backdrop, panel, and toast transitions."
-      },
-      {
-        "name": "state-fast",
-        "value": "180ms var(--ease)",
-        "purpose": "Hover and selection feedback."
-      },
-      {
-        "name": "panel-enter",
-        "value": "260ms var(--ease)",
-        "purpose": "Short directional entrance for controlled drawers."
-      },
-      {
-        "name": "reduced-motion",
-        "value": "prefers-reduced-motion: reduce",
-        "purpose": "Collapses transitions and animations to 0.01ms."
-      }
+      { "name": "state-change", "value": "160ms ease", "purpose": "Color, border and elevation feedback for controls." }
     ],
     "breakpoints": [
-      { "name": "compact-deck", "value": "1240px" },
-      { "name": "stacked-operation", "value": "1020px" },
-      { "name": "single-column", "value": "760px" },
-      { "name": "narrow-phone", "value": "440px" }
+      { "name": "sm", "value": "640px" },
+      { "name": "md", "value": "768px" },
+      { "name": "lg", "value": "1024px" },
+      { "name": "xl", "value": "1280px" }
     ]
   },
   "components": [
     {
-      "name": "Primary Action",
+      "name": "Primary Button",
       "kind": "button",
       "refersTo": "button-primary",
-      "description": "The safe affirmative action for one local decision or release step.",
-      "html": "<button class=\"ds-primary\" type=\"button\">OPEN AGENT LAB</button>",
-      "css": ".ds-primary { min-height: 44px; padding: 0 18px; border: 1px solid var(--accent); border-radius: 0; background: var(--accent); color: var(--accent-ink); font: 700 12px/1.4 var(--font-sans); transition: background-color 180ms var(--ease), border-color 180ms var(--ease); cursor: pointer; } .ds-primary:hover { background: #c9e595; border-color: #c9e595; } .ds-primary:active { transform: translateY(1px); } .ds-primary:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }"
+      "description": "The single strongest action on a workspace surface.",
+      "html": "<button class=\"ds-btn-primary\">运行回测</button>",
+      "css": ".ds-btn-primary{height:40px;padding:0 16px;border:1px solid hsl(231 86% 61%);border-radius:10px;background:hsl(231 86% 61%);color:white;font:600 14px system-ui;box-shadow:0 7px 18px hsl(231 86% 61% / .14);transition:background-color 160ms ease}.ds-btn-primary:hover{background:hsl(231 76% 55%)}.ds-btn-primary:focus-visible{outline:2px solid hsl(231 86% 61% / .7);outline-offset:2px}"
     },
     {
-      "name": "Selected Candidate Row",
-      "kind": "custom",
-      "refersTo": "candidate-row-selected",
-      "description": "The only candidate admitted by Selector topN=1.",
-      "html": "<button class=\"ds-candidate\" type=\"button\"><span class=\"ds-rank\">01</span><span class=\"ds-symbol\"><strong>BTCUSDT</strong><small>-2.8% / 1.84B</small></span><span class=\"ds-score\">91.4</span><span class=\"ds-state\">SELECTED</span></button>",
-      "css": ".ds-candidate { display: grid; grid-template-columns: 60px minmax(160px,1fr) 70px 100px; align-items: center; width: 100%; min-height: 62px; padding: 8px 14px; border: 1px solid var(--line); border-radius: 0; background: #14190f; color: var(--text); text-align: left; box-shadow: inset 3px 0 var(--accent); transition: background-color 180ms var(--ease); cursor: pointer; } .ds-candidate:hover { background: var(--surface-active); } .ds-candidate:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; } .ds-rank,.ds-score { color: var(--accent); font: 700 13px/1.4 var(--font-mono); } .ds-score,.ds-state { text-align: right; } .ds-symbol { display:flex; flex-direction:column; } .ds-symbol strong { font-size:15px; } .ds-symbol small { color:var(--muted); font-size:12px; } .ds-state { color:var(--accent); font-size:12px; font-weight:700; }"
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Neutral supporting action with explicit boundary.",
+      "html": "<button class=\"ds-btn-secondary\">查看记录</button>",
+      "css": ".ds-btn-secondary{height:40px;padding:0 16px;border:1px solid hsl(220 18% 85%);border-radius:10px;background:white;color:hsl(225 32% 10%);font:600 14px system-ui;transition:border-color 160ms ease,background-color 160ms ease}.ds-btn-secondary:hover{border-color:hsl(231 86% 61% / .32);background:hsl(224 24% 93%)}.ds-btn-secondary:focus-visible{outline:2px solid hsl(231 86% 61% / .7);outline-offset:2px}"
     },
     {
-      "name": "Capability Node",
+      "name": "Workspace Surface",
       "kind": "card",
-      "refersTo": "capability-node",
-      "description": "One ordered stage in the six-stage Atlas Agent chain.",
-      "html": "<button class=\"ds-capability\" type=\"button\"><span class=\"ds-step\">03</span><span class=\"ds-capability-body\"><span class=\"ds-capability-top\"><strong>ANALYSIS AGENT</strong><em>PASSED</em></span><span class=\"ds-output\">The 1h downtrend remains valid with volume confirmation.</span><span class=\"ds-artifacts\">Bull case · Fallback &nbsp; Bear case · Passed</span><span class=\"ds-meta\">547 ms / 5 artifacts</span></span></button>",
-      "css": ".ds-capability { display:grid; grid-template-columns:34px minmax(0,1fr); gap:12px; min-height:160px; padding:20px; border:1px solid var(--line); border-radius:0; background:var(--surface); color:var(--text); text-align:left; transition:background-color 180ms var(--ease); cursor:pointer; } .ds-capability:hover { background:var(--surface-active); } .ds-capability:focus-visible { outline:2px solid var(--accent); outline-offset:3px; } .ds-step,.ds-meta { color:var(--muted); font:400 12px/1.4 var(--font-mono); } .ds-capability-body { display:flex; min-width:0; flex-direction:column; } .ds-capability-top { display:flex; justify-content:space-between; gap:10px; } .ds-capability-top strong { font-size:16px; } .ds-capability-top em { color:var(--positive); font-size:12px; font-style:normal; font-weight:700; } .ds-output { margin-top:13px; color:var(--text-soft); font-size:14px; line-height:1.55; } .ds-artifacts { margin-top:9px; color:var(--warning); font-size:11px; } .ds-meta { margin-top:auto; padding-top:12px; }"
+      "refersTo": "workspace-surface",
+      "description": "Opaque structural panel for one coherent task or dataset.",
+      "html": "<section class=\"ds-surface\"><strong>策略版本</strong><p>定义、市场和数据路由已冻结。</p></section>",
+      "css": ".ds-surface{padding:20px;border:1px solid hsl(220 18% 85%);border-radius:12px;background:white;color:hsl(225 32% 10%);font:14px/1.5 system-ui;box-shadow:0 1px 2px hsl(225 24% 16% / .05),0 8px 24px hsl(225 20% 18% / .045)}.ds-surface p{margin:8px 0 0;color:hsl(222 16% 31%)}"
     },
     {
-      "name": "Selection Statistics",
-      "kind": "custom",
-      "description": "The aperture summary that makes broad input and single output explicit.",
-      "html": "<div class=\"ds-stats\"><div><strong>42</strong><span>SCANNED</span></div><b>→</b><div><strong>8</strong><span>QUALIFIED</span></div><b>→</b><div class=\"ds-final\"><strong>1</strong><span>ADMITTED</span></div></div>",
-      "css": ".ds-stats { display:grid; grid-template-columns:minmax(90px,1fr) 32px minmax(90px,1fr) 32px minmax(90px,1fr); align-items:center; max-width:620px; padding:24px; background:var(--surface); color:var(--text); } .ds-stats div { display:flex; align-items:baseline; gap:10px; } .ds-stats strong { font:700 30px/1 var(--font-mono); } .ds-stats span,.ds-stats b { color:var(--muted); font-size:13px; } .ds-stats b { text-align:center; font-weight:400; } .ds-stats .ds-final strong,.ds-stats .ds-final span { color:var(--accent); }"
-    },
-    {
-      "name": "Structured Input",
+      "name": "Input Field",
       "kind": "input",
-      "refersTo": "input-structured",
-      "description": "A readable bilingual field for thesis and candidate proposal drafts.",
-      "html": "<label class=\"ds-field\">SELECTOR TOP N<input value=\"1\" readonly /></label>",
-      "css": ".ds-field { display:grid; gap:7px; color:var(--text-soft); font:700 12px/1.4 var(--font-sans); } .ds-field input { min-height:44px; padding:10px 12px; border:1px solid var(--line-strong); border-radius:0; background:var(--bg); color:var(--text); font:400 16px/1.5 var(--font-sans); } .ds-field input:focus-visible { outline:2px solid var(--accent); outline-offset:3px; } .ds-field input[readonly] { color:var(--accent); font-family:var(--font-mono); }"
+      "description": "Compact neutral input with a visible operational focus state.",
+      "html": "<input class=\"ds-input\" value=\"system_market_data\" aria-label=\"连接标识\" />",
+      "css": ".ds-input{height:40px;width:260px;padding:0 12px;border:1px solid hsl(220 18% 82%);border-radius:10px;background:hsl(220 27% 97% / .62);color:hsl(225 32% 10%);font:14px system-ui}.ds-input:hover{border-color:hsl(225 32% 10% / .26)}.ds-input:focus{outline:none;border-color:hsl(231 86% 61% / .62);box-shadow:0 0 0 3px hsl(231 86% 61% / .1)}"
     },
     {
-      "name": "Release Rail",
-      "kind": "custom",
-      "description": "The auditable Candidate state machine from Draft through Paper.",
-      "html": "<div class=\"ds-release\"><div class=\"is-done\"><span>✓</span><strong>DRAFT</strong></div><div class=\"is-done\"><span>✓</span><strong>BACKTEST</strong></div><div class=\"is-current\"><span>3</span><strong>WALK-FORWARD</strong></div><div><span>4</span><strong>APPROVAL</strong></div><div><span>5</span><strong>PAPER</strong></div></div>",
-      "css": ".ds-release { display:grid; grid-template-columns:repeat(5,1fr); border:1px solid var(--line); background:var(--surface); } .ds-release div { display:grid; justify-items:center; gap:8px; padding:14px 8px; border-right:1px solid var(--line); color:var(--muted); } .ds-release div:last-child { border-right:0; } .ds-release span { display:grid; place-items:center; width:32px; height:32px; border:1px solid var(--line-strong); font:700 12px/1 var(--font-mono); } .ds-release strong { font-size:11px; } .ds-release .is-done { color:var(--positive); } .ds-release .is-current { color:var(--accent); } .ds-release .is-current span { border-color:var(--accent); background:#151a10; }"
-    },
-    {
-      "name": "Controlled Copilot Drawer",
-      "kind": "custom",
-      "refersTo": "panel",
-      "description": "A bounded read, explain, and draft surface with no execution authority.",
-      "html": "<aside class=\"ds-drawer\"><header><div><span>CONTROLLED ASSISTANT</span><h2>COPILOT</h2></div><button type=\"button\">CLOSE</button></header><div class=\"ds-drawer-body\"><strong>ATLAS TRADING AGENT</strong><p>Query evidence or prepare a Candidate draft. The running profile and exchange write path remain protected.</p></div></aside>",
-      "css": ".ds-drawer { width:min(390px,100vw); min-height:360px; border-left:1px solid var(--line-strong); border-radius:0; background:var(--surface); color:var(--text); box-shadow:-18px 0 48px rgb(0 0 0 / .28); } .ds-drawer header { display:flex; min-height:78px; align-items:center; justify-content:space-between; padding:16px 20px; border-bottom:1px solid var(--line-strong); background:var(--surface-raised); } .ds-drawer header span { color:var(--muted); font:700 12px/1.4 var(--font-mono); } .ds-drawer h2 { margin:4px 0 0; font-size:21px; } .ds-drawer button { min-height:44px; padding:0 12px; border:1px solid var(--line-strong); border-radius:0; background:transparent; color:var(--text-soft); cursor:pointer; } .ds-drawer button:hover { background:var(--surface-active); } .ds-drawer button:focus-visible { outline:2px solid var(--accent); outline-offset:3px; } .ds-drawer-body { padding:24px 20px; } .ds-drawer-body strong { color:var(--accent); font-size:13px; } .ds-drawer-body p { margin-top:12px; color:var(--text-soft); font-size:15px; line-height:1.6; }"
+      "name": "Active Navigation Item",
+      "kind": "nav",
+      "description": "Current workspace location in the fixed operational rail.",
+      "html": "<a class=\"ds-nav-active\" href=\"#\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><path d=\"M3 3v18h18\"/><path d=\"M7 16V8\"/><path d=\"M12 16V5\"/><path d=\"M17 16v-4\"/></svg>策略总览</a>",
+      "css": ".ds-nav-active{position:relative;display:flex;align-items:center;gap:12px;height:40px;padding:0 12px;border:1px solid hsl(231 86% 61% / .2);border-radius:10px;background:hsl(231 86% 61% / .1);color:hsl(231 86% 61%);font:600 13px system-ui;text-decoration:none}.ds-nav-active:before{content:'';position:absolute;left:0;top:8px;bottom:8px;width:2px;border-radius:0 2px 2px 0;background:hsl(231 86% 61%)}.ds-nav-active:focus-visible{outline:2px solid hsl(231 86% 61% / .7);outline-offset:2px}"
     }
   ],
   "narrative": {
-    "northStar": "Selection Aperture",
-    "overview": "TradeBoard is the operating surface for one Atlas Trading Agent. A broad market universe enters through a visible aperture, but `Selector topN=1` admits exactly one auditable symbol into the cycle. The interface gives that selection, the running Agent, its six-stage chain, current position, and one required human action clear priority.\n\nThe world is cold graphite, hard seams, system sans, mono evidence, and a single chartreuse live signal. It is bilingual by construction and restrained in density. Bull/Bear and Position Monitor remain inspectable artifacts inside the main chain rather than peer stages that inflate the topology. Agent Lab owns candidate evolution; Audit Log owns historical trace; Copilot stays a controlled drawer.",
-    "keyCharacteristics": [
-      "One running Atlas Trading Agent and one admitted symbol per cycle.",
-      "Selection narrows 42 scanned candidates to 8 qualified and 1 admitted.",
-      "Six visible stages: Selector, Data, Analysis, Decision, Risk, and Execution.",
-      "Bull/Bear artifacts nest under Analysis; Position Monitor nests under Decision.",
-      "Candidate release requires Draft, Backtest, Walk-Forward, human Approval, then Paper.",
-      "Chinese and English share one layout and evidence hierarchy.",
-      "Mock data and the missing Runtime API are always explicit."
-    ],
+    "northStar": "The Strategy Control Plane",
+    "overview": "LLM TradeBot is a precise institutional research instrument: calm enough for long sessions, dense enough for real decision work, and explicit about every state transition. Brand expression comes from alignment, restrained cobalt signals, compact labels, tabular data, and a stable operational rail.",
+    "keyCharacteristics": ["Continuous workspace rather than isolated floating canvases.", "Cool porcelain in light mode and carbon graphite in dark mode.", "Cobalt reserved for primary action, current location, focus, and selected state.", "Thin mineral rules and shallow structural elevation.", "Compact, familiar controls that disappear into the task."],
     "rules": [
-      {
-        "name": "The One Live Signal Rule",
-        "body": "Chartreuse identifies the single admitted path and its safe action. Never spread it across unrelated decoration.",
-        "section": "colors"
-      },
-      {
-        "name": "The Semantic Isolation Rule",
-        "body": "Green, amber, coral, and blue keep their operational meanings.",
-        "section": "colors"
-      },
-      {
-        "name": "The Evidence Voice Rule",
-        "body": "Use sans for interpretation and mono for facts that must be compared or audited.",
-        "section": "typography"
-      },
-      {
-        "name": "The Aperture Before Chain Rule",
-        "body": "Show universe narrowing before downstream reasoning so users understand why the only symbol entered the cycle.",
-        "section": "layout"
-      },
-      {
-        "name": "The One-Agent Rule",
-        "body": "Fixed coin tabs and multiple equal-weight Trading Agents are prohibited; candidates are inputs, not separate Agent identities.",
-        "section": "layout"
-      },
-      {
-        "name": "The Flat Runtime Rule",
-        "body": "Persistent operating modules never float; only overlays and transient feedback use cast shadow.",
-        "section": "elevation"
-      },
-      {
-        "name": "The Hard Seam Rule",
-        "body": "A new component starts rectangular and attached. Round only a state dot.",
-        "section": "shapes"
-      }
+      { "name": "The One Signal Rule", "body": "Cobalt should identify what is active or actionable; inactive content remains neutral.", "section": "colors" },
+      { "name": "The Semantic State Rule", "body": "Green, amber, and red communicate real state only.", "section": "colors" },
+      { "name": "The Flat-By-Default Rule", "body": "No glow and no zero-offset colored shadow.", "section": "elevation" }
     ],
-    "dos": [
-      "Do make Atlas, its one admitted symbol, and `topN=1` immediately clear.",
-      "Do preserve the six-stage chain and nest Bull/Bear and Position Monitor artifacts.",
-      "Do keep candidate approval and Paper release as distinct, auditable states.",
-      "Do maintain complete Chinese and English labels without changing hierarchy.",
-      "Do expose the synthetic-data banner and disconnected exchange-write boundary.",
-      "Do preserve keyboard focus, focus return, reduced motion, and responsive stacking."
-    ],
-    "donts": [
-      "Don't introduce fixed BTC/ETH/SOL tabs or multiple equal-weight running Agents.",
-      "Don't flatten Bull, Bear, or Position Monitor into extra primary stages.",
-      "Don't imply that candidate inspection, Copilot, or a draft can execute.",
-      "Don't hide the mock/runtime boundary or invent live API connectivity.",
-      "Don't add rounded SaaS cards, ambient chartreuse, decorative glow, or high-amplitude motion."
-    ]
+    "dos": ["Do use divided ledgers and lists for related strategy state.", "Do reserve cobalt for the one active or primary operation.", "Do preserve both light and dark themes with equivalent hierarchy and contrast."],
+    "donts": ["Don't restore cyan-purple gradients, decorative glow, or glass surfaces.", "Don't wrap every section in a large rounded card.", "Don't use fake market metrics, performance data, or decorative charts."]
   }
 }

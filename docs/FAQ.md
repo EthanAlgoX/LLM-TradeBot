@@ -1,0 +1,422 @@
+# ❓ 常见问题解答 (FAQ)
+
+本文档整理了用户在使用过程中遇到的常见问题及解决方案。
+
+---
+
+## 📊 数据相关
+
+### Q1: 美股代码（如 AMD, AAPL）分析时价格显示不正确？
+
+**现象**：输入美股代码后，显示的价格明显不对（如 AMD 显示 7.33 元），或被误识别为 A 股。
+
+**原因**：早期版本代码匹配逻辑优先尝试国内 A 股规则，导致代码冲突。
+
+**解决方案**：
+1. 已在 v2.3.0 修复，系统现在支持美股代码自动识别
+2. 如仍有问题，可在 `.env` 中设置：
+   ```bash
+   YFINANCE_PRIORITY=0
+   ```
+   这将优先使用 Yahoo Finance 数据源获取美股数据
+
+> 📌 相关 Issue: [#153](https://github.com/ZhuLinsen/daily_stock_analysis/issues/153)
+
+---
+
+### Q2: 报告中"量比"字段显示为空或 N/A？
+
+**现象**：分析报告中量比数据缺失，影响 AI 对缩放量的判断。
+
+**原因**：默认的某些实时行情源（如新浪接口）不提供量比字段。
+
+**解决方案**：
+1. 已在 v2.3.0 修复，腾讯接口现已支持量比解析
+2. 推荐配置实时行情源优先级：
+   ```bash
+   REALTIME_SOURCE_PRIORITY=tencent,akshare_sina,efinance,akshare_em
+   ```
+3. 系统已内置 5 日均量计算作为兜底逻辑
+
+> 📌 相关 Issue: [#155](https://github.com/ZhuLinsen/daily_stock_analysis/issues/155)
+
+---
+
+### Q3: Tushare 获取数据失败，提示 Token 不对？
+
+**现象**：日志显示 `Tushare 获取数据失败: 您的token不对，请确认`
+
+**解决方案**：
+1. **无 Tushare 账号**：无需配置 `TUSHARE_TOKEN`，系统会自动使用免费数据源（AkShare、Efinance）
+2. **有 Tushare 账号**：确认 Token 是否正确，可在 [Tushare Pro](https://tushare.pro/weborder/#/login?reg=834638 ) 个人中心查看
+3. 本项目所有核心功能均可在无 Tushare 的情况下正常运行
+
+---
+
+### Q4: 数据获取被限流或返回为空？
+
+**现象**：日志显示 `熔断器触发` 或数据返回 `None`，或出现 `RemoteDisconnected`、`push2his.eastmoney.com` 连接被关闭等
+
+**原因**：免费数据源（东方财富、新浪等）有反爬机制，短时间大量请求会被限流。
+
+**解决方案**：
+1. 系统已内置多数据源自动切换和熔断保护
+2. 减少自选股数量，或增加请求间隔
+3. 避免频繁手动触发分析
+4. 若东财接口频繁失败，可设置 `ENABLE_EASTMONEY_PATCH=true` 启用东财补丁（注入 NID 令牌与随机 User-Agent，降低被限流概率）
+5. 将 `MAX_WORKERS=1` 改为串行获取，减少对东财的并发压力
+
+---
+
+## ⚙️ 配置相关
+
+### Q5: GitHub Actions 运行失败，提示找不到环境变量？
+
+**现象**：Actions 日志显示 `GEMINI_API_KEY` 或 `STOCK_LIST` 未定义
+
+**原因**：GitHub 区分 `Secrets`（加密）和 `Variables`（普通变量），配置位置不对会导致读取失败。
+
+**解决方案**：
+1. 进入仓库 `Settings` → `Secrets and variables` → `Actions`
+2. **Secrets**（点击 `New repository secret`）：存放敏感信息
+   - `GEMINI_API_KEY`
+   - `OPENAI_API_KEY`
+   - `TELEGRAM_BOT_TOKEN`
+   - 各类 Webhook URL
+3. **Variables**（点击 `Variables` 标签）：存放非敏感配置
+   - `STOCK_LIST`
+   - `GEMINI_MODEL`
+   - `REPORT_TYPE`
+
+> 兼容说明：每日分析 workflow 也会绑定名为 `STOCK_LIST` 的 Environment，因此误把 `STOCK_LIST` 填到该 Environment variables 中也能被读取；但推荐位置仍是 Repository variables。除非你希望每日任务等待人工审批，否则不要给该 Environment 配置 required reviewers、wait timer 或部署分支限制。
+
+---
+
+### Q6: 修改 .env 文件后配置没有生效？
+
+**解决方案**：
+1. 确保 `.env` 文件位于项目根目录
+2. **Docker 部署 / WebUI 系统设置**：
+   - `--env-file .env` / Compose `env_file` 只会把宿主机 `.env` 作为启动环境变量注入容器，不会自动创建或回写容器内 `/app/.env`
+   - WebUI 设置页会在当前活跃 `.env` 文件缺少某些键时展示启动注入的同名环境变量作为兜底；但“导出 `.env`”仍只导出当前活跃配置文件内容
+   - WebUI 保存后的 `STOCK_LIST`、`SCHEDULE_ENABLED`、`SCHEDULE_TIME`、`SCHEDULE_TIMES`、`SCHEDULE_RUN_IMMEDIATELY`、`RUN_IMMEDIATELY` 会写回容器内的 `.env`
+   - WebUI 保存后会触发当前进程的配置重载；运行中的读取路径会同步使用最新写回的 `.env`，例如定时任务会继续热读取保存后的 `STOCK_LIST`
+   - 如果容器启动命令里传入了这些同名环境变量（如 `--env-file .env`、`docker run -e ...` 或 Compose `environment:`），后续重启时仍可能以启动环境变量为准；要让 WebUI 保存值接管，请同步更新或移除这些同名 override
+   - 如需持久化 WebUI 保存的配置，请将 `ENV_FILE` 指向 `/app/data/runtime.env` 等可写数据卷文件，不要把宿主机 `.env` 单文件挂载到 `/app/.env`
+   - `SCHEDULE_ENABLED`、`SCHEDULE_TIME`、`SCHEDULE_TIMES` 保存后会让 WebUI/API/Desktop 长运行进程按新配置启停或重建 runtime scheduler
+   - `SCHEDULE_RUN_IMMEDIATELY` 与 `RUN_IMMEDIATELY` 仍属于启动期/一次性运行配置，保存后不会立即触发一次分析
+3. **Docker 手工改 `.env` 后**：修改后仍建议重启容器
+   ```bash
+   docker-compose down && docker-compose up -d
+   ```
+4. **GitHub Actions**：`.env` 文件不生效，必须在 Secrets/Variables 中配置
+5. 检查是否有多个 `.env` 文件（如 `.env.local`）导致覆盖
+
+---
+
+### Q7: 如何配置代理访问 Gemini/OpenAI API？
+
+**解决方案**：
+
+在 `.env` 中配置：
+```bash
+USE_PROXY=true
+PROXY_HOST=127.0.0.1
+PROXY_PORT=10809
+```
+
+> ⚠️ 注意：代理配置仅对本地运行生效，GitHub Actions 环境无需配置代理。
+
+---
+
+### LLM 配置常见问题
+
+> 完整说明见 [LLM 配置指南](LLM_CONFIG_GUIDE.md)。
+
+**Q: 配置了 GEMINI_API_KEY 和 LLM_CHANNELS，为什么只用渠道？**
+
+系统按优先级只取一种：高级模型路由 YAML（`LITELLM_CONFIG`）> `LLM_CHANNELS` > legacy keys。但 YAML 仅在文件可正常解析且产出了有效 `model_list` 时才生效；如果 YAML 路径无效或内容为空，系统会自动回退到 `LLM_CHANNELS` 或 legacy keys。一旦某一层级实际生效，更低优先级的配置不参与解析。
+
+**Q: check_env 输出“未配置可用 AI 模型”怎么办？**
+
+默认先选一种服务商并填写对应 API Key；如果需要固定主模型，再补 `LITELLM_MODEL=provider/model`；如果要多模型切换，再配置 `LLM_CHANNELS` 或高级模型路由 YAML。运行 `python scripts/check_env.py --config` 校验配置，`python scripts/check_env.py --llm` 实际调用 API 测试。
+
+**Q: 如何同时使用多个模型（如 AIHubmix + DeepSeek + Gemini）？**
+
+使用渠道模式：设置 `LLM_CHANNELS=aihubmix,deepseek,gemini`，并配置各渠道的 `LLM_{NAME}_BASE_URL`、`LLM_{NAME}_API_KEY`、`LLM_{NAME}_MODELS`。也可在 Web 设置页 → AI 模型 → AI 模型接入 中可视化配置。
+
+**Q: 问股/Agent 提示未配置可用 LLM，但我只有旧的 `GEMINI_*` / `OPENAI_*` / `ANTHROPIC_*` 配置，怎么办？**
+
+先确认当前是否启用了 `LITELLM_CONFIG` 或 `LLM_CHANNELS`；如果启用了，上层配置会覆盖 legacy keys。若你没有启用这两层，且 `AGENT_LITELLM_MODEL` 为空，问股 Agent 仍会自动继承 legacy provider 模型：`GEMINI_MODEL`、`OPENAI_MODEL`、`ANTHROPIC_MODEL` 分别映射到对应 provider 前缀的 LiteLLM 模型名。此次修复不会静默迁移或清空旧配置，只是把“真实缺失原因”直接返回到前端，便于你判断到底是缺 key、缺模型名，还是被上层配置覆盖。完整兼容语义见 [LLM 配置指南](LLM_CONFIG_GUIDE.md) 中“问股 Agent / LiteLLM 配置兼容说明”。
+
+---
+
+## 📱 推送相关
+
+### Q8: 机器人推送失败，提示消息过长？
+
+**现象**：分析成功但未收到推送，日志显示 400 错误或 `Message too long`
+
+**原因**：不同平台消息长度限制不同：
+- 企业微信：4KB
+- 飞书：20KB
+- 钉钉：20KB
+
+**解决方案**：
+1. **自动分块**：最新版本已实现长消息自动切割
+2. **单股推送模式**：设置 `SINGLE_STOCK_NOTIFY=true`，每分析完一只股票立即推送
+3. **精简报告**：设置 `REPORT_TYPE=simple` 使用精简格式
+
+---
+
+### Q9: Telegram 推送收不到消息？
+
+**解决方案**：
+1. 确认 `TELEGRAM_BOT_TOKEN` 和 `TELEGRAM_CHAT_ID` 都已配置
+2. 获取 Chat ID 方法：
+   - 给 Bot 发送任意消息
+   - 访问 `https://api.telegram.org/bot<TOKEN>/getUpdates`
+   - 在返回的 JSON 中找到 `chat.id`
+3. 确保 Bot 已被添加到目标群组（如果是群聊）
+4. 本地运行时需要能访问 Telegram API（可能需要代理）
+
+---
+
+### Q10: 企业微信 Markdown 格式显示不正常？
+
+**解决方案**：
+1. 企业微信对 Markdown 支持有限，可尝试设置：
+   ```bash
+   WECHAT_MSG_TYPE=text
+   ```
+2. 这将发送纯文本格式的消息
+
+---
+
+## 🤖 AI 模型相关
+
+### Q11: Gemini API 返回 429 错误（请求过多）？
+
+**现象**：日志显示 `Resource has been exhausted` 或 `429 Too Many Requests`
+
+**解决方案**：
+1. Gemini 免费版有速率限制（约 15 RPM）
+2. 减少同时分析的股票数量
+3. 增加请求延迟：
+   ```bash
+   GEMINI_REQUEST_DELAY=5
+   ANALYSIS_DELAY=10
+   ```
+4. 或切换到 OpenAI 兼容 API 作为备选
+
+---
+
+### Q12: 如何使用 DeepSeek 等国产模型？
+
+**配置方法**：
+
+```bash
+# 不需要配置 GEMINI_API_KEY
+OPENAI_API_KEY=sk-xxxxxxxx
+OPENAI_BASE_URL=https://api.deepseek.com
+OPENAI_MODEL=deepseek-v4-flash
+# deepseek-chat / deepseek-reasoner 仍兼容，但官方已标记为 2026/07/24 后废弃
+```
+
+支持的模型服务：
+- DeepSeek: `https://api.deepseek.com`
+- 通义千问: `https://dashscope.aliyuncs.com/compatible-mode/v1`
+- Moonshot: `https://api.moonshot.cn/v1`
+
+---
+
+### Q12b: 如何使用 Ollama 本地模型？
+
+**配置方法**：使用 `OLLAMA_API_BASE` + `LITELLM_MODEL`，或渠道模式（`LLM_CHANNELS=ollama` + `LLM_OLLAMA_BASE_URL` + `LLM_OLLAMA_MODELS`）。
+
+**避坑**：不要使用 `OPENAI_BASE_URL` 配置 Ollama，否则系统会错误拼接 URL（如 404、`api/generate/api/show`）。详见 [LLM 配置指南](LLM_CONFIG_GUIDE.md) 示例 4 与渠道示例。
+
+---
+
+### Q12c: 运行时报 `OllamaException / APIConnectionError`（All LLM models failed）怎么办？
+
+**症状**：日志出现 `litellm.APIConnectionError: OllamaException` 或 `Analysis failed: All LLM models failed (tried 1 model(s))`。
+
+逐项排查以下 5 个检查点：
+
+1. **Ollama 服务是否已启动**
+   ```bash
+   # 查看进程
+   pgrep -a ollama
+   # 若无输出则先启动
+   ollama serve
+   ```
+   确认服务正在监听：`curl http://localhost:11434`，应返回 `Ollama is running`。
+
+2. **`OLLAMA_API_BASE` 是否配置正确**
+   - ✅ 正确：`OLLAMA_API_BASE=http://localhost:11434`
+   - ❌ 错误：把 Ollama 地址填到 `OPENAI_BASE_URL`，会导致 URL 路径拼错（如 `…/api/generate/api/show`）。
+
+3. **模型名称是否加了 `ollama/` 前缀**
+   - ✅ 正确：`LITELLM_MODEL=ollama/qwen3:8b`
+   - ❌ 错误：`LITELLM_MODEL=qwen3:8b`（缺少前缀，litellm 无法路由到 Ollama）
+
+4. **模型是否已下载到本地**
+   ```bash
+   ollama list          # 查看已有模型
+   ollama pull qwen3:8b # 如无则先拉取
+   ```
+
+5. **远程部署 / Docker 时的网络与防火墙**
+   - 若 Ollama 和程序不在同一主机，需将 `OLLAMA_API_BASE` 改为实际 IP，如 `http://192.168.1.100:11434`。
+   - 确认防火墙已放行 11434 端口，且 Ollama 启动时绑定了正确地址（`OLLAMA_HOST=0.0.0.0:11434`）。
+
+> 完整配置示例见 [LLM 配置指南 → 示例 4（Ollama）](LLM_CONFIG_GUIDE.md#example-4-ollama)。
+
+---
+
+## 🐳 Docker 相关
+
+### Q13: Docker 容器启动后立即退出？
+
+**解决方案**：
+1. 查看容器日志：
+   ```bash
+   docker logs <container_id>
+   ```
+2. 常见原因：
+   - 环境变量未正确配置
+   - `.env` 文件格式错误（如有多余空格）
+   - 依赖包版本冲突
+
+---
+
+### Q14: Docker 中 API 服务无法访问？
+
+**解决方案**：
+1. 确保启动命令包含 `--host 0.0.0.0`（不能是 127.0.0.1）
+2. 检查端口映射是否正确：
+   ```yaml
+   ports:
+     - "8000:8000"
+   ```
+
+---
+
+### Q14.1: Docker 中网络/DNS 解析失败（如 api.tushare.pro、searchapi.eastmoney.com 无法解析）？
+
+**现象**：日志显示 `Temporary failure in name resolution` 或 `NameResolutionError`，股票数据 API 和大模型 API 均无法访问。
+
+**原因**：自定义 bridge 网络下，容器使用 Docker 内置 DNS，在旁路由、特定网络环境时可能解析失败。
+
+**解决方案**（按优先级尝试）：
+
+1. **显式配置 DNS**：在 `docker/docker-compose.yml` 的 `x-common` 下添加：
+   ```yaml
+   dns:
+     - 223.5.5.5
+     - 119.29.29.29
+     - 8.8.8.8
+   ```
+   然后执行 `docker-compose down` 和 `docker-compose up -d --force-recreate` 重新创建容器。
+
+2. **改用 host 网络模式**：若上述仍无效，可在 `server` 服务下添加 `network_mode: host`，并移除 `ports` 映射。使用 host 模式时，`ports` 无效，**端口由 `command` 中的 `--port` 指定**。若宿主机默认端口已占用，可修改为其他端口（如 `.env` 中设置 `API_PORT=8080`），访问对应 `http://localhost:8080`。
+
+> 📌 相关 Issue: [#372](https://github.com/ZhuLinsen/daily_stock_analysis/issues/372)
+
+---
+
+### Q14.2: Docker 安装时，软件版本号写在哪个文件里？
+
+**结论**：对 Docker 用户来说，**最权威的版本不是某个 Python 源文件常量，而是你实际使用的镜像 tag**。
+
+**为什么**：
+1. 仓库的 Docker 发布由 `.github/workflows/docker-publish.yml` 触发，只有推送 `v*.*.*` 形式的 Git tag（例如 `v3.12.0`）时才会生成对应发布镜像。
+2. 这意味着 Docker 镜像版本本质上跟随 **GitHub Release / Git tag**，而不是写死在 `main.py`、`server.py` 或其他后端源码里。
+3. `apps/dsa-web/package.json` 里的 `version` 当前是占位值 `0.0.0`，WebUI “版本信息”卡片更适合用来确认静态资源是否已重建，不应当作 Docker 发布版本。
+4. 桌面端版本是单独维护的，写在 `apps/dsa-desktop/package.json` 的 `version` 字段；它只代表 Electron 桌面端，不代表 Docker 镜像版本。
+
+**怎么查当前 Docker 版本**：
+1. **先看部署命令或 Compose 文件里的镜像 tag**：例如 `ghcr.io/zhulinsen/daily_stock_analysis:v3.12.0`，其中 `v3.12.0` 就是当前部署版本。
+2. **如果你拉的是 `latest`**：请回看当时的 `docker pull` / `docker-compose.yml` / 部署脚本，或对照 [GitHub Releases](https://github.com/ZhuLinsen/daily_stock_analysis/releases) 确认对应发布记录。
+3. **如果只是想确认前端是否更新到新构建**：可以打开 WebUI 的“系统设置”页查看 `构建标识` / `构建时间`；这能帮助确认静态资源是否刷新，但不等同于 Docker 镜像发布版本。
+
+**建议**：如果你想避免重复更新，部署时尽量固定使用明确的版本 tag（如 `v3.12.0`），不要长期依赖 `latest`。
+
+---
+
+## 🖥️ 桌面端相关
+
+### Q15: macOS 提示“应用已损坏”或无法打开桌面端？
+
+**原因**：当前 macOS DMG 尚未使用 Apple Developer 证书签名和公证。从浏览器下载后，macOS Gatekeeper 可能给应用添加 quarantine（下载隔离）属性并阻止启动。
+
+**解决方案**：
+
+1. 只从项目的 [GitHub Releases](https://github.com/ZhuLinsen/daily_stock_analysis/releases) 下载附件，并确认安装包架构与 Mac 一致。不要对第三方转载或来源不明的应用绕过 Gatekeeper。
+2. 将 `Daily Stock Analysis` 拖入“应用程序”，先在“系统设置 → 隐私与安全性”中尝试“仍要打开”。
+3. 如果仍无法启动，并且已经确认文件来自项目官方 Release，可在终端只针对该应用移除 quarantine 属性并启动：
+
+   ```bash
+   xattr -dr com.apple.quarantine "/Applications/Daily Stock Analysis.app"
+   open "/Applications/Daily Stock Analysis.app"
+   ```
+
+如果应用不在 `/Applications`，请替换为实际 `.app` 路径。不要对整个 `/Applications` 目录执行 `xattr`。该命令只是临时放行受信任的 unsigned 应用，不等同于签名或公证；完整排查说明见 [桌面端打包与发布](desktop-package.md#macos-提示应用已损坏无法打开)。
+
+> 📌 相关 Issue: [#2113](https://github.com/ZhuLinsen/daily_stock_analysis/issues/2113)
+
+---
+
+## 🔧 其他问题
+
+### Q16: 如何只运行大盘复盘，不分析个股？
+
+**方法**：
+```bash
+# 本地运行
+python main.py --market-only
+
+# GitHub Actions
+# 手动触发时选择 mode: market-only
+```
+
+---
+
+### Q17: 分析结果中买入/观望/卖出数量统计不对？
+
+**原因**：早期版本使用正则匹配统计，可能与实际建议不一致。
+
+**解决方案**：已在最新版本中修复，AI 模型现在会直接输出 `decision_type` 字段用于准确统计。
+
+---
+
+### Q18: 为什么周末在 GitHub Actions 手动触发仍显示“非交易日跳过”？
+
+**现象**：已经配置了 `TRADING_DAY_CHECK_ENABLED` 或希望手动运行，但日志仍提示“今日所有相关市场均为非交易日，跳过执行”。
+
+**解决方案**：
+1. 打开 `Actions → 每日股票分析 → Run workflow`
+2. 手动触发时将 `force_run` 设为 `true`（单次强制运行）
+3. 如果希望长期关闭交易日检查，在 `Settings → Secrets and variables → Actions` 中设置：
+   ```bash
+   TRADING_DAY_CHECK_ENABLED=false
+   ```
+
+**规则说明**：
+- `TRADING_DAY_CHECK_ENABLED=true` 且 `force_run=false`：非交易日跳过（默认）
+- `force_run=true`：本次即使非交易日也执行
+- `TRADING_DAY_CHECK_ENABLED=false`：定时和手动都不做交易日检查
+
+---
+
+## 💬 还有问题？
+
+如果以上内容没有解决你的问题，欢迎：
+1. 查看 [完整配置指南](full-guide.md)
+2. 搜索或提交 [GitHub Issue](https://github.com/ZhuLinsen/daily_stock_analysis/issues)
+3. 查看 [更新日志](CHANGELOG.md) 了解最新修复
+
+---
+
+*最后更新：2026-08-03*

@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/tradebot-mark.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script>
+      (() => {
+        const storageKey = 'theme';
+        const root = document.documentElement;
+        const storedTheme = localStorage.getItem(storageKey);
+        const theme = storedTheme === 'light' || storedTheme === 'dark' ? storedTheme : 'dark';
+        root.classList.remove('light', 'dark');
+        root.classList.add(theme);
+        root.style.colorScheme = theme;
+      })();
+    </script>
+    <title>LLM TradeBot</title>
+  </head>
+  <body>
+    <!--
+      THESIS: An instrument-grade strategy control plane; it refuses the floating neon-card dashboard.
+      OWN-WORLD: Cool porcelain and carbon surfaces, cobalt actions, mineral rules, compact type, ten-pixel controls, no decorative glow.
+      STORY: Users orient in the strategy lifecycle, inspect evidence and state, then take one explicit research action.
+      FIRST VIEWPORT: A fixed operational rail frames a continuous workspace with a command header and lifecycle trace before page content.
+      FORM: Semiconductor observability console, grounded direction 7; control-plane staging; seed f31c0950.
+    -->
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
