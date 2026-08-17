@@ -1,299 +1,285 @@
 <div align="center">
 
-# 📈 股票智能分析系统
+<img src="apps/dsa-web/public/tradebot-mark.svg" alt="LLM TradeBot" width="72" height="72">
 
-[![GitHub stars](https://img.shields.io/github/stars/ZhuLinsen/daily_stock_analysis?style=social)](https://github.com/ZhuLinsen/daily_stock_analysis/stargazers)
-[![CI](https://github.com/ZhuLinsen/daily_stock_analysis/actions/workflows/ci.yml/badge.svg)](https://github.com/ZhuLinsen/daily_stock_analysis/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
-[![GitHub Actions](https://img.shields.io/badge/GitHub%20Actions-Ready-2088FF?logo=github-actions&logoColor=white)](https://github.com/features/actions)
-[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker&logoColor=white)](https://hub.docker.com/r/zhulinsen/daily_stock_analysis)
+# LLM TradeBot
 
-<p align="center">
-  <img src="https://trendshift.io/api/badge/trendshift/repositories/18527/daily?language=Python" alt="#1 Python Repository Of The Day | Trendshift" width="250" height="55"/>&nbsp;<a href="https://hellogithub.com/repository/ZhuLinsen/daily_stock_analysis" target="_blank"><img src="https://api.hellogithub.com/v1/widgets/recommend.svg?rid=6daa16e405ce46ed97b4a57706aeb29f&claim_uid=pfiJMqhR9uvDGlT&theme=neutral" alt="Featured｜HelloGitHub" width="230" /></a>
-</p>
+**策略内核接入、版本化配置、历史验证与持续研究运行平台**
 
-> 🤖 基于 AI 大模型的 A股/港股/美股/日股/韩股/台股自选股智能分析系统，每日自动分析并推送「决策仪表盘」到企业微信/飞书/Telegram/Discord/Slack/邮箱
+[![CI](https://github.com/EthanAlgoX/LLM-TradeBot/actions/workflows/ci.yml/badge.svg)](https://github.com/EthanAlgoX/LLM-TradeBot/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![React 19](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=111)](https://react.dev/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-Strategy_API-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 
-[**产品预览**](#-产品预览) · [**功能特性**](#-功能特性) · [**快速开始**](#-快速开始) · [**推送效果**](#-推送效果) · [**文档中心**](docs/INDEX.md) · [**完整指南**](docs/full-guide.md)
-
-简体中文 | [English](docs/README_EN.md) | [繁體中文](docs/README_CHT.md)
+[产品定位](#产品定位) · [核心链路](#核心链路) · [快速开始](#快速开始) · [策略包接入](#策略包接入) · [能力边界](#能力边界) · [开发与测试](#开发与测试)
 
 </div>
 
-## 💖 赞助商 (Sponsors)
-<div align="center">
-  <p align="center">
-    <a href="https://open.anspire.cn/dsa?share_code=QFBC0FYC" target="_blank"><img src="./docs/assets/anspire.png" alt="Anspire Open 一站式模型和搜索服务" width="300" height="141" style="width: 300px; height: 141px; object-fit: contain;"></a>
-    <a href="https://serpapi.com/baidu-search-api?utm_source=github_daily_stock_analysis" target="_blank"><img src="./docs/assets/serpapi_banner_zh.png" alt="轻松抓取搜索引擎上的实时金融新闻数据 - SerpApi" width="300" height="141" style="width: 300px; height: 141px; object-fit: contain;"></a>
-  </p>
-</div>
+> LLM TradeBot 用于接入、配置、验证和持续观察股票研究策略。它不连接券商，不自动下单，也不会把策略发布、历史回放或模型建议描述成真实交易结果。
 
+## 产品定位
 
-## 🖥️ 产品预览
+LLM TradeBot 不要求用户在网页中搭建 Agent、Prompt 或底层工具链。策略实现由外部工程工具生成或维护，并以具有稳定输入输出契约的 **Python 策略内核** 上传；网站负责把内核与市场、数据源、股票范围、周期、参数和风险边界组合成可运行的完整策略。
 
-<p align="center">
-  <img src="docs/assets/readme_workspace_tour_20260510.gif" alt="DSA Web 工作台演示" width="720">
-</p>
+平台围绕五个问题展开：
 
-## ✨ 功能特性
+1. 这个策略依赖什么数据，输入和输出是否符合契约？
+2. 同一个策略内核在不同市场、周期和参数下表现如何？
+3. 哪个不可变版本接受过什么历史验证？
+4. 当前运行的是哪个正式版本，何时开始、处于什么状态？
+5. 研究报告、候选股票或交易决策提案来自哪次运行，能否追溯？
 
-| 能力 | 覆盖内容 |
-|------|------|
-| AI 决策报告 | 核心结论、评分、趋势、买卖点位、风险警报、催化因素、操作检查清单 |
-| 多市场数据聚合 | 覆盖 A股、港股、美股、日股、韩股、台股和 ETF，支持行情、K 线、技术指标、新闻、公告、基本面与报告辅助数据；不同市场的数据源和能力边界见 [市场支持边界](docs/market-support.md) |
-| Web / 桌面工作台 | 手动分析、任务进度、历史报告、完整 Markdown、回测、持仓、配置管理、浅色 / 深色主题 |
-| Agent 策略问股 | 多轮追问，支持均线、缠论、波浪、趋势、热点、事件、成长、预期等 15 种内置策略，覆盖 Web/Bot/API |
-| 智能导入与补全 | 图片、CSV/Excel、剪贴板导入；股票代码/名称/拼音/别名补全 |
-| 自动化与推送 | GitHub Actions、Docker、本地定时任务、FastAPI 服务和企业微信/飞书/Telegram/Discord/Slack/邮件推送 |
+### 两层策略模型
 
-> 功能细节、字段契约、基本面 P0 超时语义、交易纪律、数据源优先级、Web/API 行为请看 [完整配置与部署指南](docs/full-guide.md)。
+| 对象 | 负责内容 | 是否可直接运行 |
+| --- | --- | --- |
+| **策略内核** | Python 实现、输入输出 Schema、数据依赖、参数声明和 `STRATEGY.md` | 否 |
+| **完整策略** | 策略内核 + 市场 + 数据来源 + 股票范围 + 周期 + 参数 + 风险边界 | 检查并发布后可以 |
+| **StrategyVersion** | 完整策略的不可变版本快照，用于验证、运行和审计 | 正式版本可以 |
 
-### 技术栈与数据来源
+同一个内核可以派生多套完整策略，用来比较不同市场、周期或参数，而不必把运行环境写死在策略代码中。
 
-| 类型 | 支持 |
-|------|------|
-| AI 模型 | [Anspire](https://open.anspire.cn/dsa?share_code=QFBC0FYC)、[AIHubMix](https://aihubmix.com/?aff=CfMq)、Gemini、OpenAI 兼容、DeepSeek、通义千问、Claude、Ollama 本地模型等 |
-| 行情数据 | [TickFlow](https://tickflow.org/auth/register?ref=WDSGSPS5XC)、AkShare、Tushare、Pytdx、Baostock、YFinance、Longbridge |
-| 新闻搜索 | [Anspire](https://open.anspire.cn/dsa/?share_code=QFBC0FYC)、[SerpAPI](https://serpapi.com/baidu-search-api?utm_source=github_daily_stock_analysis)、[Tavily](https://tavily.com/)、[Bocha](https://open.bocha.cn/)、[Brave](https://brave.com/search/api/)、[MiniMax](https://platform.minimaxi.com/)、SearXNG |
-| 社交舆情 | [Stock Sentiment API](https://api.adanos.org/docs)（Reddit / X / Polymarket，仅美股，可选） |
+## 核心链路
 
-> 项目默认内置 AkShare、Baostock、YFinance 等免费行情源，可零配置运行；免费源受上游限流、接口变动和网络波动影响，稳定性不保证。长期定时、批量分析或更稳定行情建议配置 TickFlow、Tushare、Longbridge 等 token 型数据源，适用市场、Actions 映射和 fallback 规则见 [数据源配置](docs/full-guide.md#数据源配置)。
+```mermaid
+flowchart LR
+    A["策略生成指南<br/>动态写入数据中心目录"] --> B["Codex / Claude Code<br/>生成 Python 策略包"]
+    B --> C["上传策略内核<br/>契约与安全检查"]
+    C --> D["创建运行配置<br/>市场·数据·周期·参数"]
+    D --> E["检查策略"]
+    E --> F{"历史回放<br/>可选"}
+    F --> G["正式发布<br/>冻结 StrategyVersion"]
+    E --> G
+    G --> H["验证中心<br/>实验历史与版本对比"]
+    G --> I["运行中心<br/>一次或持续研究运行"]
+```
 
-## 🚀 快速开始
+- **检查策略**：验证内核状态、输入输出契约、数据依赖、市场匹配和运行配置。
+- **历史回放**：可以在发布前执行，也可以对已发布的历史版本重新研究；它不是发布的强制条件。
+- **正式发布**：只表示策略定义已经冻结，不表示策略已经验证有效。
+- **运行中心**：运行正式策略并保存运行记录；当前属于研究运行，不是模拟或真实交易。
 
-### 方式一：[GitHub Actions（推荐）](https://www.bilibili.com/video/BV11FEb66EXG/)
+### 平台架构
 
-> 5 分钟完成部署，零成本，无需服务器。
+```mermaid
+flowchart TB
+    subgraph Inputs["平台输入"]
+        DC["数据中心<br/>行情·新闻·基本面·扩展来源"]
+        PKG["策略包<br/>Python + Schema + STRATEGY.md"]
+    end
 
+    subgraph Governance["策略治理"]
+        KR["策略内核库"]
+        CFG["运行配置"]
+        VER["不可变 StrategyVersion"]
+    end
 
-#### 1. Fork 本仓库
+    subgraph Products["验证与运行"]
+        VAL["验证中心<br/>OHLCV 回放·版本对比"]
+        RUN["运行中心<br/>一次运行·持续运行·运行记录"]
+        RES["单股研究"]
+        SCAN["选股扫描"]
+    end
 
-点击右上角 `Fork` 按钮（顺便点个 Star⭐ 支持一下）
+    PKG --> KR
+    KR --> CFG
+    DC --> CFG
+    CFG --> VER
+    VER --> VAL
+    VER --> RUN
+    VER --> RES
+    VER --> SCAN
+```
 
-#### 2. 配置 Secrets
+## 三类策略输出
 
-`Settings` → `Secrets and variables` → `Actions` → `New repository secret`
+每个策略只能声明一个产品用途和对应输出契约：
 
-**AI 模型配置（至少配置一个）**
+| 策略用途 | 输出契约 | 产品入口 | 当前状态 |
+| --- | --- | --- | --- |
+| 单股研究 `research_report` | `ResearchReport` | 单股研究 | 已接入正式策略选择、任务和报告记录 |
+| 选股扫描 `candidate_screening` | `CandidateList` | 选股扫描 | 已接入正式策略选择、任务和候选记录 |
+| 交易决策 `trading_decision` | `DecisionProposal` | 验证中心、运行中心 | 已接入观察性回放和研究运行，不生成订单 |
 
-默认先选一个模型服务商并填写 API Key；需要多模型、图片识别、本地模型或高级路由时，再参考 [LLM 配置指南](docs/LLM_CONFIG_GUIDE.md)。
+`DecisionProposal` 是研究决策提案，不是订单、成交或持仓指令。
 
-| Secret 名称 | 说明 | 必填 |
-|------------|------|:----:|
-| `ANSPIRE_API_KEYS` | [Anspire](https://open.anspire.cn/dsa?share_code=QFBC0FYC) API Key，一Key同时启用全球热门大模型和联网搜索，本项目新用户提供30元等额的免费额度（GLM5.2、GPT等模型特惠中） | **推荐** |
-| `AIHUBMIX_KEY` | [AIHubMix](https://aihubmix.com/?aff=CfMq) API Key，一Key切换使用全系模型，无需科学上网，本项目可享 10% 优惠 | **推荐** |
-| `GEMINI_API_KEY` | Google Gemini API Key | 可选 |
-| `ANTHROPIC_API_KEY` | Anthropic Claude API Key | 可选 |
-| `OPENAI_API_KEY` | OpenAI 兼容 API Key（支持 DeepSeek、通义千问等） | 可选 |
-| `OPENAI_BASE_URL` / `OPENAI_MODEL` | 使用 OpenAI 兼容服务时填写 | 可选 |
+## 开箱即用的策略
 
-> Ollama 更适合本地 / Docker 部署，GitHub Actions 推荐使用云端 API。
+平台会在真实数据库中初始化三个普通策略内核，并各自提供一套 A 股运行配置。它们与用户上传的策略使用相同模型，不单独划分为“系统策略”或“Daily 策略”。
 
-**通知渠道配置（至少配置一个）**
+| 策略 | 用途 | 实现基础 | 关键依赖 |
+| --- | --- | --- | --- |
+| **单股研究策略** | 生成一只股票的结构化研究报告 | 复用 Daily Stock 的成熟单股研究执行链 | 日线、新闻和基本面均允许按真实链路降级 |
+| **多因子选股策略** | 从市场快照生成候选列表 | 硬筛、因子评分、可选 LLM 重排与失败回退 | 全市场快照必需；历史日线、新闻和基本面可选 |
+| **研究决策基线** | 生成研究型交易决策提案 | 候选筛选 + OHLCV 可复现规则 + 研究决策内核 | 可形成候选的市场数据必需；新闻和基本面可选 |
 
-| Secret 名称 | 说明 |
-|------------|------|
-| `WECHAT_WEBHOOK_URL` | 企业微信机器人 |
-| `FEISHU_WEBHOOK_URL` | 飞书机器人 |
-| `TELEGRAM_BOT_TOKEN` + `TELEGRAM_CHAT_ID` | Telegram |
-| `DISCORD_WEBHOOK_URL` | Discord Webhook |
-| `SLACK_BOT_TOKEN` + `SLACK_CHANNEL_ID` | Slack Bot |
-| `EMAIL_SENDER` + `EMAIL_PASSWORD` | 邮件推送 |
+研究决策基线只有在本地存在足够真实历史行情时才会形成可直接回放的固定股票池；系统不会编造股票、行情或回测结果。
 
-更多渠道、签名校验、分组邮件、Markdown 转图片等配置见 [通知渠道详细配置](docs/full-guide.md#通知渠道详细配置)。
+## 主要页面
 
-**自选股配置（必填）**
+| 页面 | 路由 | 作用 |
+| --- | --- | --- |
+| 策略首页 | `/overview` | 汇总真实策略、验证、运行和数据源状态 |
+| 策略中心 | `/strategies` | 管理策略内核、完整策略、版本、复制、检查、发布和删除 |
+| 策略生成指南 | `/strategy-development` | 生成可复制给 Codex / Claude Code 的动态策略开发说明 |
+| 验证中心 | `/backtests` | 对交易决策版本执行 OHLCV 历史回放、查看实验与版本对比 |
+| 运行中心 | `/runs` | 运行已发布的交易决策策略并查看一次/持续运行记录 |
+| 数据中心 | `/data` | 查看数据来源、适用市场、连接配置和可用状态 |
+| 单股研究 | `/stock-research` | 选择单股研究正式策略，生成并查看研究报告 |
+| 选股扫描 | `/screening` | 选择选股正式策略，执行扫描并查看候选结果 |
+| 模型用量 | `/usage` | 查看当前模型调用量及可追溯归属 |
+| 平台设置 | `/settings` | 配置模型运行时、认证和平台级运行参数 |
 
-| Secret 名称 | 说明 | 必填 |
-|------------|------|:----:|
-| `STOCK_LIST` | 自选股代码，如 `600519,hk00700,AAPL,7203.T,005930.KS,2330.TW` | ✅ |
+## 快速开始
 
-**新闻源配置（推荐）**
+### 环境要求
 
-新闻源会显著影响舆情、公告、事件和催化因素质量，建议至少配置一个搜索服务。
+- Python 3.10+
+- Node.js 20.19+ 与 npm 10+
+- macOS、Linux 或 Windows（WSL 推荐）
 
-| Secret 名称 | 说明 | 必填 |
-|------------|------|:----:|
-| `ANSPIRE_API_KEYS` | [Anspire AI Search](https://open.anspire.cn/dsa?share_code=QFBC0FYC)：汇聚全球舆情信息，适配A股、美股、港股等新闻和舆情检索；同一Key可复用大模型服务，本项目新用户提供免费30元等额的免费点数 | **推荐** |
-| `SERPAPI_API_KEYS` | [SerpAPI](https://serpapi.com/baidu-search-api?utm_source=github_daily_stock_analysis)：搜索引擎结果补强，适合实时金融新闻 | **推荐** |
-| `TAVILY_API_KEYS` | [Tavily](https://tavily.com/)：通用新闻搜索 API | 可选 |
-| `BOCHA_API_KEYS` | [博查搜索](https://open.bocha.cn/)：中文搜索优化，支持 AI 摘要 | 可选 |
-| `BRAVE_API_KEYS` | [Brave Search](https://brave.com/search/api/)：隐私优先，美股资讯补强 | 可选 |
-| `MINIMAX_API_KEYS` | [MiniMax](https://platform.minimaxi.com/)：结构化搜索结果 | 可选 |
-| `SEARXNG_BASE_URLS` | SearXNG 自建实例：无配额兜底，适合私有部署 | 可选 |
-
-更多搜索源、社交舆情和降级规则见 [搜索服务配置](docs/full-guide.md#搜索服务配置)。
-
-**行情数据源配置（可选）**
-
-> 默认使用 AkShare、Baostock、YFinance 等免费数据源，日志中"未配置"的提示不影响运行。
-> 如需更稳定的行情，可按市场配置以下 Secret：
-
-| Secret 名称 | 适用市场 | 说明 |
-|------------|:--------:|------|
-| `TUSHARE_TOKEN` | A 股 | 提升历史行情稳定性 |
-| `LONGBRIDGE_OAUTH_CLIENT_ID` + `LONGBRIDGE_OAUTH_TOKEN_CACHE_B64` | 港股/美股 | 补齐量比、换手率、PE 等字段 |
-
-> 详见 [数据源配置](docs/full-guide.md#数据源配置)。
-
-#### 3. 启用 Actions
-
-`Actions` 标签 → `I understand my workflows, go ahead and enable them`
-
-#### 4. 手动测试
-
-`Actions` → `每日股票分析` → `Run workflow` → `Run workflow`
-
-#### 完成
-
-默认每个**工作日 18:00（北京时间）**自动执行，也可手动触发。默认非交易日（含 A/H/US 节假日）不执行；强制运行、交易日检查、断点续传等规则见 [完整指南](docs/full-guide.md#定时任务配置)。
-
-### 方式二：[客户端配置教程](https://www.bilibili.com/video/BV11FEb66Eyr/) / 本地运行 / Docker 部署
+### 本地启动
 
 ```bash
-# 克隆项目
-git clone https://github.com/ZhuLinsen/daily_stock_analysis.git && cd daily_stock_analysis
+git clone git@github.com:EthanAlgoX/LLM-TradeBot.git
+cd LLM-TradeBot
 
-# 安装依赖
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
 
-# 配置环境变量
-cp .env.example .env && vim .env
+cp .env.example .env
 
-# 运行分析
-python main.py
+cd apps/dsa-web
+npm ci
+npm run build
+cd ../..
+
+python main.py --serve-only --host 127.0.0.1 --port 8000
 ```
 
-常用命令：
+打开：
+
+- Web：<http://127.0.0.1:8000>
+- API 文档：<http://127.0.0.1:8000/docs>
+
+也可以改用其他端口，例如：
 
 ```bash
-python main.py --debug
-python main.py --dry-run
-python main.py --stocks 600519,hk00700,AAPL,2330.TW
-python main.py --market-review
-python main.py --schedule
-python main.py --serve-only
+python main.py --serve-only --host 127.0.0.1 --port 8001
 ```
 
-> Docker 部署、定时任务、云服务器访问请参考 [完整指南](docs/full-guide.md)；桌面客户端打包请参考 [桌面端打包说明](docs/desktop-package.md)。
-
-## 📱 推送效果
-
-### 决策仪表盘
-```
-🎯 2026-02-08 决策仪表盘
-共分析3只股票 | 🟢买入:0 🟡观望:2 🔴卖出:1
-
-📊 分析结果摘要
-⚪ 中钨高新(000657): 观望 | 评分 65 | 看多
-⚪ 永鼎股份(600105): 观望 | 评分 48 | 震荡
-🟡 新莱应材(300260): 卖出 | 评分 35 | 看空
-
-⚪ 中钨高新 (000657)
-📰 重要信息速览
-💭 舆情情绪: 市场关注其AI属性与业绩高增长，情绪偏积极，但需消化短期获利盘和主力流出压力。
-📊 业绩预期: 基于舆情信息，公司2025年前三季度业绩同比大幅增长，基本面强劲，为股价提供支撑。
-
-🚨 风险警报:
-
-风险点1：2月5日主力资金大幅净卖出3.63亿元，需警惕短期抛压。
-风险点2：筹码集中度高达35.15%，表明筹码分散，拉升阻力可能较大。
-风险点3：舆情中提及公司历史违规记录及重组相关风险提示，需保持关注。
-✨ 利好催化:
-
-利好1：公司被市场定位为AI服务器HDI核心供应商，受益于AI产业发展。
-利好2：2025年前三季度扣非净利润同比暴涨407.52%，业绩表现强劲。
-📢 最新动态: 【最新消息】舆情显示公司是AI PCB微钻领域龙头，深度绑定全球头部PCB/载板厂。2月5日主力资金净卖出3.63亿元，需关注后续资金流向。
-
----
-生成时间: 18:00
-```
-
-### 大盘复盘
-```
-🎯 2026-01-10 大盘复盘
-
-📊 主要指数
-- 上证指数: 3250.12 (🟢+0.85%)
-- 深证成指: 10521.36 (🟢+1.02%)
-- 创业板指: 2156.78 (🟢+1.35%)
-
-📈 市场概况
-上涨: 3920 | 下跌: 1349 | 涨停: 155 | 跌停: 3
-
-🔥 板块表现
-领涨: 互联网服务、文化传媒、小金属
-领跌: 保险、航空机场、光伏设备
-```
-
-## ⚙️ 配置说明
-
-完整环境变量、模型渠道、通知渠道、数据源优先级、交易纪律、基本面 P0 语义和部署说明请参考 [完整配置指南](docs/full-guide.md)。
-
-## 🖥️ Web 界面
-
-Web 工作台提供配置管理、任务监控、手动分析、历史报告、完整 Markdown 报告、Agent 问股、回测、持仓管理、智能导入和浅色 / 深色主题。启动方式：
+### 前后端开发模式
 
 ```bash
-python main.py --webui
-python main.py --webui-only
+# 终端 1：FastAPI
+python main.py --serve-only --host 127.0.0.1 --port 8000
+
+# 终端 2：React / Vite
+cd apps/dsa-web
+npm run dev
 ```
 
-访问 `http://127.0.0.1:8000` 即可使用。认证、智能导入、搜索补全、历史报告复制、云服务器访问等细节见 [本地 WebUI 管理界面](docs/full-guide.md#本地-webui-管理界面)。
+开发前端默认访问 <http://127.0.0.1:5173>，`/api` 请求会代理到 `http://127.0.0.1:8000`。
 
-## 🤖 Agent 策略问股
+> 不配置 LLM 也可以浏览策略、数据和验证页面；需要模型的策略运行会明确停止并提示配置，不会绕过安全限制。
 
-配置任意可用 AI API Key 后，Web `/chat` 页面即可使用策略问股；如需显式关闭可设置 `AGENT_MODE=false`。
+## 策略包接入
 
-- 支持均线金叉、缠论、波浪理论、多头趋势、热点题材、事件驱动、成长质量、预期重估等内置策略
-- 支持实时行情、K 线、技术指标、新闻和风险信息调用
-- 支持多轮追问、会话导出、发送到通知渠道和后台执行
-- 支持自定义策略文件与多 Agent 编排（实验性）
+1. 在数据中心确认希望使用的数据来源和市场标签。
+2. 打开“策略生成指南”，复制包含当前数据目录的动态说明。
+3. 将说明交给 Codex、Claude Code 或其他工程工具，并描述策略想法。
+4. 得到包含 `strategy.yaml`、`strategy.py`、Schema、测试和 `STRATEGY.md` 的 ZIP 策略包。
+5. 在策略中心上传内核，再创建独立运行配置。
+6. 检查策略，按需历史回放，然后正式发布。
 
-> Agent 具体参数、`skill` 命名兼容、多 Agent 模式和预算护栏见 [完整指南](docs/full-guide.md#本地-webui-管理界面) 与 [LLM 配置指南](docs/LLM_CONFIG_GUIDE.md)。
+策略包唯一执行入口为：
 
-## 🧩 相关项目 (Related Projects)
+```python
+def run(context: StrategyContext) -> StrategyResult:
+    ...
+```
 
-> DSA 聚焦日常分析报告；选股实现参考 AlphaSift，AlphaEvo 用于策略验证与进化。
+完整协议、Manifest、输出最低字段和受限执行说明见 [策略包规范](docs/strategy-package-spec.md)。
 
-| 项目 | 定位 |
-|------|------|
-| [AlphaSift](https://github.com/ZhuLinsen/alphasift) | DSA 选股实现的参考项目 |
-| [AlphaEvo](https://github.com/ZhuLinsen/alphaevo) | 策略回测与自我进化，用于验证策略规则，并通过迭代探索策略参数与组合 |
+## 能力边界
 
-## 📬 联系与合作
+### 当前真实能力
 
-<table>
-  <tr>
-    <td width="92" valign="top"><strong>合作邮箱</strong></td>
-    <td valign="top">
-      <a href="mailto:zhuls345@gmail.com">zhuls345@gmail.com</a><br>
-      项目咨询、部署支持与功能扩展
-    </td>
-    <td align="center" rowspan="3" valign="middle" width="148">
-      <a href="http://xhslink.com/m/tU520DWCKT" target="_blank"><img src="./docs/assets/xiaohongshu_tick.jpg" width="112" alt="小红书二维码"></a><br>
-      <sub>扫码关注小红书</sub>
-    </td>
-  </tr>
-  <tr>
-    <td width="92" valign="top"><strong>小红书</strong></td>
-    <td valign="top"><a href="http://xhslink.com/m/tU520DWCKT">欢迎关注小红书</a></td>
-  </tr>
-  <tr>
-    <td width="92" valign="top"><strong>问题反馈</strong></td>
-    <td valign="top"><a href="https://github.com/ZhuLinsen/daily_stock_analysis/issues">提交 Issue</a></td>
-  </tr>
-</table>
+- Strategy / StrategyVersion 草稿、检查、乐观并发、不可变发布、复制、差异与删除。
+- Python ZIP 策略包上传、静态检查、归档及受限子进程调用。
+- 数据来源目录、市场标签、策略依赖和运行配置绑定。
+- 单股研究、选股扫描、验证实验和策略运行记录的版本归属与时间留存。
+- 交易决策策略的真实本地 OHLCV 观察性历史回放及可信版本对比。
+- 已发布交易决策策略的一次研究运行与持续运行控制。
 
-## 📄 License
+### 尚未实现或明确不属于当前范围
 
-[MIT License](LICENSE) © 2026 ZhuLinsen
+- 券商连接、真实下单、订单、成交、持仓和资金账本。
+- 模拟交易撮合、真实收益监控和自动风险放行。
+- 对 `ResearchReport` 与 `CandidateList` 的专用历史验证引擎。
+- 对任意动态选股策略补造历史时点股票池；缺少历史成分时会明确停止正式回放。
+- 通用容器级代码沙箱。当前策略包采用静态白名单、`python -I` 隔离子进程、清洁环境与资源限制，不能视为允许不受信任代码任意执行的安全容器。
 
-欢迎在二次开发或引用时注明本仓库来源，感谢支持项目持续维护。
+验证中心的“回放完成”只代表可信观察性实验执行成功；当前不会自动升级为“策略已验证有效”。详细语义见 [StrategyVersion 历史验证](docs/strategy-version-validation.md)。
 
-## ⚠️ 免责声明
+## 技术栈
 
-本项目仅供学习和研究使用，不构成任何投资建议。股市有风险，投资需谨慎。作者不对使用本项目产生的任何损失负责。
+| 层级 | 技术 |
+| --- | --- |
+| Web | React 19、TypeScript、Vite、React Router、Tailwind CSS、Recharts、Vitest、Playwright |
+| API | FastAPI、Pydantic、Uvicorn |
+| 服务与存储 | Python、SQLAlchemy、SQLite、本地文件归档 |
+| 数据适配 | AkShare、Tushare、Baostock、YFinance、Longbridge 等现有适配器与回退链 |
+| 策略执行 | 受限 Python 子进程、标准化输入输出契约、版本快照 |
 
----
+## 项目结构
+
+```text
+LLM-TradeBot/
+├── api/                    # FastAPI 路由、Schema 与中间件
+├── apps/dsa-web/           # React / TypeScript Web 控制台
+├── apps/dsa-desktop/       # Electron 桌面端
+├── src/services/           # 策略、验证、运行、数据与报告服务
+├── src/schemas/            # 后端领域 Schema
+├── data_provider/          # 行情及第三方数据适配器
+├── tests/                  # Python 测试
+├── docs/                   # 策略协议、验证语义和专题文档
+├── main.py                 # CLI 与 Web/API 启动入口
+└── server.py               # FastAPI ASGI 入口
+```
+
+## 开发与测试
+
+```bash
+# 后端门禁
+./scripts/ci_gate.sh
+
+# 后端离线测试
+python -m pytest -m "not network"
+
+# Web
+cd apps/dsa-web
+npm run test
+npm run lint
+npm run build
+
+# 策略定义 smoke（服务启动后）
+cd ../..
+.venv/bin/python scripts/smoke_strategy_definition.py http://127.0.0.1:8000
+```
+
+更多测试说明见 [docs/testing.md](docs/testing.md)。
+
+## 项目来源与致谢
+
+本项目复用了 [Daily Stock Analysis](https://github.com/ZhuLinsen/daily_stock_analysis) 的数据接入、单股研究、报告和选股等成熟能力，并在其基础上重构为以策略内核、版本验证和运行监控为中心的平台。相关第三方代码、许可证与修改范围见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+
+## License
+
+本项目沿用仓库中的 [MIT License](LICENSE)。原始版权声明和第三方许可必须保留。
+
+## 免责声明
+
+本项目仅用于软件工程、策略研究与历史验证，不构成投资建议。历史回放、研究报告和模型输出均不能保证未来表现。任何交易决策及其后果由使用者自行承担。
