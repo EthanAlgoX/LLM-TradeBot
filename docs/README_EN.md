@@ -1,285 +1,283 @@
 <div align="center">
 
-# AI Stock Analysis System
+<img src="../apps/dsa-web/public/tradebot-mark.svg" alt="LLM TradeBot" width="72" height="72">
 
-[![GitHub stars](https://img.shields.io/github/stars/ZhuLinsen/daily_stock_analysis?style=social)](https://github.com/ZhuLinsen/daily_stock_analysis/stargazers)
-[![CI](https://github.com/ZhuLinsen/daily_stock_analysis/actions/workflows/ci.yml/badge.svg)](https://github.com/ZhuLinsen/daily_stock_analysis/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
-[![GitHub Actions](https://img.shields.io/badge/GitHub%20Actions-Ready-2088FF?logo=github-actions&logoColor=white)](https://github.com/features/actions)
-[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker&logoColor=white)](https://hub.docker.com/r/zhulinsen/daily_stock_analysis)
+# LLM TradeBot
 
-<p align="center">
-  <img src="https://trendshift.io/api/badge/trendshift/repositories/18527/daily?language=Python" alt="#1 Python Repository Of The Day | Trendshift" width="250" height="55"/>&nbsp;<a href="https://hellogithub.com/repository/ZhuLinsen/daily_stock_analysis" target="_blank"><img src="https://api.hellogithub.com/v1/widgets/recommend.svg?rid=6daa16e405ce46ed97b4a57706aeb29f&claim_uid=pfiJMqhR9uvDGlT&theme=neutral" alt="Featured｜HelloGitHub" width="230" /></a>
-</p>
+**A platform for strategy-kernel intake, versioned configuration, historical validation, and continuous research runs**
 
-**AI-powered stock analysis system for A-shares / Hong Kong / US / Japanese / Korean / Taiwan stocks**
+[![CI](https://github.com/EthanAlgoX/LLM-TradeBot/actions/workflows/ci.yml/badge.svg)](https://github.com/EthanAlgoX/LLM-TradeBot/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](../LICENSE)
+[![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![React 19](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=111)](https://react.dev/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-Strategy_API-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 
-Analyze your watchlist daily -> generate a decision dashboard -> push to Telegram / Discord / Slack / Email / WeChat Work / Feishu.
+[Positioning](#positioning) · [Core lifecycle](#core-lifecycle) · [Quick start](#quick-start) · [Strategy package intake](#strategy-package-intake) · [Capability boundaries](#capability-boundaries) · [Development and testing](#development-and-testing)
 
-[**Product Preview**](#-product-preview) · [**Key Features**](#-key-features) · [**Quick Start**](#-quick-start) · [**Sample Output**](#-sample-output) · [**Documentation Index**](./INDEX_EN.md) · [**Full Guide**](./full-guide_EN.md)
-
-English | [简体中文](../README.md) | [繁體中文](README_CHT.md)
+[简体中文](../README.md) | **English**
 
 </div>
 
-## 💖 Sponsors
+> LLM TradeBot integrates, configures, validates, and continuously observes stock-research strategies. It does not connect to brokers or place orders, and it never presents publication, historical replay, or model suggestions as real trading results.
 
-<div align="center">
-  <p align="center">
-    <a href="https://open.anspire.cn/?share_code=QFBC0FYC" target="_blank"><img src="assets/anspire.png" alt="Anspire Open all-in-one model and search service" width="300" height="141" style="width: 300px; height: 141px; object-fit: contain;"></a>
-    <a href="https://serpapi.com/baidu-search-api?utm_source=github_daily_stock_analysis" target="_blank"><img src="assets/serpapi_banner_en.png" alt="Easily scrape real-time financial news data from search engines - SerpApi" width="300" height="141" style="width: 300px; height: 141px; object-fit: contain;"></a>
-  </p>
-</div>
+## Positioning
 
-## 🖥️ Product Preview
+LLM TradeBot does not require users to assemble agents, prompts, or low-level tools in the browser. Strategy implementations are generated or maintained with external engineering tools and uploaded as **Python strategy kernels** with stable input and output contracts. The platform combines each kernel with a market, data sources, security universe, timeframe, parameters, and risk boundaries to form a runnable strategy.
 
-<p align="center">
-  <img src="assets/readme_workspace_tour_20260510.gif" alt="DSA Web workspace demo" width="720">
-</p>
+The platform is designed to answer five questions:
 
-## ✨ Key Features
+1. Which data does a strategy require, and do its inputs and outputs satisfy the contract?
+2. How does the same kernel behave under different markets, timeframes, and parameters?
+3. Which historical validation evidence belongs to each immutable version?
+4. Which published version is running, when did it start, and what is its current state?
+5. Which run produced a research report, candidate list, or decision proposal, and can that result be traced?
 
-| Capability | Coverage |
-|------------|----------|
-| AI decision reports | Core conclusion, score, trend, entry/exit levels, risk alerts, catalysts, and action checklist |
-| Multi-market data | Covers A-shares, Hong Kong, US, Japanese, Korean, Taiwan stocks, and ETFs, with quotes, K-lines, technical indicators, news, announcements, fundamentals, and report context. Data-source coverage and market boundaries are documented in [market boundaries](market-support.md) |
-| Web / desktop workspace | Manual analysis, task progress, history, full Markdown reports, backtest, portfolio, settings, and light/dark themes |
-| Agent strategy chat | Multi-turn Q&A with 15 built-in strategies across Web/Bot/API |
-| Smart import & autocomplete | Image, CSV/Excel, clipboard import; code/name/pinyin/alias autocomplete |
-| Automation & notifications | GitHub Actions, Docker, local scheduler, FastAPI service, and WeChat Work / Feishu / Telegram / Discord / Slack / Email delivery |
+### Two-layer strategy model
 
-> Detailed fields, fundamental P0 timeout semantics, trading rules, data-source priority, Web/API behavior, and troubleshooting live in the [Full Guide](./full-guide_EN.md).
+| Object | Responsibility | Directly runnable |
+| --- | --- | --- |
+| **Strategy kernel** | Python implementation, input/output schemas, data dependencies, parameter declarations, and `STRATEGY.md` | No |
+| **Complete strategy** | Kernel + market + data sources + universe + timeframe + parameters + risk boundaries | Yes, after checks and publication |
+| **StrategyVersion** | Immutable snapshot of a complete strategy for validation, execution, and audit | Published versions only |
 
-### Tech Stack & Data Sources
+One kernel can produce multiple complete strategies, making it possible to compare markets, timeframes, and parameter sets without hard-coding runtime configuration into the strategy implementation.
 
-| Type | Supported |
-|------|-----------|
-| AI Models | [Anspire](https://open.anspire.cn/?share_code=QFBC0FYC), [AIHubMix](https://aihubmix.com/?aff=CfMq), Gemini, OpenAI-compatible providers, DeepSeek, Qwen, Claude, Ollama |
-| Market Data | [TickFlow](https://tickflow.org/auth/register?ref=WDSGSPS5XC), AkShare, Tushare, Pytdx, Baostock, YFinance, Longbridge |
-| News Search | [Anspire](https://open.anspire.cn/?share_code=QFBC0FYC), [SerpAPI](https://serpapi.com/baidu-search-api?utm_source=github_daily_stock_analysis), [Tavily](https://tavily.com/), [Bocha](https://open.bocha.cn/), [Brave](https://brave.com/search/api/), [MiniMax](https://platform.minimaxi.com/), SearXNG |
-| Social Sentiment | [Stock Sentiment API](https://api.adanos.org/docs) for Reddit / X / Polymarket, US stocks only |
+## Core lifecycle
 
-> The project includes free market-data sources such as AkShare, Baostock, and YFinance and can run without extra data-source credentials. These free sources can be rate-limited, change upstream contracts, or fluctuate by network condition, so stability is not guaranteed. For scheduled runs, batch analysis, or steadier quotes, configure token-based sources such as TickFlow, Tushare, or Longbridge; market coverage, Actions mappings, and fallback rules are documented in [Data Source Configuration](./full-guide_EN.md#data-source-configuration).
+```mermaid
+flowchart LR
+    A["Strategy generation guide<br/>with the live data catalog"] --> B["Codex / Claude Code<br/>generates a Python package"]
+    B --> C["Upload strategy kernel<br/>contract and safety checks"]
+    C --> D["Create runtime configuration<br/>market · data · timeframe · parameters"]
+    D --> E["Check strategy"]
+    E --> F{"Historical replay<br/>optional"}
+    F --> G["Publish<br/>freeze StrategyVersion"]
+    E --> G
+    G --> H["Validation center<br/>experiments and version comparison"]
+    G --> I["Run center<br/>one-off or continuous research runs"]
+```
 
-## 🚀 Quick Start
+- **Check strategy** validates kernel readiness, contracts, dependencies, market compatibility, and runtime configuration.
+- **Historical replay** can run before publication or against an already published historical version. It is optional.
+- **Publication** freezes a definition; it does not prove that the strategy is effective.
+- **Run center** executes published strategies and retains run records. Current runs are research runs, not simulated or live trading.
 
-### Option 1: GitHub Actions (Recommended)
+### Platform architecture
 
-> Deploy in about 5 minutes, with no server and no infrastructure cost.
+```mermaid
+flowchart TB
+    subgraph Inputs["Platform inputs"]
+        DC["Data center<br/>market data · news · fundamentals · extensions"]
+        PKG["Strategy package<br/>Python + schemas + STRATEGY.md"]
+    end
 
-#### 1. Fork this repository
+    subgraph Governance["Strategy governance"]
+        KR["Strategy kernel library"]
+        CFG["Runtime configuration"]
+        VER["Immutable StrategyVersion"]
+    end
 
-Click `Fork` in the upper-right corner. A star is very welcome if this project helps you.
+    subgraph Products["Validation and execution"]
+        VAL["Validation center<br/>OHLCV replay · version comparison"]
+        RUN["Run center<br/>one-off · continuous · run history"]
+        RES["Single-stock research"]
+        SCAN["Stock screening"]
+    end
 
-#### 2. Configure Secrets
+    PKG --> KR
+    KR --> CFG
+    DC --> CFG
+    CFG --> VER
+    VER --> VAL
+    VER --> RUN
+    VER --> RES
+    VER --> SCAN
+```
 
-Open your forked repository, then go to `Settings` -> `Secrets and variables` -> `Actions` -> `New repository secret`.
+## Three strategy outputs
 
-**AI model configuration (configure at least one)**
+Each strategy declares exactly one product purpose and its corresponding output contract:
 
-Start with one provider and one API key. For multi-model routing, image recognition, local models, or advanced routing, see the [LLM Config Guide](./LLM_CONFIG_GUIDE_EN.md).
+| Purpose | Output contract | Product entry | Current status |
+| --- | --- | --- | --- |
+| Single-stock research `research_report` | `ResearchReport` | Single-stock research | Published-version selection, tasks, and report records are connected |
+| Stock screening `candidate_screening` | `CandidateList` | Stock screening | Published-version selection, tasks, and candidate records are connected |
+| Trading decision `trading_decision` | `DecisionProposal` | Validation center and run center | Observational replay and research runs are connected; no orders are created |
 
-| Secret Name | Description | Required |
-|-------------|-------------|:--------:|
-| `ANSPIRE_API_KEYS` | [Anspire](https://open.anspire.cn/?share_code=QFBC0FYC) API key, one key for popular LLMs and web search with free quota for this project | **Recommended** |
-| `AIHUBMIX_KEY` | [AIHubMix](https://aihubmix.com/?aff=CfMq) API key, one key for multiple model families and a 10% top-up discount for this project | **Recommended** |
-| `GEMINI_API_KEY` | Google Gemini API key | Optional |
-| `ANTHROPIC_API_KEY` | Anthropic Claude API key | Optional |
-| `OPENAI_API_KEY` | OpenAI-compatible API key, including DeepSeek and Qwen-compatible services | Optional |
-| `OPENAI_BASE_URL` / `OPENAI_MODEL` | Fill these when using an OpenAI-compatible provider | Optional |
+A `DecisionProposal` is a research proposal, not an order, fill, position, or direct execution instruction.
 
-> Ollama is better suited for local or Docker deployment. GitHub Actions is usually smoother with a cloud API.
+## Ready-to-use strategies
 
-**Notification channels (configure at least one)**
+The platform initializes three ordinary strategy kernels in the real database and provides one A-share runtime configuration for each. They use the same model and product entries as uploaded strategies and are not placed in a special category.
 
-| Secret Name | Description |
-|-------------|-------------|
-| `WECHAT_WEBHOOK_URL` | WeChat Work bot |
-| `FEISHU_WEBHOOK_URL` | Feishu bot |
-| `TELEGRAM_BOT_TOKEN` + `TELEGRAM_CHAT_ID` | Telegram |
-| `DISCORD_WEBHOOK_URL` | Discord webhook |
-| `SLACK_BOT_TOKEN` + `SLACK_CHANNEL_ID` | Slack bot |
-| `EMAIL_SENDER` + `EMAIL_PASSWORD` | Email push |
+| Strategy | Purpose | Implementation | Key dependencies |
+| --- | --- | --- | --- |
+| **Single-stock research strategy** | Produce a structured report for one security | Multi-source evidence preparation, deterministic analysis, and LLM report generation | Daily bars, news, and fundamentals may degrade according to the real execution contract |
+| **Multi-factor screening strategy** | Produce a ranked candidate list from a market snapshot | Hard filters, factor scoring, optional LLM reranking, and failure fallback | Full-market snapshot required; historical bars, news, and fundamentals optional |
+| **Research decision baseline** | Produce a research-oriented trading decision proposal | Candidate screening, reproducible OHLCV rules, and a decision kernel | Market data capable of producing candidates required; news and fundamentals optional |
 
-More channels, signatures, email groups, and Markdown-to-image settings are in [Notification Configuration](./full-guide_EN.md#notification-channel-configuration).
+The research decision baseline becomes immediately replayable only when enough real local historical data exists to freeze a fixed universe. The system does not invent securities, prices, or backtest results.
 
-**Watchlist (required)**
+## Main pages
 
-| Secret Name | Description | Required |
-|-------------|-------------|:--------:|
-| `STOCK_LIST` | Watchlist codes, such as `600519,hk00700,AAPL,7203.T,005930.KS,2330.TW` | ✅ |
+| Page | Route | Responsibility |
+| --- | --- | --- |
+| Strategy overview | `/overview` | Summarize real strategy, validation, run, and data-source state |
+| Strategy center | `/strategies` | Manage kernels, complete strategies, versions, copies, checks, publication, and deletion |
+| Strategy generation guide | `/strategy-development` | Build a dynamic development prompt for Codex or Claude Code |
+| Validation center | `/backtests` | Run OHLCV historical replay for decision strategies and compare trusted versions |
+| Run center | `/runs` | Execute published decision strategies and inspect one-off or continuous run records |
+| Data center | `/data` | Inspect sources, market labels, connection configuration, and availability |
+| Single-stock research | `/stock-research` | Select a published research strategy and produce a report |
+| Stock screening | `/screening` | Select a published screening strategy and inspect candidates |
+| Model usage | `/usage` | Inspect model usage and traceable strategy/run attribution |
+| Platform settings | `/settings` | Configure model runtime, authentication, and platform-level runtime settings |
 
-**News sources (recommended)**
+## Quick start
 
-News search strongly improves sentiment, announcements, events, and catalyst quality. Configure at least one search provider if possible.
+### Requirements
 
-| Secret Name | Description | Required |
-|-------------|-------------|:--------:|
-| `ANSPIRE_API_KEYS` | [Anspire AI Search](https://aisearch.anspire.cn/), optimized for Chinese content and A-share analysis; the same key can also be used for Anspire LLM fallback examples | **Recommended** |
-| `SERPAPI_API_KEYS` | [SerpAPI](https://serpapi.com/baidu-search-api?utm_source=github_daily_stock_analysis), search-engine results for realtime financial news | **Recommended** |
-| `TAVILY_API_KEYS` | [Tavily](https://tavily.com/), general news search API | Optional |
-| `BOCHA_API_KEYS` | [Bocha](https://open.bocha.cn/), Chinese search with AI summaries | Optional |
-| `BRAVE_API_KEYS` | [Brave Search](https://brave.com/search/api/), privacy-first search and US-stock news enrichment | Optional |
-| `MINIMAX_API_KEYS` | [MiniMax](https://platform.minimaxi.com/), structured search results | Optional |
-| `SEARXNG_BASE_URLS` | Self-hosted SearXNG instances for quota-free fallback | Optional |
+- Python 3.10+
+- Node.js 20.19+ and npm 10+
+- macOS, Linux, or Windows (WSL recommended)
 
-More search providers, social sentiment, and fallback behavior are in [Search Configuration](./full-guide_EN.md#search-service-configuration).
-
-**Market data sources (optional)**
-
-> Free sources like AkShare, Baostock, and YFinance are used by default. "Not configured" messages in the logs are informational and do not affect execution.
-> For more stable data, configure the following secrets per market:
-
-| Secret Name | Market | Description |
-|-------------|:------:|-------------|
-| `TUSHARE_TOKEN` | A-shares | Improves historical data stability |
-| `LONGBRIDGE_OAUTH_CLIENT_ID` + `LONGBRIDGE_OAUTH_TOKEN_CACHE_B64` | HK/US stocks | Fills in volume ratio, turnover rate, P/E, and other fields |
-
-> See [Data Source Configuration](./full-guide_EN.md#data-source-configuration).
-
-#### 3. Enable Actions
-
-Open the `Actions` tab and click `I understand my workflows, go ahead and enable them`.
-
-#### 4. Manual Test
-
-`Actions` -> `Daily Stock Analysis` -> `Run workflow` -> `Run workflow`.
-
-#### Done
-
-By default, the workflow runs every weekday at 18:00 Beijing time and skips non-trading days. Forced runs, trading-day checks, and resume rules are covered in the [Full Guide](./full-guide_EN.md#scheduled-task-configuration).
-
-### Option 2: Local / Docker Deployment
+### Local startup
 
 ```bash
-# Clone the project
-git clone https://github.com/ZhuLinsen/daily_stock_analysis.git && cd daily_stock_analysis
+git clone git@github.com:EthanAlgoX/LLM-TradeBot.git
+cd LLM-TradeBot
 
-# Install dependencies
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
 
-# Configure environment variables
-cp .env.example .env && vim .env
+cp .env.example .env
 
-# Run analysis
-python main.py
+cd apps/dsa-web
+npm ci
+npm run build
+cd ../..
+
+python main.py --serve-only --host 127.0.0.1 --port 8000
 ```
 
-Common commands:
+Open:
+
+- Web: <http://127.0.0.1:8000>
+- API docs: <http://127.0.0.1:8000/docs>
+
+To use a different port:
 
 ```bash
-python main.py --debug
-python main.py --dry-run
-python main.py --stocks 600519,hk00700,AAPL,2330.TW
-python main.py --market-review
-python main.py --schedule
-python main.py --serve-only
+python main.py --serve-only --host 127.0.0.1 --port 8001
 ```
 
-> Docker deployment, scheduling, and cloud-server WebUI access are documented in the [Full Guide](./full-guide_EN.md).
-
-## 📱 Sample Output
-
-### Decision Dashboard
-
-```markdown
-🎯 2026-02-08 Decision Dashboard
-Analyzed 3 stocks | 🟢 Buy:0 🟡 Watch:2 🔴 Sell:1
-
-📊 Summary
-🟡 000657: Watch | Score 65 | Bullish
-🟡 600105: Watch | Score 48 | Range-bound
-🔴 300260: Sell | Score 35 | Bearish
-
-🚨 Risk Alerts:
-Risk 1: Main-force funds showed notable outflow.
-Risk 2: Chip concentration suggests short-term resistance.
-
-✨ Positive Catalysts:
-Catalyst 1: AI-server supply-chain exposure remains a market focus.
-Catalyst 2: Recent earnings growth provides fundamental support.
-```
-
-### Market Review
-
-```markdown
-🎯 2026-01-10 Market Review
-
-📊 Major Indices
-- SSE Composite: 3250.12 (+0.85%)
-- SZSE Component: 10521.36 (+1.02%)
-- ChiNext: 2156.78 (+1.35%)
-
-📈 Market Breadth
-Up: 3920 | Down: 1349 | Limit up: 155 | Limit down: 3
-```
-
-## ⚙️ Configuration
-
-Full environment variables, model routing, notification channels, data-source priority, trading rules, fundamental P0 semantics, and deployment details are in the [Full Guide](./full-guide_EN.md).
-
-## 🖥️ Web UI
-
-The Web workspace supports settings, task monitoring, manual analysis, history reports, full Markdown reports, Agent strategy chat, backtest, portfolio management, smart import, and light/dark themes.
+### Frontend and backend development
 
 ```bash
-python main.py --webui
-python main.py --webui-only
+# Terminal 1: FastAPI
+python main.py --serve-only --host 127.0.0.1 --port 8000
+
+# Terminal 2: React / Vite
+cd apps/dsa-web
+npm run dev
 ```
 
-Visit `http://127.0.0.1:8000`. Authentication, smart import, autocomplete, report copying, and cloud-server access are documented in [Local WebUI Management](./full-guide_EN.md#local-webui-management-interface).
+The development frontend runs at <http://127.0.0.1:5173> and proxies `/api` to `http://127.0.0.1:8000`.
 
-## 🤖 Agent Strategy Chat
+> You can browse strategy, data, and validation pages without an LLM configuration. Model-dependent runs stop with an explicit configuration prompt; the safety restriction is never bypassed.
 
-After configuring any available AI API key, the Web `/chat` page can use strategy chat. Set `AGENT_MODE=false` only if you want to disable it explicitly.
+## Strategy package intake
 
-- Built-in strategies include moving-average crossovers, Chan theory, Elliott wave, bull trend, hot themes, event-driven, growth quality, expectation repricing, and more
-- Calls realtime quotes, K-line data, technical indicators, news, and risk context
-- Supports follow-up questions, session export, notification sending, and background execution
-- Supports custom strategy files and experimental multi-agent orchestration
+1. Confirm the desired data sources and market labels in the data center.
+2. Open the strategy generation guide and copy the dynamic instructions containing the current data catalog.
+3. Give the instructions and your strategy idea to Codex, Claude Code, or another engineering tool.
+4. Generate a ZIP package containing `strategy.yaml`, `strategy.py`, schemas, tests, and `STRATEGY.md`.
+5. Upload the kernel in the strategy center and create an independent runtime configuration.
+6. Check the strategy, optionally run historical replay, and publish it.
 
-> Agent parameters, `skill` naming compatibility, multi-agent mode, and budget guards are covered in the [Full Guide](./full-guide_EN.md#local-webui-management-interface) and [LLM Config Guide](./LLM_CONFIG_GUIDE_EN.md).
+Every strategy package has one execution entry point:
 
-## 🧩 Related Projects
+```python
+def run(context: StrategyContext) -> StrategyResult:
+    ...
+```
 
-> DSA focuses on daily analysis reports. Its screening implementation references AlphaSift, while AlphaEvo covers strategy validation and evolution.
+See the [strategy package specification](strategy-package-spec.md) for the complete manifest, minimum output fields, and restricted execution model.
 
-| Project | Focus |
-|---------|-------|
-| [AlphaSift](https://github.com/ZhuLinsen/alphasift) | Reference project for DSA's screening implementation |
-| [AlphaEvo](https://github.com/ZhuLinsen/alphaevo) | Strategy backtesting and self-evolution experiments for validating rules and iteratively exploring strategy parameters and combinations |
+## Capability boundaries
 
-## 📞 Contact
+### Available today
 
-<table>
-  <tr>
-    <td width="92" valign="top"><strong>Email</strong></td>
-    <td valign="top">
-      <a href="mailto:zhuls345@gmail.com">zhuls345@gmail.com</a><br>
-      Project consulting, deployment support, and feature extensions
-    </td>
-    <td align="center" rowspan="3" valign="middle" width="148">
-      <a href="http://xhslink.com/m/tU520DWCKT" target="_blank"><img src="assets/xiaohongshu_tick.jpg" width="112" alt="Xiaohongshu QR code"></a><br>
-      <sub>Follow on Xiaohongshu</sub>
-    </td>
-  </tr>
-  <tr>
-    <td width="92" valign="top"><strong>Xiaohongshu</strong></td>
-    <td valign="top"><a href="http://xhslink.com/m/tU520DWCKT">Follow on Xiaohongshu</a></td>
-  </tr>
-  <tr>
-    <td width="92" valign="top"><strong>Feedback</strong></td>
-    <td valign="top"><a href="https://github.com/ZhuLinsen/daily_stock_analysis/issues">GitHub Issues</a> · <a href="https://github.com/ZhuLinsen/daily_stock_analysis/discussions">Discussions</a></td>
-  </tr>
-</table>
+- Strategy and StrategyVersion drafts, checks, optimistic concurrency, immutable publication, copies, diffs, and deletion.
+- Python ZIP package upload, static checks, archival, and restricted subprocess invocation.
+- Data-source catalog, market labels, dependency declarations, and runtime-configuration binding.
+- Version attribution and timestamps for research, screening, validation, and strategy-run records.
+- Real local OHLCV observational replay and trusted version comparison for decision strategies.
+- One-off and continuous research-run controls for published decision strategies.
 
-## 📄 License
+### Not implemented or explicitly out of scope
 
-[MIT License](../LICENSE) © 2026 ZhuLinsen
+- Broker connections, live orders, fills, positions, and cash ledgers.
+- Simulated matching, live P&L monitoring, and automatic risk approval.
+- Dedicated historical validation engines for `ResearchReport` and `CandidateList`.
+- Fabricated historical constituents for arbitrary dynamic-screening strategies. Formal replay stops when historical universe data is unavailable.
+- A general-purpose container sandbox. Strategy packages use a static allowlist, an isolated `python -I` subprocess, a clean environment, and resource limits; this must not be treated as a safe container for arbitrary untrusted code.
 
-If you use or build on this project, attribution with a link back to this repository is appreciated.
+“Replay completed” means that a trusted observational experiment executed successfully. It is not automatically upgraded to “strategy validated.” See [StrategyVersion historical validation](strategy-version-validation.md) for the detailed semantics.
 
-## ⚠️ Disclaimer
+## Technology stack
 
-This project is for informational and educational purposes only. AI-generated analysis is not investment advice. Stock market investing involves risk; do your own research and consult a licensed financial advisor when needed.
+| Layer | Technology |
+| --- | --- |
+| Web | React 19, TypeScript, Vite, React Router, Tailwind CSS, Recharts, Vitest, Playwright |
+| API | FastAPI, Pydantic, Uvicorn |
+| Services and storage | Python, SQLAlchemy, SQLite, local package archives |
+| Data adapters | Existing AkShare, Tushare, Baostock, YFinance, and Longbridge adapters with fallback routing |
+| Strategy execution | Restricted Python subprocess, standardized contracts, version snapshots |
+
+## Repository structure
+
+```text
+LLM-TradeBot/
+├── api/                    # FastAPI routes, schemas, and middleware
+├── apps/dsa-web/           # React / TypeScript web console
+├── apps/dsa-desktop/       # Electron desktop app
+├── src/services/           # Strategy, validation, run, data, and report services
+├── src/schemas/            # Backend domain schemas
+├── data_provider/          # Market and third-party data adapters
+├── tests/                  # Python tests
+├── docs/                   # Strategy contracts, validation semantics, and topic guides
+├── main.py                 # CLI and Web/API entry point
+└── server.py               # FastAPI ASGI entry point
+```
+
+## Development and testing
+
+```bash
+# Backend quality gate
+./scripts/ci_gate.sh
+
+# Offline backend tests
+python -m pytest -m "not network"
+
+# Web
+cd apps/dsa-web
+npm run test
+npm run lint
+npm run build
+
+# Strategy-definition smoke test (with the service running)
+cd ../..
+.venv/bin/python scripts/smoke_strategy_definition.py http://127.0.0.1:8000
+```
+
+See [docs/testing.md](testing.md) for additional testing guidance.
+
+## License
+
+This repository is distributed under the included [MIT License](../LICENSE). Existing copyright and third-party license notices must be retained.
+
+## Disclaimer
+
+This project is intended for software engineering, strategy research, and historical validation only. It is not investment advice. Historical replay, research reports, and model outputs do not guarantee future performance. Users are solely responsible for their investment decisions and outcomes.
