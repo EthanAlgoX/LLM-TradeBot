@@ -37,7 +37,7 @@ External engineering tools generate or maintain Python strategy packages. The pl
 | Upload a Python kernel and schemas | Bind markets, data, schedules, and parameters | Publish an immutable `StrategyVersion` | Run historical validation or continuous research |
 
 <div align="center">
-  <img src="assets/readme/strategy-lifecycle-v2.jpg" alt="Lifecycle from composable data and a strategy kernel to an immutable version, historical validation, and research runs" width="100%">
+  <img src="assets/readme/strategy-lifecycle-en.svg" alt="Lifecycle flowchart covering package intake, runtime composition, immutable version publication, historical validation and continuous research, and evidence archiving" width="100%">
 </div>
 
 ### Two-layer strategy model
@@ -52,18 +52,9 @@ One kernel can produce multiple complete strategies for different markets, sched
 
 ## How it works
 
-```mermaid
-flowchart LR
-    IDEA["Strategy idea"] --> PKG["Python package"]
-    PKG --> CHECK["Contract and safety checks"]
-    DATA["Markets and data sources"] --> CONFIG["Runtime configuration"]
-    CHECK --> CONFIG
-    CONFIG --> VERSION["Immutable version"]
-    VERSION --> VALIDATE["Historical validation"]
-    VERSION --> RUN["Research run"]
-    VALIDATE --> EVIDENCE["Traceable evidence"]
-    RUN --> EVIDENCE
-```
+<div align="center">
+  <img src="assets/readme/research-workflow-en.svg" alt="End-to-end flowchart with two inputs, contract checks, a correction loop, runtime configuration, immutable versioning, validation and research branches, and evidence convergence" width="100%">
+</div>
 
 - **Strategy checks** validate kernel state, input/output contracts, data dependencies, market compatibility, and runtime configuration.
 - **Historical validation** freezes the version and data snapshot, then persists observational experiment results. It can run before publication or revisit a published version later.

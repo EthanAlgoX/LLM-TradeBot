@@ -37,7 +37,7 @@ LLM TradeBot 关注的不是“再做一个股票聊天机器人”，而是把�
 | 上传 Python 策略内核与 Schema | 绑定市场、数据源、周期和参数 | 发布不可变 `StrategyVersion` | 执行历史验证或持续研究运行 |
 
 <div align="center">
-  <img src="docs/assets/readme/strategy-lifecycle-v2.jpg" alt="从数据组合、策略内核到不可变版本、历史验证与研究运行的生命周期" width="100%">
+  <img src="docs/assets/readme/strategy-lifecycle-zh.svg" alt="策略包接入、运行配置组合、版本冻结、历史验证与持续研究运行、证据归档的生命周期流程图" width="100%">
 </div>
 
 ### 两层策略模型
@@ -52,18 +52,9 @@ LLM TradeBot 关注的不是“再做一个股票聊天机器人”，而是把�
 
 ## 工作方式
 
-```mermaid
-flowchart LR
-    IDEA["策略想法"] --> PKG["Python 策略包"]
-    PKG --> CHECK["契约与安全检查"]
-    DATA["市场与数据源"] --> CONFIG["运行配置"]
-    CHECK --> CONFIG
-    CONFIG --> VERSION["不可变版本"]
-    VERSION --> VALIDATE["历史验证"]
-    VERSION --> RUN["研究运行"]
-    VALIDATE --> EVIDENCE["可追溯证据"]
-    RUN --> EVIDENCE
-```
+<div align="center">
+  <img src="docs/assets/readme/research-workflow-zh.svg" alt="包含双输入、契约检查、失败回修、运行配置、不可变版本、验证与研究分支以及证据汇聚的端到端流程图" width="100%">
+</div>
 
 - **检查策略**：验证内核状态、输入输出契约、数据依赖、市场匹配和运行配置。
 - **历史验证**：冻结版本和数据快照，保存观察性实验结果；可以在发布前执行，也可以对历史版本重新研究。
