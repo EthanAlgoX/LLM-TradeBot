@@ -1,137 +1,74 @@
 <div align="center">
 
-<img src="../apps/dsa-web/public/tradebot-mark.svg" alt="LLM TradeBot" width="72" height="72">
+<img src="../apps/dsa-web/public/tradebot-mark.svg" alt="LLM TradeBot" width="76" height="76">
 
 # LLM TradeBot
 
-**A platform for strategy-kernel intake, versioned configuration, historical validation, and continuous research runs**
+**Turn strategy code into a configurable, verifiable, and traceable stock-research system**
+
+Strategy kernels · Immutable versions · Historical validation · Continuous research runs
 
 [![CI](https://github.com/EthanAlgoX/LLM-TradeBot/actions/workflows/ci.yml/badge.svg)](https://github.com/EthanAlgoX/LLM-TradeBot/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](../LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![React 19](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=111)](https://react.dev/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-Strategy_API-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-Research_API-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 
-[Positioning](#positioning) · [Core lifecycle](#core-lifecycle) · [Quick start](#quick-start) · [Strategy package intake](#strategy-package-intake) · [Capability boundaries](#capability-boundaries) · [Development and testing](#development-and-testing)
+[Positioning](#positioning) · [How it works](#how-it-works) · [Quick start](#quick-start) · [Core capabilities](#core-capabilities) · [Strategy package intake](#strategy-package-intake) · [Documentation](#documentation)
 
-[简体中文](../README.md) | **English**
+[简体中文](../README.md) · **English**
+
+<br>
+
+<img src="assets/readme/llm-tradebot-hero-v2.jpg" alt="Market data flows into a strategy kernel, becomes an immutable version, and produces validation results and traceable research evidence" width="100%">
 
 </div>
 
-> LLM TradeBot integrates, configures, validates, and continuously observes stock-research strategies. It does not connect to brokers or place orders, and it never presents publication, historical replay, or model suggestions as real trading results.
+> LLM TradeBot supports strategy research and engineering validation for mainland China, Hong Kong, and US equities. It does not connect to brokers or place orders, and it never presents publication, historical replay, or model suggestions as real trading results.
 
 ## Positioning
 
-LLM TradeBot does not require users to assemble agents, prompts, or low-level tools in the browser. Strategy implementations are generated or maintained with external engineering tools and uploaded as **Python strategy kernels** with stable input and output contracts. The platform combines each kernel with a market, data sources, security universe, timeframe, parameters, and risk boundaries to form a runnable strategy.
+LLM TradeBot is not another stock-market chatbot. It turns the parts of strategy research that most often drift out of control into explicit contracts: **how strategies enter the system, where data comes from, how configuration is composed, how versions are frozen, how experiments are reproduced, and how results are traced.**
 
-The platform is designed to answer five questions:
+External engineering tools generate or maintain Python strategy packages. The platform checks their contracts and combines each kernel with a market, data sources, a stock universe, schedule, parameters, and risk boundaries to create a complete strategy that can be validated and run.
 
-1. Which data does a strategy require, and do its inputs and outputs satisfy the contract?
-2. How does the same kernel behave under different markets, timeframes, and parameters?
-3. Which historical validation evidence belongs to each immutable version?
-4. Which published version is running, when did it start, and what is its current state?
-5. Which run produced a research report, candidate list, or decision proposal, and can that result be traced?
+| 01 · Import | 02 · Compose | 03 · Freeze | 04 · Research |
+| --- | --- | --- | --- |
+| Upload a Python kernel and schemas | Bind markets, data, schedules, and parameters | Publish an immutable `StrategyVersion` | Run historical validation or continuous research |
+
+<div align="center">
+  <img src="assets/readme/strategy-lifecycle-v2.jpg" alt="Lifecycle from composable data and a strategy kernel to an immutable version, historical validation, and research runs" width="100%">
+</div>
 
 ### Two-layer strategy model
 
-| Object | Responsibility | Directly runnable |
+| Object | Responsibility | Runtime semantics |
 | --- | --- | --- |
-| **Strategy kernel** | Python implementation, input/output schemas, data dependencies, parameter declarations, and `STRATEGY.md` | No |
-| **Complete strategy** | Kernel + market + data sources + universe + timeframe + parameters + risk boundaries | Yes, after checks and publication |
-| **StrategyVersion** | Immutable snapshot of a complete strategy for validation, execution, and audit | Published versions only |
+| **Strategy kernel** | Python implementation, input/output schemas, data dependencies, parameter declarations, and `STRATEGY.md` | Cannot run without a configuration |
+| **Complete strategy** | Kernel + market + data sources + stock universe + schedule + parameters + risk boundaries | Runnable after checks and publication |
+| **StrategyVersion** | Immutable snapshot of a complete strategy | Sole version reference for validation, runs, and audit |
 
-One kernel can produce multiple complete strategies, making it possible to compare markets, timeframes, and parameter sets without hard-coding runtime configuration into the strategy implementation.
+One kernel can produce multiple complete strategies for different markets, schedules, or parameters without hard-coding runtime assumptions into strategy code.
 
-## Core lifecycle
+## How it works
 
 ```mermaid
 flowchart LR
-    A["Strategy generation guide<br/>with the live data catalog"] --> B["Codex / Claude Code<br/>generates a Python package"]
-    B --> C["Upload strategy kernel<br/>contract and safety checks"]
-    C --> D["Create runtime configuration<br/>market · data · timeframe · parameters"]
-    D --> E["Check strategy"]
-    E --> F{"Historical replay<br/>optional"}
-    F --> G["Publish<br/>freeze StrategyVersion"]
-    E --> G
-    G --> H["Validation center<br/>experiments and version comparison"]
-    G --> I["Run center<br/>one-off or continuous research runs"]
+    IDEA["Strategy idea"] --> PKG["Python package"]
+    PKG --> CHECK["Contract and safety checks"]
+    DATA["Markets and data sources"] --> CONFIG["Runtime configuration"]
+    CHECK --> CONFIG
+    CONFIG --> VERSION["Immutable version"]
+    VERSION --> VALIDATE["Historical validation"]
+    VERSION --> RUN["Research run"]
+    VALIDATE --> EVIDENCE["Traceable evidence"]
+    RUN --> EVIDENCE
 ```
 
-- **Check strategy** validates kernel readiness, contracts, dependencies, market compatibility, and runtime configuration.
-- **Historical replay** can run before publication or against an already published historical version. It is optional.
-- **Publication** freezes a definition; it does not prove that the strategy is effective.
-- **Run center** executes published strategies and retains run records. Current runs are research runs, not simulated or live trading.
-
-### Platform architecture
-
-```mermaid
-flowchart TB
-    subgraph Inputs["Platform inputs"]
-        DC["Data center<br/>market data · news · fundamentals · extensions"]
-        PKG["Strategy package<br/>Python + schemas + STRATEGY.md"]
-    end
-
-    subgraph Governance["Strategy governance"]
-        KR["Strategy kernel library"]
-        CFG["Runtime configuration"]
-        VER["Immutable StrategyVersion"]
-    end
-
-    subgraph Products["Validation and execution"]
-        VAL["Validation center<br/>OHLCV replay · version comparison"]
-        RUN["Run center<br/>one-off · continuous · run history"]
-        RES["Single-stock research"]
-        SCAN["Stock screening"]
-    end
-
-    PKG --> KR
-    KR --> CFG
-    DC --> CFG
-    CFG --> VER
-    VER --> VAL
-    VER --> RUN
-    VER --> RES
-    VER --> SCAN
-```
-
-## Three strategy outputs
-
-Each strategy declares exactly one product purpose and its corresponding output contract:
-
-| Purpose | Output contract | Product entry | Current status |
-| --- | --- | --- | --- |
-| Single-stock research `research_report` | `ResearchReport` | Single-stock research | Published-version selection, tasks, and report records are connected |
-| Stock screening `candidate_screening` | `CandidateList` | Stock screening | Published-version selection, tasks, and candidate records are connected |
-| Trading decision `trading_decision` | `DecisionProposal` | Validation center and run center | Observational replay and research runs are connected; no orders are created |
-
-A `DecisionProposal` is a research proposal, not an order, fill, position, or direct execution instruction.
-
-## Ready-to-use strategies
-
-The platform initializes three ordinary strategy kernels in the real database and provides one A-share runtime configuration for each. They use the same model and product entries as uploaded strategies and are not placed in a special category.
-
-| Strategy | Purpose | Implementation | Key dependencies |
-| --- | --- | --- | --- |
-| **Single-stock research strategy** | Produce a structured report for one security | Multi-source evidence preparation, deterministic analysis, and LLM report generation | Daily bars, news, and fundamentals may degrade according to the real execution contract |
-| **Multi-factor screening strategy** | Produce a ranked candidate list from a market snapshot | Hard filters, factor scoring, optional LLM reranking, and failure fallback | Full-market snapshot required; historical bars, news, and fundamentals optional |
-| **Research decision baseline** | Produce a research-oriented trading decision proposal | Candidate screening, reproducible OHLCV rules, and a decision kernel | Market data capable of producing candidates required; news and fundamentals optional |
-
-The research decision baseline becomes immediately replayable only when enough real local historical data exists to freeze a fixed universe. The system does not invent securities, prices, or backtest results.
-
-## Main pages
-
-| Page | Route | Responsibility |
-| --- | --- | --- |
-| Strategy overview | `/overview` | Summarize real strategy, validation, run, and data-source state |
-| Strategy center | `/strategies` | Manage kernels, complete strategies, versions, copies, checks, publication, and deletion |
-| Strategy generation guide | `/strategy-development` | Build a dynamic development prompt for Codex or Claude Code |
-| Validation center | `/backtests` | Run OHLCV historical replay for decision strategies and compare trusted versions |
-| Run center | `/runs` | Execute published decision strategies and inspect one-off or continuous run records |
-| Data center | `/data` | Inspect sources, market labels, connection configuration, and availability |
-| Single-stock research | `/stock-research` | Select a published research strategy and produce a report |
-| Stock screening | `/screening` | Select a published screening strategy and inspect candidates |
-| Model usage | `/usage` | Inspect model usage and traceable strategy/run attribution |
-| Platform settings | `/settings` | Configure model runtime, authentication, and platform-level runtime settings |
+- **Strategy checks** validate kernel state, input/output contracts, data dependencies, market compatibility, and runtime configuration.
+- **Historical validation** freezes the version and data snapshot, then persists observational experiment results. It can run before publication or revisit a published version later.
+- **Publication** means only that the strategy definition is frozen. It does not mean the strategy has been proven effective.
+- **Research runs** retain each run's input, version, status, and output. They are not paper trading or live trading.
 
 ## Quick start
 
@@ -144,7 +81,7 @@ The research decision baseline becomes immediately replayable only when enough r
 ### Local startup
 
 ```bash
-git clone git@github.com:EthanAlgoX/LLM-TradeBot.git
+git clone https://github.com/EthanAlgoX/LLM-TradeBot.git
 cd LLM-TradeBot
 
 python3 -m venv .venv
@@ -161,18 +98,15 @@ cd ../..
 python main.py --serve-only --host 127.0.0.1 --port 8000
 ```
 
-Open:
+After startup, open:
 
-- Web: <http://127.0.0.1:8000>
-- API docs: <http://127.0.0.1:8000/docs>
+- Web console: <http://127.0.0.1:8000>
+- API documentation: <http://127.0.0.1:8000/docs>
 
-To use a different port:
+> You can browse strategy, data, and validation pages without an LLM configuration. Runs that require a model stop explicitly and request configuration instead of bypassing safety limits.
 
-```bash
-python main.py --serve-only --host 127.0.0.1 --port 8001
-```
-
-### Frontend and backend development
+<details>
+<summary><strong>Frontend and backend development</strong></summary>
 
 ```bash
 # Terminal 1: FastAPI
@@ -183,48 +117,100 @@ cd apps/dsa-web
 npm run dev
 ```
 
-The development frontend runs at <http://127.0.0.1:5173> and proxies `/api` to `http://127.0.0.1:8000`.
+The frontend runs at <http://127.0.0.1:5173> and proxies `/api` to `http://127.0.0.1:8000`.
 
-> You can browse strategy, data, and validation pages without an LLM configuration. Model-dependent runs stop with an explicit configuration prompt; the safety restriction is never bypassed.
+</details>
+
+<details>
+<summary><strong>Docker startup</strong></summary>
+
+```bash
+cp .env.example .env
+docker compose -f docker/docker-compose.yml up -d server
+```
+
+See the [deployment guide](DEPLOY_EN.md) for complete options.
+
+</details>
+
+## Core capabilities
+
+| Capability | What the platform provides | Key boundary |
+| --- | --- | --- |
+| **Strategy governance** | Drafts, copies, checks, diffs, immutable publication, and deletion | Published versions cannot be edited in place |
+| **Package runtime** | ZIP upload, static checks, archiving, and restricted Python subprocess invocation | Not a general-purpose container sandbox |
+| **Data orchestration** | Multi-market source catalog, dependency declarations, runtime configuration, and fallback | Never fabricates missing quotes or historical universes |
+| **Historical validation** | Local OHLCV observational replay, experiment history, and version comparison | A completed replay does not prove strategy effectiveness |
+| **Research runs** | One-off and continuous runs, status history, version attribution, and retained results | Produces no orders, fills, or positions |
+| **Research products** | Single-stock research, candidate screening, and decision proposals | Every result retains its source and run attribution |
+
+### Three strategy outputs
+
+Each strategy declares exactly one product purpose and output contract:
+
+| Strategy purpose | Output contract | Product entry point |
+| --- | --- | --- |
+| Single-stock research `research_report` | `ResearchReport` | Structured reports and history |
+| Candidate screening `candidate_screening` | `CandidateList` | Candidate lists and source records |
+| Trading decision `trading_decision` | `DecisionProposal` | Observational replay and research runs in Validation Center and Run Center |
+
+A `DecisionProposal` is a research proposal, not an order, fill, or position instruction.
+
+### Ready-to-use strategies
+
+The platform initializes three ordinary strategy kernels in the real database. They use the same models, versioning, and product entry points as uploaded strategies.
+
+| Strategy | Purpose | Implementation basis |
+| --- | --- | --- |
+| **Single-stock research strategy** | Produce a structured equity research report | Multi-source evidence, deterministic analysis, and LLM report generation |
+| **Multi-factor screening strategy** | Produce candidates from a market snapshot | Hard filters, factor scoring, optional LLM reranking, and failure fallback |
+| **Research decision baseline** | Produce a research decision proposal | Candidate selection, reproducible OHLCV rules, and a decision kernel |
+
+The system creates a replayable fixed universe only when sufficient real local market history exists. It never invents symbols, quotes, or backtest results.
+
+### Main pages
+
+| Page | Route | Purpose |
+| --- | --- | --- |
+| Strategy Overview | `/overview` | Summarize strategy, validation, run, and data-source status |
+| Strategy Center | `/strategies` | Manage strategies, configurations, versions, checks, and publication |
+| Strategy Generation Guide | `/strategy-development` | Generate development instructions containing the current data catalog |
+| Validation Center | `/backtests` | Run OHLCV historical replay and compare experiments and versions |
+| Run Center | `/runs` | Run published strategies and inspect one-off or continuous history |
+| Data Center | `/data` | Inspect sources, market labels, connection settings, and availability |
+| Single-stock Research | `/stock-research` | Select a published strategy and produce a structured report |
+| Screening | `/screening` | Select a published strategy and produce a candidate list |
+| Model Usage | `/usage` | Inspect model usage and traceable attribution |
+| Platform Settings | `/settings` | Configure model runtimes, authentication, and platform parameters |
 
 ## Strategy package intake
 
-1. Confirm the desired data sources and market labels in the data center.
-2. Open the strategy generation guide and copy the dynamic instructions containing the current data catalog.
-3. Give the instructions and your strategy idea to Codex, Claude Code, or another engineering tool.
-4. Generate a ZIP package containing `strategy.yaml`, `strategy.py`, schemas, tests, and `STRATEGY.md`.
-5. Upload the kernel in the strategy center and create an independent runtime configuration.
-6. Check the strategy, optionally run historical replay, and publish it.
+1. Confirm the target market and sources in Data Center.
+2. Open Strategy Generation Guide and copy its dynamic instructions, including the current data catalog.
+3. Give those instructions and your strategy idea to Codex, Claude Code, or another engineering tool.
+4. Receive a ZIP package containing `strategy.yaml`, `strategy.py`, schemas, tests, and `STRATEGY.md`.
+5. Upload the kernel in Strategy Center, create an independent runtime configuration, and run checks.
+6. Perform historical validation when needed, then publish an immutable version.
 
-Every strategy package has one execution entry point:
+The strategy package has one execution entry point:
 
 ```python
 def run(context: StrategyContext) -> StrategyResult:
     ...
 ```
 
-See the [strategy package specification](strategy-package-spec.md) for the complete manifest, minimum output fields, and restricted execution model.
+See the [strategy package specification](strategy-package-spec.md) for the full manifest, schemas, minimum output fields, and restricted-execution rules.
 
 ## Capability boundaries
 
-### Available today
+### Explicitly out of scope today
 
-- Strategy and StrategyVersion drafts, checks, optimistic concurrency, immutable publication, copies, diffs, and deletion.
-- Python ZIP package upload, static checks, archival, and restricted subprocess invocation.
-- Data-source catalog, market labels, dependency declarations, and runtime-configuration binding.
-- Version attribution and timestamps for research, screening, validation, and strategy-run records.
-- Real local OHLCV observational replay and trusted version comparison for decision strategies.
-- One-off and continuous research-run controls for published decision strategies.
+- Broker connectivity, automatic order placement, orders, fills, positions, and cash ledgers.
+- Paper-trading matching, real-return monitoring, or automated risk approval.
+- Fabricating point-in-time universes for dynamic screening strategies when historical constituents are unavailable.
+- Presenting the restricted Python subprocess as a general sandbox for arbitrary untrusted code.
 
-### Not implemented or explicitly out of scope
-
-- Broker connections, live orders, fills, positions, and cash ledgers.
-- Simulated matching, live P&L monitoring, and automatic risk approval.
-- Dedicated historical validation engines for `ResearchReport` and `CandidateList`.
-- Fabricated historical constituents for arbitrary dynamic-screening strategies. Formal replay stops when historical universe data is unavailable.
-- A general-purpose container sandbox. Strategy packages use a static allowlist, an isolated `python -I` subprocess, a clean environment, and resource limits; this must not be treated as a safe container for arbitrary untrusted code.
-
-“Replay completed” means that a trusted observational experiment executed successfully. It is not automatically upgraded to “strategy validated.” See [StrategyVersion historical validation](strategy-version-validation.md) for the detailed semantics.
+“Replay completed” means only that a trustworthy observational experiment executed successfully. It does not automatically become “strategy validated.” See [StrategyVersion historical validation](strategy-version-validation.md) for exact semantics.
 
 ## Technology stack
 
@@ -232,27 +218,42 @@ See the [strategy package specification](strategy-package-spec.md) for the compl
 | --- | --- |
 | Web | React 19, TypeScript, Vite, React Router, Tailwind CSS, Recharts, Vitest, Playwright |
 | API | FastAPI, Pydantic, Uvicorn |
-| Services and storage | Python, SQLAlchemy, SQLite, local package archives |
-| Data adapters | Existing AkShare, Tushare, Baostock, YFinance, and Longbridge adapters with fallback routing |
-| Strategy execution | Restricted Python subprocess, standardized contracts, version snapshots |
+| Services and storage | Python, SQLAlchemy, SQLite, local file archives |
+| Data adapters | AkShare, Tushare, Baostock, YFinance, Longbridge, and existing fallback chains |
+| Strategy execution | Restricted Python subprocesses, standardized I/O contracts, immutable version snapshots |
 
-## Repository structure
+<details>
+<summary><strong>Repository structure</strong></summary>
 
 ```text
 LLM-TradeBot/
 ├── api/                    # FastAPI routes, schemas, and middleware
 ├── apps/dsa-web/           # React / TypeScript web console
 ├── apps/dsa-desktop/       # Electron desktop app
-├── src/services/           # Strategy, validation, run, data, and report services
+├── src/core/               # Analysis and runtime orchestration
+├── src/services/           # Strategy, validation, data, and report services
 ├── src/schemas/            # Backend domain schemas
-├── data_provider/          # Market and third-party data adapters
+├── data_provider/          # Market-data and third-party adapters
 ├── tests/                  # Python tests
-├── docs/                   # Strategy contracts, validation semantics, and topic guides
+├── docs/                   # Configuration, contracts, validation, and topic docs
 ├── main.py                 # CLI and Web/API entry point
 └── server.py               # FastAPI ASGI entry point
 ```
 
-## Development and testing
+</details>
+
+## Documentation
+
+| Topic | Documents |
+| --- | --- |
+| Documentation map | [Documentation center](INDEX_EN.md) |
+| Strategy intake | [Strategy package specification](strategy-package-spec.md) · [Strategy architecture](strategy-architecture.md) |
+| Validation semantics | [StrategyVersion historical validation](strategy-version-validation.md) |
+| Configuration and models | [Full guide](full-guide_EN.md) · [LLM configuration guide](LLM_CONFIG_GUIDE_EN.md) |
+| Deployment and desktop | [Deployment guide](DEPLOY_EN.md) · [Desktop packaging](desktop-package.md) |
+| Development and testing | [Testing guide](testing.md) · [Contribution guide](CONTRIBUTING_EN.md) |
+
+### Development validation
 
 ```bash
 # Backend quality gate
@@ -266,18 +267,12 @@ cd apps/dsa-web
 npm run test
 npm run lint
 npm run build
-
-# Strategy-definition smoke test (with the service running)
-cd ../..
-.venv/bin/python scripts/smoke_strategy_definition.py http://127.0.0.1:8000
 ```
-
-See [docs/testing.md](testing.md) for additional testing guidance.
 
 ## License
 
-This repository is distributed under the included [MIT License](../LICENSE). Existing copyright and third-party license notices must be retained.
+This project is licensed under the [MIT License](../LICENSE). Original copyright notices and third-party licenses must be preserved.
 
 ## Disclaimer
 
-This project is intended for software engineering, strategy research, and historical validation only. It is not investment advice. Historical replay, research reports, and model outputs do not guarantee future performance. Users are solely responsible for their investment decisions and outcomes.
+This project is for software engineering, strategy research, and historical validation only. It is not investment advice. Historical replays, research reports, and model outputs do not guarantee future performance. Users are responsible for their own trading decisions and outcomes.
